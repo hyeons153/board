@@ -1,0 +1,11 @@
+node_modules/
+.npm-cache/
+dist/
+.env*
+!.env.example
+.longboard/
+.longboard-test-*/
+.vercel/
+.neon
+.codex/
+*.log

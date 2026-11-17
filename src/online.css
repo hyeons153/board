@@ -1,0 +1,59 @@
+/* Retirement, accounts, and public records */
+.account-form { display: grid; gap: .8rem; width: min(100%, 430px); margin: .8rem 0 0; }
+.account-form label, .search-form label, .online-controls > label:not(.checkbox-line) { display: grid; gap: .3rem; }
+.account-form .button { justify-self: start; }
+.account-page .content-panel > p + p { margin-top: .55rem; }
+.account-tabs { margin-bottom: .75rem; }
+.form-error { background: #fae5de; color: #7b382f; border: 1px solid #e8bcb0; border-radius: 8px; padding: .6rem .75rem; }
+.account-identity { display: flex; align-items: center; gap: .65rem; padding: .7rem .8rem; margin: .65rem 0 0; border: 1px solid #d0d8e0; border-radius: 9px; background: #eef1f7; }
+.account-identity > svg { color: #477858; }
+.account-identity > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.account-identity .pixel-rider { width: 48px; height: 49px; }
+.account-identity p { font-size: .79rem; }
+.retirement-summary { background: #f7ebdc; padding: .8rem; border: 1px solid #e4c9a9; border-radius: 9px; margin-top: .7rem; }
+.retirement-summary p { margin: .35rem 0; font-size: .84rem; }
+.retirement-summary details .pill-row { margin-top: .45rem; }
+.archive-title .pixel-rider { width: 48px; height: 49px; border-radius: 8px; background: #eae7f5; }
+.online-controls { display: flex; flex-wrap: wrap; align-items: end; gap: .55rem .75rem; margin: .95rem 0; }
+.search-form { display: flex; gap: .45rem; align-items: flex-end; }
+.search-form input { width: min(215px, 44vw); }
+.online-controls .checkbox-line { padding: .5rem .25rem; }
+.online-controls select { min-height: 42px; }
+.rules-note { background: #edf2f6; padding: .65rem .75rem; border: 1px solid #c7d8e7; border-radius: 8px; margin: .65rem 0; font-size: .84rem; }
+.my-ranking { display: grid; gap: .35rem; background: #ecf2df; border: 1px solid #cdd9bc; border-radius: 9px; padding: .6rem .75rem; margin: .7rem 0; }
+.my-ranking p { font-size: .82rem; }
+.public-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+.public-card { display: flex; align-items: center; gap: .5rem; min-width: 0; text-align: left; background: #f8f1e4; border: 1px solid #e0d3bd; border-radius: 9px; padding: .5rem; }
+.public-card:hover { background: #e5efe3; border-color: #9cb19c; }
+.public-card .pixel-rider { width: 51px; height: 52px; flex: none; background: #e9e9f7; border-radius: 8px; }
+.public-card > div { display: grid; gap: .18rem; flex: 1; min-width: 0; }
+.public-card strong { overflow-wrap: anywhere; }
+.public-card > div > span { font-size: .81rem; color: #37435f; }
+.public-card > .tag { flex: none; }
+.pagination { display: flex; justify-content: center; align-items: center; gap: .75rem; margin-top: .9rem; font-size: .8rem; }
+.public-hero { margin: .65rem 0; display: flex; align-items: center; gap: .8rem; background: linear-gradient(115deg,#e5ecd5,#f3e5dc); padding: .75rem; border: 1px solid #d1d6c2; border-radius: 11px; }
+.public-hero h2 { font-size: clamp(1.4rem, 5vw, 2.5rem); }
+.public-hero p { margin-bottom: .35rem; }
+.public-hero .pixel-rider { width: 90px; height: 91px; flex: none; }
+.public-subhead { margin-top: 1rem; font-size: .97rem; }
+.public-routine { padding-left: 1.55rem; margin: .45rem 0; font-size: .86rem; }
+.ceremony { overflow: hidden; margin: 1rem auto; max-width: 1040px; }
+.ceremony-stage { position: relative; min-height: clamp(205px, 38vw, 415px); overflow: hidden; background: #344358; }
+.ceremony-legend .ceremony-stage { box-shadow: inset 0 0 0 3px #e9c565; }
+.ceremony-stage .spot-title p { max-width: 26rem; font-size: .91rem; }
+.ceremony-content { padding: clamp(.85rem, 2vw, 1.45rem); }
+.ceremony-content blockquote { margin: 0; padding: .7rem .9rem; border-left: 4px solid #9f88bd; background: #eee8f8; border-radius: 0 7px 7px 0; }
+.epilogue { background: #ede9f7; padding: .65rem; border-radius: 8px; margin-top: .7rem; }
+.top-status .button { max-width: 155px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media(max-width:640px){
+  .start-top { flex-wrap: wrap; justify-content: flex-end; gap: .3rem; }
+  .public-grid { grid-template-columns: 1fr; }
+}
+@media(max-width:475px){
+  .sidebar nav { grid-template-columns: repeat(9,minmax(0,1fr)); }
+  .topbar { gap: .35rem; }
+  .top-status { gap: .32rem; }
+  .top-status .store-state { display: none; }
+  .top-status .button { max-width: 110px; }
+  .account-identity { flex-wrap: wrap; }
+}
