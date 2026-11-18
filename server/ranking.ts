@@ -2,11 +2,12 @@ import { CALENDAR, RULES } from '../src/game/data.js';
 import { simulateRun } from '../src/game/competition.js';
 import { equippedLook, freshExtras } from '../src/game/economy.js';
 import { chooseEnding, endingName, summarize } from '../src/game/legacy.js';
+import { divisionFor } from '../src/game/career.js';
 import { DISCIPLINES, DIVISIONS, type Archive, type MeetRecord, type Result } from '../src/game/types.js';
 import { RANKING_VERSION, type Metric, type PublicProfile, type Scope } from '../src/game/public.js';
 
 export type RankEntry={metric:Metric;scope:Scope;score:number};
-const divisionWeight={rookie:1,regular:1.5,open:2.25};
+const divisionWeight={rookie:1,regular:1.5,open:2.25,master:3};
 const allowedPlace=[1,.72,.52,.32,.23,.16,.10];
 
 function canonical(value:unknown):string {
@@ -72,7 +73,7 @@ export function publicationFor(archive:Archive):{profile:PublicProfile;entries:R
     return best?[[d,best.proof?.routine??best.run.log.map(frame=>frame.id)]]:[];
   }));
   return {entries,profile:{name:archive.name,look:equippedLook(archive),title:endingName(ending),year:archive.year,week:archive.week,
-    complete,division:archive.year>=4?'open':archive.year>=2?'regular':'rookie',stats:archive.stats,
+    complete,division:divisionFor(archive.year),stats:archive.stats,
     skills:summary.learned.map(skill=>({id:skill.id,mastery:archive.skills[skill.id].mastery})),signature:summary.favorite?.id,
     wins:summary.wins,podiums:summary.podiums,meets:summary.meets,best:summary.best,points:summary.points,careerPoints,
     ending, routines, official:entries.length>0,historic:verified.length!==all.length||archive.rankedStart!==RANKING_VERSION}};

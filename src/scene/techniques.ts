@@ -1,5 +1,6 @@
 import type { MoveLog, Outcome, Plan, Rider } from '../game/types';
 import type { Motion } from './motion';
+import { RULES } from '../game/data';
 
 const TAU=Math.PI*2;
 export const ACTOR_WIDTH=224, ACTOR_HEIGHT=136;
@@ -191,7 +192,7 @@ export function headingsBefore(log:MoveLog[],at:number){
   return {bodyHeading,boardHeading};
 }
 
-export function trainingTechnique(r:Pick<Rider,'plan'|'routines'|'skills'>,elapsedSeconds:number):Technique|undefined {
+export function trainingTechnique(r:Pick<Rider,'plan'|'routines'|'skills'>,elapsedSeconds:number,duration=RULES.weekMs/1000):Technique|undefined {
   const plan:Plan|null=r.plan;if(!plan)return;
   let ids:string[]=[];
   if(plan.skill)ids=[plan.skill];
@@ -199,6 +200,6 @@ export function trainingTechnique(r:Pick<Rider,'plan'|'routines'|'skills'>,elaps
   else if(plan.action==='dance'||plan.action==='link')ids=['peter-pan','cross','step-180'];
   else if(plan.action==='trick')ids=['no-comply','shuvit'];
   if(!ids.length)return;
-  const index=Math.floor(elapsedSeconds/4)%ids.length;
-  return {id:ids[index],progress:elapsedSeconds%4/4,rate:.25,loop:true};
+  const total=Math.max(.1,duration),cycle=total/ids.length,elapsed=Math.min(total-.00001,Math.max(0,elapsedSeconds)),index=Math.floor(elapsed/cycle);
+  return {id:ids[index],progress:(elapsed-index*cycle)/cycle,rate:1/cycle,loop:false};
 }

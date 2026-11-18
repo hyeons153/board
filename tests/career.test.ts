@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CALENDAR, DEFAULT_LOOK, RULES, SKILL, SKILLS } from '../src/game/data';
-import { command, GameError, newRider, processWeek } from '../src/game/career';
+import { command, divisionFor, GameError, newRider, processWeek } from '../src/game/career';
 import { chance, generateRoutine, learned, routineTime, simulateMeet, simulateRun, validRoutine } from '../src/game/competition';
 import { ECONOMY, equippedLook, extras, playerPlace, SPONSOR } from '../src/game/economy';
-import { previewTraining, trainingSuccess } from '../src/game/training';
+import { previewTraining, statAfter, trainingSuccess } from '../src/game/training';
 import { pickEvent } from '../src/game/events';
 import { seeded } from '../src/game/random';
 import { advance, blankSave, remaining } from '../server/clock';
@@ -12,8 +12,41 @@ import { DISCIPLINES, STATS, type Career, type Plan } from '../src/game/types';
 
 const identity=()=>({id:'rider-1',seed:5411});
 const career=():Career=>({rider:newRider(identity().id,identity().seed,'리버',{...DEFAULT_LOOK}),hall:[]});
-const plan=(p:Plan['action']):Plan=>({action:p,spot:'river',intensity:'safe'});
-const enterAuto=(c:Career)=>command(c,{type:'settings',settings:{mode:'auto',strategy:'freestyle',intensity:'normal',entries:[...DISCIPLINES]}},identity);
+const plan=(p:Plan['action']):Plan=>({action:p,spot:'river'});
+const enterAuto=(c:Career)=>command(c,{type:'settings',settings:{mode:'auto',strategy:'freestyle',entries:[...DISCIPLINES]}},identity);
+
+test('career divisions follow the four age groups and stats grow above 100 up to 200',()=>{
+  assert.deepEqual(Array.from({length:9},(_,year)=>divisionFor(year)),['rookie','rookie','regular','regular','open','open','master','master','master']);
+  assert.equal(RULES.statCap,200);
+  assert.equal(statAfter(199.9,1000),200);
+  assert.equal(statAfter(200,10),200);
+  let successes=0;
+  for(let seed=1;seed<=12;seed++){
+    const c:Career={rider:newRider('uncapped-'+seed,seed,'Master',DEFAULT_LOOK),hall:[]},r=c.rider!;
+    r.year=6;r.week=3;r.stats={speed:150,carve:200,link:180,balance:200};
+    const preview=previewTraining(r,plan('speed')),before=r.stats.speed;
+    assert.ok(preview.gains.speed!.min>0);
+    command(c,{type:'plan',plan:plan('speed')},identity);processWeek(c);
+    if(r.stats.speed>before){successes++;assert.ok(r.stats.speed-before<=preview.gains.speed!.max+.00001);}
+    assert.ok(STATS.every(stat=>r.stats[stat]>=0&&r.stats[stat]<=200));
+    assert.ok(r.energy<=100);assert.ok(Object.values(r.skills).every(skill=>skill.study<=100&&skill.mastery<=100));
+  }
+  assert.ok(successes>=10);
+});
+
+test('main map movement persists freely and exposes the actual spot growth bonus',()=>{
+  let save=advance(blankSave(),{type:'create',name:'Map rider',look:DEFAULT_LOOK},'first',0,RULES.weekMs,identity);
+  const before=structuredClone(save.career.rider!);
+  save=advance(save,{type:'spot',spot:'plaza'},'first',0,RULES.weekMs,identity);
+  const r=save.career.rider!;
+  assert.equal(r.spot,'plaza');assert.equal(r.week,before.week);assert.equal(r.energy,before.energy);assert.equal(r.plan,null);
+  const boosted=previewTraining(r,{action:'trick',spot:'plaza'}),neutral=previewTraining(r,{action:'trick',spot:'river'});
+  assert.ok(boosted.gains.balance!.max>neutral.gains.balance!.max);
+  assert.throws(()=>advance(save,{type:'spot',spot:'night'},'first',0,RULES.weekMs,identity),GameError);
+  save=advance(JSON.parse(JSON.stringify(save)),{type:'plan',plan:{action:'trick',spot:'plaza'}},'first',0,RULES.weekMs,identity);
+  assert.equal(save.career.rider!.plan!.spot,'plaza');
+  assert.throws(()=>advance(save,{type:'spot',spot:'river'},'first',1,RULES.weekMs,identity),GameError);
+});
 
 test('direct training spends energy, pauses for an event and awards progress only once',()=>{
   const c=career(),r=c.rider!;
@@ -84,10 +117,15 @@ test('eight consecutive seasons yield 48 distinct meets, promotion, resets, and 
       assert.ok(r.seasons[0].scores.dance.player>0);
     }
     if(i===52*3-1)assert.equal(r.season.division,'open');
+    if(i===52*5-1)assert.equal(r.season.division,'master');
   }
   assert.equal(r.phase,'retired');
   assert.equal(c.hall.length,1);
   assert.equal(c.hall[0].reason,'complete');
+  assert.equal(r.year,8);assert.equal(r.week,52);
+  assert.equal(r.records.at(-1)!.division,'master');
+  assert.equal(r.records.at(-1)!.id,CALENDAR.at(-1)!.id);
+  assert.deepEqual(r.seasons.map(season=>season.division),['rookie','regular','regular','open','open','master','master','master']);
   assert.equal(c.hall[0].seasons.length,8);
   assert.equal(c.hall[0].records.length,48);
   assert.equal(new Set(r.records.map(m=>m.year+'-'+m.id)).size,48);
@@ -118,7 +156,7 @@ test('equipment, lesson fees, and locked spots are enforced by the career comman
   assert.equal(equippedLook(r).shoes,3);
   assert.equal(equippedLook(r).deckDesign,1);
   const before=r.money;
-  command(c,{type:'plan',plan:{action:'dance',intensity:'normal',spot:'studio',skill:'mango',lesson:true}},identity);
+  command(c,{type:'plan',plan:{action:'dance',spot:'studio',skill:'mango',lesson:true}},identity);
   assert.equal(r.money,before);
   processWeek(c);
   assert.equal(r.money,before-ECONOMY.lesson+RULES.weeklyAllowance);
@@ -129,7 +167,7 @@ test('specific story choices pause auto mode and unlock follow-up dialogue',()=>
   const c=career(),r=c.rider!;
   r.week=11;
   r.relations.yu=8;
-  r.settings={mode:'auto',strategy:'dance',intensity:'normal',entries:[],pauseStory:true};
+  r.settings={mode:'auto',strategy:'dance',entries:[],pauseStory:true};
   assert.ok(processWeek(c));
   assert.equal(r.event,'mango-lesson');
   assert.equal(r.phase,'event');
@@ -176,19 +214,19 @@ test('sponsors pay once per season, award equipment and pay a recorded podium bo
   assert.equal(extras(r).inventory.filter(item=>item===brand.gift).length,1);
 });
 
-test('each confirmed action takes four seconds, survives reload and awards one result before any event',()=>{
-  const week=RULES.weekMs;assert.equal(week,4000);
-  let save=advance(blankSave(),{type:'create',name:'Four seconds',look:DEFAULT_LOOK},'first',0,week,identity);
+test('each confirmed action takes two seconds, survives reload and awards one result before any event',()=>{
+  const week=RULES.weekMs;assert.equal(week,2000);
+  let save=advance(blankSave(),{type:'create',name:'Two seconds',look:DEFAULT_LOOK},'first',0,week,identity);
   save=advance(save,{type:'pulse'},'first',300000,week,identity);
   assert.equal(save.career.rider!.week,1);assert.equal(remaining(save,week,300000),0);
   save=advance(save,{type:'plan',plan:plan('speed')},'first',300000,week,identity);
-  assert.equal(remaining(save,week,300000),4000);
+  assert.equal(remaining(save,week,300000),2000);
   save=advance(save,{type:'fast-forward',enabled:true},'other',301000,week,identity);
-  assert.equal(remaining(save,week,301000),3000);
-  save=advance(save,{type:'pulse'},'other',303999,week,identity);
+  assert.equal(remaining(save,week,301000),1000);
+  save=advance(save,{type:'pulse'},'other',301999,week,identity);
   assert.equal(save.career.rider!.stats.speed,18);
-  assert.throws(()=>advance(save,{type:'plan',plan:plan('rest')},'other',303999,week,identity),GameError);
-  save=advance(JSON.parse(JSON.stringify(save)),{type:'pulse'},'reopened',304000,week,identity);
+  assert.throws(()=>advance(save,{type:'plan',plan:plan('rest')},'other',301999,week,identity),GameError);
+  save=advance(JSON.parse(JSON.stringify(save)),{type:'pulse'},'reopened',302000,week,identity);
   assert.ok(save.clock.pendingTraining);assert.ok(save.career.rider!.stats.speed>18);
   const snapshot=structuredClone(save);
   assert.deepEqual(advance(save,{type:'pulse'},'reopened',900000,week,identity),snapshot);
@@ -204,10 +242,17 @@ test('automatic play performs one action at a time and waits for its result and 
   for(const final of [false,true]){
     let save=advance(blankSave(),{type:'create',name:'Automatic',look:DEFAULT_LOOK},'first',0,week,identity);
     save.career.rider!.week=final?52:7;save.career.rider!.year=final?8:1;
-    save=advance(save,{type:'settings',settings:{mode:'auto',strategy:'balanced',intensity:'safe',entries:['dance','trick']}},'first',0,week,identity);
+    save=advance(save,{type:'settings',settings:{mode:'auto',strategy:'balanced',entries:['dance','trick']}},'first',0,week,identity);
     const selected=structuredClone(save.career.rider!.plan);assert.ok(selected);
+    const choice=save.clock.pendingChoice!;assert.ok(choice);
+    assert.equal(remaining(save,week,0),0);
+    assert.deepEqual(advance(save,{type:'pulse'},'other',100000,week,identity),save,'No unseen training before the selection scene is acknowledged');
+    assert.throws(()=>advance(save,{type:'start-training',record:'wrong'},'first',2000,week,identity),GameError);
     save=advance(save,{type:'settings',settings:{...save.career.rider!.settings,strategy:'trick'}},'first',1000,week,identity);
     assert.deepEqual(save.career.rider!.plan,selected);
+    save=advance(JSON.parse(JSON.stringify(save)),{type:'start-training',record:choice},'first',2000,week,identity);
+    assert.equal(remaining(save,week,2000),2000);assert.equal(save.clock.pendingChoice,undefined);
+    assert.throws(()=>advance(save,{type:'start-training',record:choice},'first',2001,week,identity),GameError);
     save=advance(save,{type:'pulse'},'first',100000,week,identity,true);
     assert.equal(save.career.rider!.records.length,1);assert.ok(save.clock.pendingTraining);assert.ok(save.clock.pendingMeet);
     assert.equal(save.career.rider!.phase,final?'retired':'plan');
@@ -216,8 +261,23 @@ test('automatic play performs one action at a time and waits for its result and 
     assert.ok(save.clock.pendingMeet);assert.equal(save.career.rider!.plan,null);
     save=advance(save,{type:'continue-meet',record:save.clock.pendingMeet!},'first',1000000,week,identity);
     assert.equal(save.clock.pendingMeet,undefined);
-    assert.equal(remaining(save,week,1000000),final?0:4000);
+    assert.equal(remaining(save,week,1000000),0);
+    assert.equal(!!save.clock.pendingChoice,!final);
   }
+});
+
+test('retired training intensity has no effect and automatic choice can be cancelled without consuming a week',()=>{
+  const variants=['safe','normal','focus'].map(intensity=>{
+    const c=career();const p=Object.assign(plan('speed'),{intensity});
+    command(c,{type:'plan',plan:p},identity);processWeek(c);return c;
+  });
+  assert.deepEqual(variants[0],variants[1]);assert.deepEqual(variants[1],variants[2]);
+  assert.equal('intensity' in variants[0].rider!.lastPlan!,false);
+  let save=advance(blankSave(),{type:'create',name:'Cancel auto',look:DEFAULT_LOOK},'first',0,RULES.weekMs,identity);
+  save=advance(save,{type:'settings',settings:{mode:'auto',strategy:'balanced',entries:[]}},'first',0,RULES.weekMs,identity);
+  assert.ok(save.clock.pendingChoice);
+  save=advance(save,{type:'settings',settings:{...save.career.rider!.settings,mode:'manual'}},'first',1000,RULES.weekMs,identity);
+  assert.equal(save.career.rider!.plan,null);assert.equal(save.clock.pendingChoice,undefined);assert.equal(save.career.rider!.week,1);
 });
 
 test('zero stamina permits all competition entries without changing execution, links, score or automatic line choice',()=>{
@@ -235,7 +295,7 @@ test('zero stamina permits all competition entries without changing execution, l
 });
 
 test('training previews match recovery and successful stat gains while low stamina meaningfully increases failure',()=>{
-  const p:Plan={action:'speed',spot:'river',intensity:'normal'};
+  const p:Plan={action:'speed',spot:'river'};
   const r=career().rider!;
   assert.ok(trainingSuccess({...r,energy:0},p)<.2);assert.ok(trainingSuccess({...r,energy:100},p)>.9);
   let misses=0,successes=0;

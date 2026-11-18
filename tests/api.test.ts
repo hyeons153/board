@@ -42,7 +42,7 @@ test('guest snapshots survive reopening storage; concurrent tournament submissio
     const heartbeatView:View=await heartbeat.json();
     assert.ok(heartbeatView.version>=save.version);
     assert.equal(heartbeatView.stateVersion,save.stateVersion);
-    const planAfterHeartbeat=await post({type:'plan',plan:{action:'speed',intensity:'safe',spot:'river'}},save.version,'http://127.0.0.1',save.stateVersion);
+    const planAfterHeartbeat=await post({type:'plan',plan:{action:'speed',spot:'river'}},save.version,'http://127.0.0.1',save.stateVersion);
     assert.equal(planAfterHeartbeat.status,200,'Clock-only saves must not reject the player choice');
     const staleChoice=await post({type:'fast-forward',enabled:false},save.version,'http://127.0.0.1',save.stateVersion);
     assert.equal(staleChoice.status,409,'A competing player choice must still be protected');

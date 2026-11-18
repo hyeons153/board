@@ -1,11 +1,10 @@
-import type { Family, Meet, Skill, Spot, Action, Stats, Discipline, Division, Intensity, RoutineStyle, Strategy, Look, Progress } from './types.js';
+import type { Family, Meet, Skill, Spot, Action, Stats, Discipline, Division, RoutineStyle, Strategy, Look, Progress } from './types.js';
 
 export const RULES = {
-  weekMs:4_000, weeks:52, years:8, runSeconds:60, transition:1, recovery:2.5,
-  statCap:100, statHeadroom:68, startStats:{ speed:18, carve:16, link:14, balance:20 } satisfies Stats,
+  weekMs:2_000, weeks:52, years:8, runSeconds:60, transition:1, recovery:2.5,
+  statCap:200, statHeadroom:136, startStats:{ speed:18, carve:16, link:14, balance:20 } satisfies Stats,
   startMoney:120_000, weeklyAllowance:3_000, hospitalFee:32_000, safetyFund:15_000,
   statGrowth:2.8, secondaryGrowth:0.7, study:37, mastery:13, restEnergy:41,
-  intensity: { safe:{ gain:.78, cost:.65, risk:.55 }, normal:{ gain:1, cost:1, risk:1 }, focus:{ gain:1.3, cost:1.32, risk:1.65 } },
   energy: { speed:17, carve:17, link:17, balance:15, dance:19, trick:23, rest:0, hospital:0, rehearsal:18 } satisfies Record<Action,number>,
   entryCost:{ dance:20, trick:25, freestyle:30 }, places:[100,75,60,45,35,10], majorMultiplier:1.5,
   prizes:[190_000,130_000,95_000,55_000,40_000,22_000],
@@ -30,9 +29,8 @@ export const RULES = {
 
 export const STAT_NAMES = { speed:'속도', carve:'카빙', link:'연계', balance:'밸런스' };
 export const DISCIPLINE_NAMES: Record<Discipline,string> = { dance:'댄싱', trick:'트릭', freestyle:'프리스타일' };
-export const DIVISION_NAMES: Record<Division,string> = { rookie:'뉴비부', regular:'일반부', open:'오픈부' };
+export const DIVISION_NAMES: Record<Division,string> = { rookie:'뉴비부', regular:'일반부', open:'오픈부', master:'마스터부' };
 export const STRATEGY_NAMES: Record<Strategy,string> = { balanced:'밸런스형', dance:'댄싱 중심', trick:'트릭 중심', freestyle:'프리스타일 중심' };
-export const INTENSITY_NAMES: Record<Intensity,string> = { safe:'안전형', normal:'균형형', focus:'집중형' };
 export const STYLE_NAMES: Record<RoutineStyle,string> = { stable:'안정형', flow:'연계형', score:'고득점형' };
 export const ACTION_NAMES: Record<Action,string> = { speed:'속도 훈련', carve:'카빙 훈련', link:'연계 훈련', balance:'밸런스 훈련', dance:'댄싱 연마', trick:'트릭 연마', rest:'휴식', hospital:'병원 치료', rehearsal:'라인 리허설' };
 export const OUTCOME_NAMES = { miss:'실패', rough:'어설픈 성공', clean:'성공', great:'대성공' };

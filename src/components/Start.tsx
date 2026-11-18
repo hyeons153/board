@@ -40,7 +40,7 @@ export default function Start({onCreate,onHall,onOnline,onAccount,username,hasHa
         <div><Zap size={22}/><span><b>02 / BUILD</b><strong>29개의 기술과 라인</strong><small>배운 기술을 이어 60초의 무대를 만드세요.</small></span></div>
         <div><Flag size={22}/><span><b>03 / COMPETE</b><strong>한 시즌, 여섯 번의 대회</strong><small>뉴비부에서 시작해 오픈부로 올라가세요.</small></span></div>
       </div>
-      <footer className="start-footer"><span><CircleHelp size={14}/> 행동 확인 후 약 4초 수행</span><span>ORIGINAL PIXEL CAREER SIM <ArrowUpRight size={13}/></span></footer>
+      <footer className="start-footer"><span><CircleHelp size={14}/> 행동 확인 후 2초 수행</span><span>ORIGINAL PIXEL CAREER SIM <ArrowUpRight size={13}/></span></footer>
     </main>
   </div>;
 }

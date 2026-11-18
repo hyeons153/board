@@ -1,9 +1,9 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { ACTIONS, DISCIPLINES, INTENSITIES, SPOTS, STRATEGIES, type View } from '../src/game/types.js';
+import { ACTIONS, DISCIPLINES, SPOTS, STRATEGIES, type View } from '../src/game/types.js';
 import { RULES } from '../src/game/data.js';
 import { GEAR_SLOTS } from '../src/game/economy.js';
-import { GameError } from '../src/game/career.js';
+import { divisionFor, GameError } from '../src/game/career.js';
 import { advance, remaining } from './clock.js';
 import { GUEST_SECONDS, type Row, type Store } from './store.js';
 import { AccessError, type OnlineStore } from './databaseStore.js';
@@ -13,14 +13,18 @@ const color=z.number().int().min(0).max(3);
 const look=z.strictObject({hair:color,skin:color,shirt:color,board:color,hairColor:color.optional(),pants:color.optional(),shoes:color.optional(),deckDesign:color.optional()});
 const skill=z.string().max(40).regex(/^[a-z0-9-]+$/);
 const disciplines=z.array(z.enum(DISCIPLINES)).max(3).refine(ds=>new Set(ds).size===ds.length);
+// Older open clients can still submit this retired field; it is discarded.
+const legacyIntensity=z.enum(['safe','normal','focus']).optional();
 const actionSchema=z.discriminatedUnion('type',[
   z.strictObject({type:z.literal('pulse')}),
   z.strictObject({type:z.literal('continue-training'),record:z.string().max(140)}),
+  z.strictObject({type:z.literal('start-training'),record:z.string().max(140)}),
+  z.strictObject({type:z.literal('spot'),spot:z.enum(SPOTS)}),
   z.strictObject({type:z.literal('continue-meet'),record:z.string().max(140)}),
   z.strictObject({type:z.literal('fast-forward'),enabled:z.boolean()}),
   z.strictObject({type:z.literal('create'),name:z.string().trim().min(1).max(16).regex(/^[\p{L}\p{N} _.-]+$/u),look}),
-  z.strictObject({type:z.literal('plan'),plan:z.strictObject({action:z.enum(ACTIONS),spot:z.enum(SPOTS),intensity:z.enum(INTENSITIES),skill:skill.optional(),lesson:z.boolean().optional(),discipline:z.enum(DISCIPLINES).optional()})}),
-  z.strictObject({type:z.literal('settings'),settings:z.strictObject({mode:z.enum(['manual','auto']),strategy:z.enum(STRATEGIES),intensity:z.enum(INTENSITIES),entries:disciplines,pauseStory:z.boolean().optional(),pauseMeet:z.boolean().optional(),pauseInjury:z.boolean().optional()})}),
+  z.strictObject({type:z.literal('plan'),plan:z.strictObject({action:z.enum(ACTIONS),spot:z.enum(SPOTS),intensity:legacyIntensity,skill:skill.optional(),lesson:z.boolean().optional(),discipline:z.enum(DISCIPLINES).optional()}).transform(({intensity,...plan})=>plan)}),
+  z.strictObject({type:z.literal('settings'),settings:z.strictObject({mode:z.enum(['manual','auto']),strategy:z.enum(STRATEGIES),intensity:legacyIntensity,entries:disciplines,pauseStory:z.boolean().optional(),pauseMeet:z.boolean().optional(),pauseInjury:z.boolean().optional()}).transform(({intensity,...settings})=>settings)}),
   z.strictObject({type:z.literal('entry'),disciplines}),
   z.strictObject({type:z.literal('event'),index:z.number().int().min(0).max(5)}),
   z.strictObject({type:z.literal('routine'),discipline:z.enum(DISCIPLINES),skills:z.array(skill).max(16)}),
@@ -65,9 +69,9 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
       ...meet,results:meet.results.map(({proof,opponents:replays,...result})=>opponents?{...result,opponents:replays}:result),
     }));
     const hall=career.hall.map(archive=>({...archive,records:records(archive.records,false)}));
-    const rider=career.rider?{...career.rider,seed:0,records:records(career.rider.records,true)}:null;
+    const rider=career.rider?{...career.rider,seed:0,season:{...career.rider.season,division:divisionFor(career.rider.year)},records:records(career.rider.records,true)}:null;
     const parked=career.parked?.map(item=>({...item,seed:0,records:records(item.records,false)}));
-    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,stateVersion:row.snapshot.clock.stateVersion??0,remainingMs:remaining(row.snapshot,weekMs),weekMs,fastForward:false,pendingMeet:row.snapshot.clock.pendingMeet,pendingTraining:row.snapshot.clock.pendingTraining,storage:store.kind,username,scope};
+    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,stateVersion:row.snapshot.clock.stateVersion??0,remainingMs:remaining(row.snapshot,weekMs),weekMs,fastForward:false,pendingMeet:row.snapshot.clock.pendingMeet,pendingTraining:row.snapshot.clock.pendingTraining,pendingChoice:row.snapshot.clock.pendingChoice,storage:store.kind,username,scope};
   };
   return async (request:Request):Promise<Response>=>{
     try{

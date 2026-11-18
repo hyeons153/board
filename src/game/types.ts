@@ -1,9 +1,8 @@
 export const STATS = ['speed', 'carve', 'link', 'balance'] as const;
-export const DIVISIONS = ['rookie','regular','open'] as const;
+export const DIVISIONS = ['rookie','regular','open','master'] as const;
 export const DISCIPLINES = ['dance','trick','freestyle'] as const;
 export const SPOTS = ['river','plaza','park','studio','night','arena'] as const;
 export const STRATEGIES = ['balanced','dance','trick','freestyle'] as const;
-export const INTENSITIES = ['safe','normal','focus'] as const;
 export const STYLES = ['stable','flow','score'] as const;
 export const ACTIONS = [...STATS,'dance','trick','rest','hospital','rehearsal'] as const;
 export type Stat = typeof STATS[number];
@@ -12,13 +11,12 @@ export type Division = typeof DIVISIONS[number];
 export type Discipline = typeof DISCIPLINES[number];
 export type Spot = typeof SPOTS[number];
 export type Strategy = typeof STRATEGIES[number];
-export type Intensity = typeof INTENSITIES[number];
 export type RoutineStyle = typeof STYLES[number];
 export type Action = typeof ACTIONS[number];
 export type Family = 'dance'|'trick';
 export type Look = { hair: number; skin: number; shirt: number; board: number; hairColor?:number; pants?:number; shoes?:number; deckDesign?:number };
-export type Plan = { action: Action; spot: Spot; intensity: Intensity; skill?: string; lesson?:boolean; discipline?:Discipline };
-export type Settings = { mode: 'manual'|'auto'; strategy: Strategy; intensity: Intensity; entries: Discipline[]; pauseStory?:boolean; pauseMeet?:boolean; pauseInjury?:boolean };
+export type Plan = { action: Action; spot: Spot; skill?: string; lesson?:boolean; discipline?:Discipline };
+export type Settings = { mode: 'manual'|'auto'; strategy: Strategy; entries: Discipline[]; pauseStory?:boolean; pauseMeet?:boolean; pauseInjury?:boolean };
 export type Skill = { id:string; name:string; family:Family; kind:'step'|'technique'|'spin'|'pop'|'flip'; difficulty:number; points:number; seconds:number; requires:string[]; risk:number; tags:readonly string[] };
 export type Progress = { study:number; mastery:number };
 export type Injury = { severity:'minor'|'major'; weeks:number; treated:boolean };
@@ -43,14 +41,16 @@ export type Ending = { kind:'legend'|'champion'|'technician'|'veteran'|'early'; 
 export type Mentor = { id:string; name:string; look:Look; skill?:string; title:string; wins:number };
 export type Archive = { id:string; name:string; look:Look; year:number; week:number; reason:'early'|'complete'; stats:Stats; skills:Record<string,Progress>; records:MeetRecord[]; seasons:Season[]; relations:Record<string,number>; fame:number; extras?:CareerExtras; events?:Rider['events']; ending?:Ending; honors?:string[]; rankedStart?:number };
 export type Career = { rider:Rider|null; hall:Archive[]; parked?:Rider[] };
-export type View = { career:Career; version:number; stateVersion:number; remainingMs:number; weekMs:number; fastForward:boolean; pendingMeet?:string; pendingTraining?:string; storage:'local'|'neon'; username?:string; scope?:string };
+export type View = { career:Career; version:number; stateVersion:number; remainingMs:number; weekMs:number; fastForward:boolean; pendingMeet?:string; pendingTraining?:string; pendingChoice?:string; storage:'local'|'neon'; username?:string; scope?:string };
 export type GameAction =
   | { type:'pulse' }
   | { type:'continue-training'; record:string }
+  | { type:'start-training'; record:string }
   | { type:'continue-meet'; record:string }
   | { type:'fast-forward'; enabled:boolean }
   | { type:'create'; name:string; look:Look }
   | { type:'plan'; plan:Plan }
+  | { type:'spot'; spot:Spot }
   | { type:'settings'; settings:Settings }
   | { type:'entry'; disciplines:Discipline[] }
   | { type:'event'; index:number }

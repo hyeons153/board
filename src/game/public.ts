@@ -4,7 +4,7 @@ export type Metric=typeof METRICS[number];
 export type Scope='all'|Division;
 export const RANKING_VERSION=1;
 export const RANK_INFO:Record<Metric,{label:string;rule:string}> = {
-  career:{label:'종합 커리어',rule:'8년 완주. 대회별 점수와 입상 가치에 부문 가중치(1·1.5·2.25)와 메이저 가중치(1.5)를 적용합니다. 시즌 챔피언은 부문별 보너스를 받습니다.'},
+  career:{label:'종합 커리어',rule:'8년 완주. 대회별 점수와 입상 가치에 부문 가중치(뉴비 1·일반 1.5·오픈 2.25·마스터 3)와 메이저 가중치(1.5)를 적용합니다. 시즌 챔피언은 부문별 보너스를 받습니다.'},
   dance:{label:'댄싱',rule:'서버 검증을 통과한 댄싱 경기의 최고점.'},
   trick:{label:'트릭',rule:'서버 검증을 통과한 트릭 경기의 최고점.'},
   freestyle:{label:'프리스타일',rule:'서버 검증을 통과한 프리스타일 경기의 최고점.'},

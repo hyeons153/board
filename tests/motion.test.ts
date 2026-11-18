@@ -51,10 +51,11 @@ test('replay preserves stance between moves and training follows the selected ta
   const heading=headingsBefore(log,5);near(heading.bodyHeading,Math.PI);near(heading.boardHeading,0);
   near(techniquePose('shuvit',0,'clean',heading.bodyHeading,heading.boardHeading).bodyYaw,Math.PI);
   log[1].outcome='miss';assert.deepEqual(headingsBefore(log,10),{bodyHeading:0,boardHeading:0});
-  const r={plan:{action:'trick' as const,skill:'heelflip',spot:'plaza' as const,intensity:'normal' as const},routines:{dance:[],trick:[],freestyle:[]},skills:{}};
+  const r={plan:{action:'trick' as const,skill:'heelflip',spot:'plaza' as const},routines:{dance:[],trick:[],freestyle:[]},skills:{}};
   assert.equal(trainingTechnique(r,2)?.id,'heelflip');
   const rehearsal={...r,plan:{...r.plan,action:'rehearsal' as const,skill:undefined,discipline:'trick' as const},routines:{...r.routines,trick:['shuvit','kickflip']}};
-  assert.equal(trainingTechnique(rehearsal,1)?.id,'shuvit');assert.equal(trainingTechnique(rehearsal,5)?.id,'kickflip');
+  assert.equal(trainingTechnique(rehearsal,.25)?.id,'shuvit');assert.equal(trainingTechnique(rehearsal,1.25)?.id,'kickflip');
+  assert.equal(trainingTechnique(rehearsal,2)?.id,'kickflip');
   assert.equal(trainingTechnique({...r,plan:null},1),undefined);
   assert.equal(lineTerms('저장한 루틴 · 루틴 리허설'),'저장한 라인 · 라인 리허설');
 });

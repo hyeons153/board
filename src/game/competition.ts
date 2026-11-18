@@ -103,7 +103,7 @@ export function simulateRun(p:Profile, discipline:Discipline, ids:string[], rng:
 export const NAMES:Record<string,string> = Object.fromEntries(RIVALS.map(n=>[n.id,n.name]));
 export function competitor(n:Rival,year:number,week:number):Profile {
   const development=year-1+(week-1)/52;
-  const stats=Object.fromEntries(STATS.map(s=>[s,clamp(n.stats[s]+development*n.growth[s])])) as Stats;
+  const stats=Object.fromEntries(STATS.map(s=>[s,clamp(n.stats[s]+development*n.growth[s],0,RULES.statCap)])) as Stats;
   const skills:Profile['skills']={};
   for (const s of SKILLS) {
     if(s.requires.some(id=>!learned(skills,id))) continue;

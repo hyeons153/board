@@ -12,7 +12,7 @@ for(const strategy of STRATEGIES){
   for(let seed=1;seed<=count;seed++){
     const rider=newRider('internal-'+seed,seed,'Simulation Rider',DEFAULT_LOOK);
     const career:Career={rider,hall:[]};
-    rider.settings={mode:'auto',strategy,intensity:'normal',entries:[...DISCIPLINES]};
+    rider.settings={mode:'auto',strategy,entries:[...DISCIPLINES]};
     for(let week=0;week<RULES.weeks*RULES.years;week++){
       if(!processWeek(career)) throw new Error('Automatic progression stalled on seed '+seed);
     }
@@ -23,7 +23,7 @@ for(const strategy of STRATEGIES){
     const summary=summarize(archive);
     totals.rankedMeets+=summary.meets;
     totals.wins+=summary.wins;
-    totals.maxed+=STATS.filter(stat=>archive.stats[stat]===100).length;
+    totals.maxed+=STATS.filter(stat=>archive.stats[stat]===RULES.statCap).length;
     totals.statTotal+=STATS.reduce((sum,stat)=>sum+archive.stats[stat],0);
     for(const meet of archive.records) for(const result of meet.results){
       if(!Number.isFinite(result.run.score)||result.run.score<0||result.run.score>100) throw new Error('Out-of-bounds score');

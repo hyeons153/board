@@ -32,7 +32,7 @@ async function game(action:GameAction){
   return view;
 }
 async function waitForWeek(){
-  const deadline=Date.now()+(view?.weekMs??4000)+30000;
+  const deadline=Date.now()+(view?.weekMs??2000)+30000;
   while(Date.now()<deadline){
     await new Promise(resolve=>setTimeout(resolve,Math.min(view?.remainingMs??1000,2000)+120));
     await game({type:'pulse'});
@@ -57,7 +57,7 @@ async function run(){
   console.log('PASS application page and assets served');
   await load();
   assert.equal(view?.storage,'neon');
-  if(deployed) assert.equal(view!.weekMs,4000);
+  if(deployed) assert.equal(view!.weekMs,2000);
   assert.equal('speed' in view!,false);
   console.log('PASS /api/game -> Neon guest session');
   await game({type:'create',name:'Neon 연결 검증 라이더',look:{hair:1,skin:2,shirt:3,board:1,pants:1,shoes:2}});
@@ -65,7 +65,12 @@ async function run(){
   await load();assert.deepEqual(view!.career.rider!.routines.dance,['peter-pan']);
   console.log('PASS saved line -> durable reload');
   const riderId=view!.career.rider!.id;
-  await game({type:'plan',plan:{action:'speed',spot:'river',intensity:'safe'}});
+  const energyBeforeMove=view!.career.rider!.energy;
+  await game({type:'spot',spot:'plaza'});await load();
+  assert.equal(view!.career.rider!.spot,'plaza');assert.equal(view!.career.rider!.week,1);assert.equal(view!.career.rider!.energy,energyBeforeMove);
+  await game({type:'spot',spot:'river'});
+  console.log('PASS main map movement -> no stamina/week cost -> durable reload');
+  await game({type:'plan',plan:{action:'speed',spot:'river'}});
   assert.ok(view!.remainingMs>0&&view!.remainingMs<=view!.weekMs);
   await waitForWeek();
   assert.ok(view!.pendingTraining);
@@ -78,7 +83,7 @@ async function run(){
   await load();
   assert.equal(view!.career.rider!.id,riderId);
   assert.equal(view!.career.rider!.week,2);
-  console.log('PASS four-second action -> result -> event -> week 2 -> durable reload');
+  console.log('PASS two-second action -> result -> event -> week 2 -> durable reload');
   await request('?area=account',{type:'register',username,password});
   registered=true;
   await load();
@@ -91,12 +96,16 @@ async function run(){
   assert.equal(view!.career.rider!.extras!.equipped.deck,'deck-flow');
   console.log('PASS equipment transaction persisted');
   if(competition){
-    await game({type:'settings',settings:{mode:'auto',strategy:'balanced',intensity:'safe',entries:['dance','trick'],pauseMeet:true,pauseStory:false,pauseInjury:false}});
-    const deadline=Date.now()+view!.weekMs*8+30000;
+    await game({type:'settings',settings:{mode:'auto',strategy:'balanced',entries:['dance','trick'],pauseMeet:true,pauseStory:false,pauseInjury:false}});
+    const deadline=Date.now()+(view!.weekMs+4000)*8+30000;
     while(Date.now()<deadline&&!view!.pendingMeet){
       if(view!.pendingTraining)await game({type:'continue-training',record:view!.pendingTraining!});
       if(view!.pendingMeet)break;
-      await new Promise(resolve=>setTimeout(resolve,Math.min(4100,(view!.remainingMs||1000)+120)));
+      if(view!.pendingChoice){
+        await new Promise(resolve=>setTimeout(resolve,2000));
+        await game({type:'start-training',record:view!.pendingChoice!});
+      }
+      await new Promise(resolve=>setTimeout(resolve,Math.min(2100,(view!.remainingMs||1000)+120)));
       await game({type:'pulse'});
     }
     assert.ok(view!.pendingMeet);
@@ -111,9 +120,10 @@ async function run(){
     assert.equal(view!.remainingMs,0);
     await game({type:'continue-meet',record:key});
     assert.equal(view!.pendingMeet,undefined);
-    assert.ok(view!.remainingMs>0&&view!.remainingMs<=view!.weekMs);
+    assert.ok(view!.pendingChoice);
     assert.equal(view!.career.rider!.records[0].results.length,2);
     console.log('PASS competition -> two disciplines -> durable result hold -> one acknowledgement -> fresh week');
+    await game({type:'settings',settings:{...view!.career.rider!.settings,mode:'manual'}});
   }
   await game({type:'retire'});
   assert.equal(view!.career.hall[0].id,riderId);

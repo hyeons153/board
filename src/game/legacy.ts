@@ -5,7 +5,7 @@ import { DISCIPLINES, STATS, type Archive, type Career, type Discipline, type En
 type CareerRecord = Pick<Archive,'name'|'year'|'week'|'stats'|'skills'|'records'|'relations'|'seasons'|'extras'> & { reason?: Rider['reason']; season?: Rider['season']; events?: Rider['events'] };
 export const ENDING_RULES = { openWins:24, majors:8, openChampionships:2, seniorChampionships:1, advancedSkillCount:6, mastery:82, friendship:30 } as const;
 export const ENDINGS = {
-  legend:{ title:'오픈부 레전드', line:'관중이 마지막 바퀴 소리가 멈출 때까지 자리에서 일어나지 않았다.', spot:'arena' },
+  legend:{ title:'마스터부 레전드', line:'관중이 마지막 바퀴 소리가 멈출 때까지 자리에서 일어나지 않았다.', spot:'arena' },
   champion:{ title:'시즌 챔피언', line:'시즌 내내 가꿔 온 한 종목의 리듬이 마침내 시상대에 닿았다.', spot:'arena' },
   technician:{ title:'보드 위의 테크니션', line:'동료들은 어려운 동작보다 어려운 동작을 배울 때의 네 표정을 더 오래 기억했다.', spot:'studio' },
   veteran:{ title:'강변의 베테랑', line:'처음 보드를 끌고 왔던 길을 오늘은 천천히 굴러 돌아간다.', spot:'river' },
@@ -27,8 +27,8 @@ export function summarize(record:CareerRecord){
   const favorite=[...learned].sort((a,b)=>(record.skills[b.id]?.mastery??0)-(record.skills[a.id]?.mastery??0)||b.difficulty-a.difficulty)[0];
   return {meets:meets.length,wins:results.filter(x=>place(x)===1).length,podiums:results.filter(x=>place(x)<=3).length,best,
     points:results.reduce((total,result)=>total+result.points,0),champions,learned,advanced,favorite,
-    openWins:meets.filter(meet=>meet.division==='open').flatMap(meet=>meet.results).filter(x=>place(x)===1).length,
-    majorWins:meets.filter(meet=>meet.division==='open'&&CALENDAR.find(item=>item.id===meet.id)?.major).flatMap(meet=>meet.results).filter(x=>place(x)===1).length,
+    openWins:meets.filter(meet=>(meet.division==='open'||meet.division==='master')).flatMap(meet=>meet.results).filter(x=>place(x)===1).length,
+    majorWins:meets.filter(meet=>(meet.division==='open'||meet.division==='master')&&CALENDAR.find(item=>item.id===meet.id)?.major).flatMap(meet=>meet.results).filter(x=>place(x)===1).length,
     triple:meets.some(meet=>meet.results.length===3&&meet.results.every(x=>place(x)===1))};
 }
 function storyFriends(record:CareerRecord){
@@ -40,7 +40,7 @@ export function chooseEnding(record:CareerRecord):Ending {
   const stats=summarize(record);
   const friends=storyFriends(record);
   if(record.reason==='early') return {kind:'early',friends};
-  if(stats.openWins>=ENDING_RULES.openWins&&stats.majorWins>=ENDING_RULES.majors&&stats.champions.filter(x=>x.division==='open').length>=ENDING_RULES.openChampionships)
+  if(stats.openWins>=ENDING_RULES.openWins&&stats.majorWins>=ENDING_RULES.majors&&stats.champions.filter(x=>x.division==='open'||x.division==='master').length>=ENDING_RULES.openChampionships)
     return {kind:'legend',friends};
   const champion=[...DISCIPLINES].sort((a,b)=>stats.champions.filter(x=>x.discipline===b).length-stats.champions.filter(x=>x.discipline===a).length||stats.best[b]-stats.best[a])
     .find(d=>stats.champions.filter(x=>x.discipline===d).length>=ENDING_RULES.seniorChampionships);
@@ -59,8 +59,8 @@ export function honors(record:CareerRecord):string[]{
     [s.learned.length===29&&s.learned.every(skill=>record.skills[skill.id].mastery>=90),'전체 기술 마스터'],
     [s.meets>0,'첫 대회 참가'],[s.podiums>0,'첫 입상'],[s.wins>0,'첫 우승'],
     [s.champions.some(x=>x.division==='rookie'),'뉴비부 챔피언'],[s.champions.some(x=>x.division==='regular'),'일반부 챔피언'],
-    [s.champions.some(x=>x.division==='open'),'오픈부 챔피언'],[s.triple,'한 대회 3종목 우승'],
-    [record.year>=4,'오픈부 진입'],[record.reason==='complete','8년 커리어 완주'],[storyFriends(record).length>0,'라이벌 에필로그'],
+    [s.champions.some(x=>x.division==='open'),'오픈부 챔피언'],[s.champions.some(x=>x.division==='master'),'마스터부 챔피언'],[s.triple,'한 대회 3종목 우승'],
+    [record.year>=4,'오픈부 진입'],[record.year>=6,'마스터부 진입'],[record.reason==='complete','8년 커리어 완주'],[storyFriends(record).length>0,'라이벌 에필로그'],
     [new Set(s.champions.map(x=>x.discipline)).size===3,'전 종목 시즌 챔피언'],
     [record.reason==='complete'&&chooseEnding(record).kind==='legend','레전드 엔딩'],
     [record.stats.carve>=85,'카빙의 달인'],[s.learned.filter(x=>x.family==='dance'&&record.skills[x.id].mastery>=85).length>=8,'스텝 마스터'],

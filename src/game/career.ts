@@ -10,7 +10,7 @@ import { statAfter, trainingFactor, trainingSuccess } from './training.js';
 import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family } from './types.js';
 
 export class GameError extends Error {}
-export const divisionFor=(year:number):Division=>year===1?'rookie':year<=3?'regular':'open';
+export const divisionFor=(year:number):Division=>year<=1?'rookie':year<=3?'regular':year<=5?'open':'master';
 export const currentMeet=(r:Rider)=>CALENDAR.find(m=>m.week===r.week);
 export const nextMeet=(r:Rider)=>CALENDAR.find(m=>m.week>=r.week);
 const makeSeason=(year:number):Season=>({year,division:divisionFor(year),scores:{dance:{},trick:{},freestyle:{}}});
@@ -18,7 +18,7 @@ export function newRider(id:string,seed:number,name:string,look:Look):Rider {
   return {
     id,seed,name,look,year:1,week:1,stats:{...RULES.startStats},energy:100,money:RULES.startMoney,fame:0,injury:null,
     skills:structuredClone(START_SKILLS),relations:Object.fromEntries(RIVALS.map(n=>[n.id,0])),events:{},extras:freshExtras(),
-    settings:{mode:'manual',strategy:'balanced',intensity:'normal',entries:['dance']},plan:null,spot:'river',phase:'plan',event:null,
+    settings:{mode:'manual',strategy:'balanced',entries:['dance']},plan:null,spot:'river',phase:'plan',event:null,
     entries:null,routines:{dance:[],trick:[],freestyle:[]},records:[],season:makeSeason(1),seasons:[],
     news:[{year:1,week:1,type:'system',text:'새 보드, 새 출발. 첫 주의 연습을 정해 보자!'}],reason:null,
   };
@@ -57,7 +57,6 @@ function award(r:Rider,id:keyof typeof ECONOMY.achievements,label:string){
 export function validatePlan(r:Rider,p:Plan) {
   if(r.phase!=='plan') throw new GameError('먼저 진행 중인 이벤트나 대회를 마쳐 주세요.');
   if (r.injury?.severity==='major' && !r.injury.treated && p.action!=='rest' && p.action!=='hospital') throw new GameError('중상 치료를 받거나 휴식해 주세요.');
-  if (r.injury && p.intensity==='focus' && p.action!=='rest'&&p.action!=='hospital') throw new GameError('부상 중에는 집중 훈련을 할 수 없어요.');
   if (p.action==='hospital'&&!r.injury) throw new GameError('치료가 필요한 부상이 없어요.');
   if(!spotUnlocked(r,p.spot)) throw new GameError(SPOT_GATE[p.spot]!.hint);
   if(p.action==='rehearsal'&&p.spot!=='arena') throw new GameError('대회 연습장에서만 라인 리허설을 할 수 있어요.');
@@ -89,7 +88,6 @@ function train(r:Rider,p:Plan) {
     names.push(fee<RULES.hospitalFee?'연맹 의료 지원으로 치료를 받았다.':`치료비 ₩${fee.toLocaleString('ko-KR')}를 지불했다.`);
   } else {
     const spot=LOCATIONS[p.spot];
-    const intensity=RULES.intensity[p.intensity];
     const energyBefore=r.energy;
     const practice=RULES.practice;
     const attempted=SKILL[p.skill??''];
@@ -104,7 +102,7 @@ function train(r:Rider,p:Plan) {
       names.push(`레슨비 ₩${ECONOMY.lesson.toLocaleString('ko-KR')}.`);
     }
     grade=missed?'miss':great?'great':'success';
-    r.energy=round(clamp(r.energy-RULES.energy[p.action]*intensity.cost));
+    r.energy=round(clamp(r.energy-RULES.energy[p.action]));
     let difficulty=attempted?.difficulty??1, mastery=attempted?(r.skills[attempted.id]?.mastery??12):60;
     if(missed){
       names.push(`훈련에 실패했다. 훈련 전 체력 ${round(energyBefore)} · 성공률 ${Math.round(success*100)}%. 능력치는 오르지 않았다.`);
@@ -139,12 +137,12 @@ function train(r:Rider,p:Plan) {
       names.push(`${DISCIPLINE_NAMES[discipline]} 라인의 연계와 기술 숙련도를 점검했다.`);
     } else if (p.action!=='hospital') {
       const before=r.stats[p.action];
-      stat(r,p.action,RULES.statGrowth*factor*late.stat*(1-before*.007));
+      stat(r,p.action,RULES.statGrowth*factor*late.stat*(1-before/RULES.statCap*.7));
       stat(r,p.action==='link'?'balance':'link',RULES.secondaryGrowth*factor*late.stat*.52);
       names.push(`주 능력치 +${round(r.stats[p.action]-before)}.`);
     }
     const risk=RULES.injury;
-    const pInjury=clamp((risk.base+(100-energyBefore)*risk.energy+(difficulty-1)*risk.difficulty-(r.stats.balance+mastery*.34)*risk.stability)*intensity.risk*spot.risk+(r.injury?.03:0),.004,.38);
+    const pInjury=clamp((risk.base+(100-energyBefore)*risk.energy+(difficulty-1)*risk.difficulty-(r.stats.balance+mastery*.34)*risk.stability)*spot.risk+(r.injury?.03:0),.004,.38);
     if(rng()<pInjury){
       const major=rng()<clamp(.12+(difficulty-1)*.06+(100-energyBefore)*.002,0,.48) || r.injury?.severity==='major';
       r.injury={severity:major?'major':'minor',weeks:major?risk.majorWeeks:risk.minorWeeks,treated:false};
@@ -163,12 +161,12 @@ function train(r:Rider,p:Plan) {
   note(r,'training',text);
 }
 function autoPlan(r:Rider):Plan {
-  const base:Plan={action:'rest',spot:r.spot,intensity:r.settings.intensity};
+  const base:Plan={action:'rest',spot:r.spot};
   if(r.injury?.severity==='major'&&!r.injury.treated) return {...base,action:'hospital'};
-  if(r.injury) return {...base,intensity:'safe'};
+  if(r.injury) return {...base};
   const soon=(nextMeet(r)?.week??54)-r.week;
   const need=r.settings.entries.reduce((s,d)=>s+RULES.entryCost[d],0);
-  const restAt=r.settings.intensity==='safe'?57:r.settings.intensity==='focus'?36:45;
+  const restAt=45;
   if(r.energy<restAt) return base;
   const rng=seeded(r.seed,r.year,r.week,'auto');
   const strategy=r.settings.strategy;
@@ -344,17 +342,22 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
     return;
   }
   if(!r||r.phase==='retired') throw new GameError('먼저 새 선수를 만들어 주세요.');
+  if(a.type==='spot'){
+    if(r.phase!=='plan'||r.plan||r.settings.mode==='auto')throw new GameError('직접 육성의 행동 선택 중에 스팟을 바꿀 수 있어요.');
+    if(!spotUnlocked(r,a.spot))throw new GameError(SPOT_GATE[a.spot]!.hint);
+    r.spot=a.spot;
+  }
   if(a.type==='plan'){
     if(r.plan) throw new GameError('이번 주 행동은 이미 시작했어요. 끝난 뒤 다음 행동을 선택해 주세요.');
     if(r.settings.mode==='auto') throw new GameError('직접 육성으로 전환한 뒤 행동을 선택해 주세요.');
-    validatePlan(r,a.plan); r.plan=a.plan; r.spot=a.plan.spot;
+    validatePlan(r,a.plan); r.plan={...a.plan};Reflect.deleteProperty(r.plan,'intensity'); r.spot=a.plan.spot;
   }
   if(a.type==='routine'){
     if(!validRoutine(r,a.discipline,a.skills)) throw new GameError('종목에 맞는 습득 기술로 60초 이하의 라인을 구성해 주세요.');
     r.routines[a.discipline]=a.skills;
   }
   if(a.type==='settings'){
-    r.settings=a.settings;
+    r.settings={...a.settings};Reflect.deleteProperty(r.settings,'intensity');
     if(r.settings.mode==='auto'){
       if(r.phase==='event'){
         const e=eventFor(r,r.event??'');

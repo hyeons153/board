@@ -100,7 +100,7 @@ export function useGame(){
     const ticker=window.setInterval(()=>setNow(performance.now()),100);
     void tick();
     return ()=>{stopped=true;window.clearTimeout(timer);window.clearInterval(ticker);document.removeEventListener('visibilitychange',wake);window.removeEventListener('pagehide',leave);};
-  },[active,training,view?.pendingTraining,view?.pendingMeet,view?.fastForward,send]);
+  },[active,training,view?.pendingTraining,view?.pendingMeet,view?.pendingChoice,view?.fastForward,send]);
   const remaining=view?Math.max(0,view.remainingMs-(now-time.current)):0;
   return {view,send,saving,error,syncNote,load,remaining,dismiss:()=>setError('')};
 }
