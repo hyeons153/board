@@ -10,12 +10,13 @@ test('playback speed scales the animation clock continuously and pauses without 
   assert.equal(advanceClock(clock,5990,2),5500);
 });
 import { createCanvas,loadImage } from '@napi-rs/canvas';
-import { BOARDS, DEFAULT_LOOK, HAIR_STYLES, LOOK_PRESETS, OUTFITS, SKILLS } from '../src/game/data';
+import { BOARDS, BOTTOMS, DEFAULT_LOOK, FOOTWEAR, HAIR_COLORS, HAIR_STYLES, LOOK_PRESETS, OUTFITS, PANTS, SHIRTS, SHOES, SKILLS, SKINS } from '../src/game/data';
 import { lineTerms, RIVALS } from '../src/game/content';
 import { paintRider } from '../src/scene/rider';
+import { paintSpriteCharacter } from '../src/scene/spriteCharacter';
 import { NEW_GEAR } from '../src/game/equipmentCatalog';
 import { equippedLook, freshExtras } from '../src/game/economy';
-import { ACTOR_HEIGHT, ACTOR_WIDTH, TECHNIQUES, boardPoint, headingsBefore, techniquePose, trainingTechnique } from '../src/scene/techniques';
+import { ACTOR_HEIGHT, ACTOR_OFFSET, ACTOR_WIDTH, TECHNIQUES, basicPose, boardPoint, headingsBefore, techniquePose, trainingTechnique } from '../src/scene/techniques';
 import type { Look, MoveLog } from '../src/game/types';
 import {prepareCharacterReview} from '../scripts/character-art';
 before(prepareCharacterReview);
@@ -115,6 +116,48 @@ test('customized riders retain every hairstyle, black/white decks and safe motio
       paintRider(c as unknown as CanvasRenderingContext2D,look,'ride',0,technique);
       const rgba=c.getImageData(0,0,ACTOR_WIDTH,ACTOR_HEIGHT).data;
       for(let y=0;y<ACTOR_HEIGHT;y++)for(let x=0;x<ACTOR_WIDTH;x++)if(rgba[(y*ACTOR_WIDTH+x)*4+3])assert.ok(x>0&&x<ACTOR_WIDTH-1&&y>0&&y<ACTOR_HEIGHT-1,'Appearance must fit the texture during movement');
+    }
+  }
+});
+
+test('mixed hair, clothing and shoes share rider anchors in every direction and major move',()=>{
+  const canvas=createCanvas(ACTOR_WIDTH,ACTOR_HEIGHT),context=canvas.getContext('2d');
+  const c=context as unknown as CanvasRenderingContext2D;
+  c.imageSmoothingEnabled=false;
+  const offsetX=(ACTOR_WIDTH-128)/2;
+  const place=({x,y}:{x:number;y:number})=>({x:x+offsetX,y:y+ACTOR_OFFSET});
+  const techniques=['cross','peter-pan','shuvit','kickflip','ghost'];
+  for(const direction of [0,Math.PI/2,Math.PI,-Math.PI/2]){
+    const stand=basicPose('rest',0),ride=basicPose('ride',0),push=basicPose('accelerate',200),jump=basicPose('jump',230);
+    const poses=[
+      {...stand,bodyYaw:direction},{...ride,bodyYaw:direction},
+      {...push,bodyYaw:direction},{...jump,bodyYaw:direction},
+      ...techniques.map(move=>techniquePose(move,.42,'clean',direction,direction)),
+    ];
+    const samples=poses.map((pose,index)=>{
+      const placed={...pose,hip:place(pose.hip),feet:[place(pose.feet[0]),place(pose.feet[1])] as typeof pose.feet};
+      const still=index<2;
+      const expected=paintSpriteCharacter(c,DEFAULT_LOOK,placed,still,0);
+      assert.ok(expected);
+      return {placed,still,expected};
+    });
+    for(const gender of ['male','female'] as const)for(const hair of HAIR_STYLES.keys()){
+      const look:Look={
+        ...DEFAULT_LOOK,gender,hair,outfit:hair%OUTFITS.length,bottom:(hair+1)%BOTTOMS.length,footwear:(hair+2)%FOOTWEAR.length,
+        skin:hair%SKINS.length,hairColor:hair%HAIR_COLORS.length,shirt:hair%SHIRTS.length,pants:hair%PANTS.length,shoes:hair%SHOES.length,
+      };
+      for(const {placed,still,expected} of samples){
+        c.clearRect(0,0,canvas.width,canvas.height);
+        assert.deepEqual(paintSpriteCharacter(c,look,placed,still,0),expected);
+        if(!still)continue;
+        const {data}=c.getImageData(0,0,canvas.width,canvas.height);
+        let sole=0;
+        for(let y=Math.floor(expected.shoulder.y);y<canvas.height;y++){
+          for(let x=0;x<canvas.width;x++)if(data[(y*canvas.width+x)*4+3]>200){sole=y;break;}
+        }
+        const ground=Math.max(...placed.feet.map(foot=>foot.y));
+        assert.ok(ground-sole>0&&ground-sole<=1.5,JSON.stringify({look,direction,sole,ground}));
+      }
     }
   }
 });
