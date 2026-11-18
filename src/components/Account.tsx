@@ -1,5 +1,6 @@
 import { ArrowRight, DoorOpen, KeyRound, ShieldCheck, UserRound } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../game/accountPolicy';
 import type { View } from '../game/types';
 import { PixelRider } from './Appearance';
 import { SectionTitle, Tag } from './Brand';
@@ -55,7 +56,7 @@ export default function Account({view,send,onSwitch,onSessionChange}:{view:View;
         <form className="account-form" onSubmit={submit}>
           <label>아이디<input value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username" required minLength={3} maxLength={24} pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]{2,23}" placeholder="예: riverside_01"/></label>
           <label>비밀번호<input value={password} onChange={e=>setPassword(e.target.value)} type="password"
-            autoComplete={form==='register'?'new-password':'current-password'} required minLength={12} maxLength={96}/></label>
+            autoComplete={form==='register'?'new-password':'current-password'} required minLength={PASSWORD_MIN_LENGTH} maxLength={PASSWORD_MAX_LENGTH}/></label>
           <button className="button primary" disabled={busy}><KeyRound size={16}/> {form==='register'?'계정 만들고 기록 연결':'로그인하고 기록 불러오기'} <ArrowRight size={16}/></button>
         </form>
       </>}
@@ -78,12 +79,13 @@ export default function Account({view,send,onSwitch,onSessionChange}:{view:View;
     </section>}
     <section className="panel content-panel">
       <SectionTitle code="DATA POLICY" title="계정과 공개 정보"/>
-      <p>로그인 아이디, 비밀번호 검증값과 세션을 서버에 보관합니다. 이메일은 수집하지 않아 이메일로 비밀번호를 복구할 수 없습니다. 선수 기록은 직접 공개 설정한 은퇴 프로필에 한해 다른 이용자가 볼 수 있습니다.</p>
+      <p>비밀번호는 {PASSWORD_MIN_LENGTH}자 이상이어야 합니다. 로그인 아이디, 비밀번호 검증값과 세션을 서버에 보관합니다. 이메일은 수집하지 않아 이메일로 비밀번호를 복구할 수 없습니다. 선수 기록은 직접 공개 설정한 은퇴 프로필에 한해 다른 이용자가 볼 수 있습니다.</p>
       <p>공개를 취소하면 프로필과 공식 순위가 숨겨집니다. 계정을 삭제하면 해당 계정의 선수, 세션, 공개 프로필과 순위가 서비스에서 삭제됩니다.</p>
       {view.username&&(deleting?<form onSubmit={submit} className="account-form">
         <p className="form-error">삭제를 확인하려면 현재 아이디와 비밀번호를 다시 입력하세요. 삭제한 기록은 게임에서 되돌릴 수 없습니다.</p>
         <label>삭제할 아이디<input value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username" required/></label>
-        <label>현재 비밀번호<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" minLength={12} required/></label>
+        <label>현재 비밀번호<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password"
+          minLength={PASSWORD_MIN_LENGTH} maxLength={PASSWORD_MAX_LENGTH} required/></label>
         <div className="pill-row"><button type="button" className="button quiet" onClick={()=>{setDeleting(false);setPassword('');}}>취소</button>
           <button className="button danger" disabled={busy||username!==view.username}>계정과 기록 영구 삭제</button></div>
       </form>:<div className="bottom-actions"><button className="button quiet" onClick={()=>{setDeleting(true);setError('');}}>계정 삭제</button></div>)}

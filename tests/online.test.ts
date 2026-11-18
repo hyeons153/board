@@ -100,11 +100,14 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
     const store=databaseStore(pg.db,'neon');
     const handle=createHandler(store,1000,true,'test-rate-key-12345678901234567890');
     const owner=browser(handle), viewer=browser(handle);
+    const ownerPassword='a4k8';
     await owner.read();
     await status(owner.game({type:'create',name:'리버 공식 선수',look:{...DEFAULT_LOOK,shirt:2}}),200);
     const ownerRider=owner.snapshot().career.rider!;
     const oldToken=owner.token();
-    const register=await status(owner.call('?area=account',{type:'register',username:'river_archive',password:pw}),200);
+    const invalid=await status(owner.call('?area=account',{type:'register',username:'river_archive',password:ownerPassword.slice(0,3)}),400);
+    assert.match((await invalid.json() as {error:string}).error,/비밀번호는 4자 이상/);
+    const register=await status(owner.call('?area=account',{type:'register',username:'river_archive',password:ownerPassword}),200);
     assert.match(register.headers.get('set-cookie')??'',/HttpOnly; SameSite=Strict.*Secure/);
     assert.notEqual(owner.token(),oldToken);
     assert.equal(await store.authenticate(sessionHash(oldToken)),undefined);
@@ -114,8 +117,7 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
     assert.equal(privateView.career.rider?.seed,0);
     const ownerId=(await store.actor(sessionHash(owner.token())))!.id;
     const credentials=await store.credential('river_archive');
-    assert.ok(credentials?.passwordHash.startsWith('s1.'));
-    assert.ok(!credentials?.passwordHash.includes(pw));
+    assert.match(credentials?.passwordHash??'',/^s1\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/);
 
     const before=await store.get(ownerId);
     const rider=before.snapshot.career.rider!;
@@ -177,14 +179,14 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
     await owner.read();
     await status(owner.game({type:'create',name:'게스트 선수',look:DEFAULT_LOOK}),200);
     await status(owner.call('?area=account',{type:'login',username:'river_archive',password:'incorrect-long-passphrase'}),401);
-    await status(owner.call('?area=account',{type:'login',username:'river_archive',password:pw}),200);
+    await status(owner.call('?area=account',{type:'login',username:'river_archive',password:ownerPassword}),200);
     const merged=await owner.read();
     assert.equal(merged.career.rider?.name,'다음 회차');
     assert.equal(merged.career.parked?.[0].name,'게스트 선수');
     await status(owner.game({type:'switch-rider',id:merged.career.parked![0].id}),200);
     assert.equal(owner.snapshot().career.rider?.name,'게스트 선수');
     assert.equal(owner.snapshot().career.hall.length,1);
-    await status(owner.call('?area=account',{type:'delete',username:'river_archive',password:pw}),200);
+    await status(owner.call('?area=account',{type:'delete',username:'river_archive',password:ownerPassword}),200);
     await status(viewer.call('?area=public&id='+publish.id),404);
     assert.equal(await store.credential('river_archive'),undefined);
     assert.equal((await pg.db.query('SELECT user_id FROM rider_careers WHERE user_id=$1',[ownerId])).length,0);

@@ -1,11 +1,12 @@
 import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { AccessError, ACCOUNT_SECONDS, type Actor, type OnlineStore } from './databaseStore.js';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../src/game/accountPolicy.js';
 import { METRICS } from '../src/game/public.js';
 import { DIVISIONS } from '../src/game/types.js';
 
 const username=z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,23}$/);
-const password=z.string().min(12).max(96).refine(value=>Buffer.byteLength(value,'utf8')<=256);
+const password=z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH).refine(value=>Buffer.byteLength(value,'utf8')<=256);
 const authAction=z.discriminatedUnion('type',[
   z.strictObject({type:z.literal('register'),username,password}),
   z.strictObject({type:z.literal('login'),username,password}),
@@ -66,7 +67,7 @@ export async function onlineRequest(request:Request,store:OnlineStore,secure:boo
   if(area==='account'){
     if(request.method!=='POST') throw new AccessError('지원하지 않는 요청입니다.',405);
     const parsed=authAction.safeParse(body);
-    if(!parsed.success) throw new AccessError('아이디는 영문·숫자 등 3~24자, 비밀번호는 12자 이상으로 입력해 주세요.');
+    if(!parsed.success) throw new AccessError(`아이디는 영문·숫자 등 3~24자, 비밀번호는 ${PASSWORD_MIN_LENGTH}자 이상으로 입력해 주세요.`);
     const action=parsed.data;
     if(action.type==='logout'){
       const logged=needsAccount(actor,hash);
