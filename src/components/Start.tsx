@@ -3,7 +3,7 @@ import { ArrowRight, ArrowUpRight, CircleHelp, Flag, Footprints, MapPin, Radio, 
 import { DEFAULT_LOOK } from '../game/data';
 import type { Look } from '../game/types';
 import Scene from './Scene';
-import { Brand, Tag } from './Brand';
+import { Brand, ENGLISH_GAME_NAME, Tag } from './Brand';
 import { LookFields, LookPreview } from './Appearance';
 export default function Start({onCreate,onHall,onOnline,onAccount,username,hasHall,saving}:{onCreate:(name:string,look:Look)=>Promise<boolean>;onHall:()=>void;onOnline:()=>void;onAccount:()=>void;username?:string;hasHall:boolean;saving:boolean}){
   const [creating,setCreating]=useState(false);
@@ -21,8 +21,8 @@ export default function Start({onCreate,onHall,onOnline,onAccount,username,hasHa
         <div className="title-shade"/>
         <div className="hero-location"><MapPin size={13}/> 01 / RIVERSIDE BANK</div>
         <div className="title-content">
-          <div className="title-kicker"><span/> <span>THE LONGBOARD CAREER SIM</span></div>
-          <h1>LONGBOARD<br/><em>LIFE<span>.</span></em></h1>
+          <div className="title-kicker"><span/> <span>{ENGLISH_GAME_NAME}</span></div>
+          <h1>롱보더 <br/><em>키우기</em></h1>
           <p className="title-ko">퇴근 후, 우리의 시즌이 시작된다.</p>
           <p className="title-desc">강변의 첫 푸시부터 마지막 페스티벌까지.<br/>나만의 라이더로 8년의 롱보드 커리어를 써 내려가세요.</p>
           {!creating&&<button className="button primary large" onClick={()=>setCreating(true)}>새 커리어 시작 <ArrowRight size={19}/></button>}

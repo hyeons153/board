@@ -34,7 +34,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .dot { background: #5e9270; box-shadow: none; }
 .sidebar { background: #263447; color: #f2eee1; border-right: 0; gap: 26px; }
 .sidebar .brand b { color: #d6ef90; }
-.sidebar .brand sup { color: #c0c8ca; }
 .sidebar nav button { color: #e2e6e7; }
 .sidebar nav button:hover { color: white; background: #37477a; }
 .sidebar nav button.active { background: #dff0ad; color: #213a33; border-color: #dff0ad; box-shadow: 0 3px 0 #1a2a35; }

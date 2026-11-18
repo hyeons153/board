@@ -1,4 +1,4 @@
-# LONGBOARD LIFE
+# 롱보더 키우기 (Longboarder Tycoon)
 
 퇴근 후 강변에서 시작하는 롱보드 커리어 시뮬레이션. React·TypeScript·Vite로 메뉴와 편집 화면을, Phaser 4로 도트 스팟·라이더·경기 재생을 구현했습니다. 훈련과 경기는 렌더링과 분리되어 서버에서 계산됩니다.
 
