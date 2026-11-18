@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import type { GameAction, View } from '../src/game/types';
+import type { GameAction, MeetRecord, View } from '../src/game/types';
 import type { Directory, Publication, PublicCard } from '../src/game/public';
 import { BOARDS, HAIR_COLORS, PANTS, SHIRTS, SHOES, SKINS } from '../src/game/data';
 
@@ -16,7 +16,7 @@ const tab=randomUUID();
 let cookie='',view:View|undefined,registered=false;
 async function request<T>(params:string,body?:unknown,method=body===undefined?'GET':'POST'):Promise<T>{
   const response=await fetch(new URL('/api/game'+params,base),{
-    method,headers:{origin:base.origin,...(cookie?{cookie}:{}),...(body===undefined?{}:{'Content-Type':'application/json'}),
+    method,headers:{origin:base.origin,'X-Game-View':'compact',...(cookie?{cookie}:{}),...(body===undefined?{}:{'Content-Type':'application/json'}),
       ...(view?.scope?{'X-Game-Scope':view.scope}:{})},
     body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(25000),
   });
@@ -90,6 +90,14 @@ async function run(){
   assert.ok(view!.career.rider!.energy<100);
   await game({type:'continue-training',record:view!.pendingTraining!});
   await game({type:'event',index:0});
+  assert.ok(view!.pendingEvent?.details.length,'An event must return a visible outcome');
+  const outcome=view!.pendingEvent!;
+  await game({type:'trade',operation:'buy',item:'acc_005'});
+  await game({type:'trade',operation:'equip',item:'acc_005'});await load();
+  assert.equal(view!.pendingEvent?.key,outcome.key,'Equipment management must preserve the event result');
+  await game({type:'unequip',slot:'accessory',item:'acc_005'});
+  await game({type:'continue-event',record:outcome.key});
+  console.log('PASS event outcome -> equipment purchase/equip during result -> durable outcome hold -> acknowledgement');
   assert.equal(view!.career.rider!.week,2);
   assert.ok(view!.career.rider!.stats.speed>=18);
   await load();
@@ -116,6 +124,7 @@ async function run(){
     const deadline=Date.now()+(view!.weekMs+4000)*8+30000;
     while(Date.now()<deadline&&!view!.pendingMeet){
       if(view!.pendingTraining)await game({type:'continue-training',record:view!.pendingTraining!});
+    if(view!.pendingEvent)await game({type:'continue-event',record:view!.pendingEvent.key});
       if(view!.pendingMeet)break;
       if(view!.pendingChoice){
         await new Promise(resolve=>setTimeout(resolve,2000));
@@ -126,6 +135,7 @@ async function run(){
     }
     assert.ok(view!.pendingMeet);
     if(view!.pendingTraining)await game({type:'continue-training',record:view!.pendingTraining!});
+      if(view!.pendingEvent)await game({type:'continue-event',record:view!.pendingEvent.key});
     const key=view!.pendingMeet;
     assert.ok(key);
     const saved=JSON.stringify(view!.career);
@@ -138,6 +148,12 @@ async function run(){
     assert.equal(view!.pendingMeet,undefined);
     assert.ok(view!.pendingChoice);
     assert.equal(view!.career.rider!.records[0].results.length,2);
+    const summary=view!.career.rider!.records[0];assert.equal(summary.detail,'summary');
+    assert.deepEqual(summary.results[0].run.log,[]);assert.equal(summary.results[0].opponents,undefined);
+    const replay=await request<MeetRecord>('?replay='+encodeURIComponent(summary.year+':'+summary.id));
+    assert.equal(replay.detail,'full');assert.ok(replay.results[0].run.log.length>0);assert.equal(Object.keys(replay.results[0].opponents??{}).length,6);
+    assert.equal(replay.results[0].run.score,summary.results[0].run.score);assert.equal(replay.results[0].proof,undefined);
+    console.log('PASS compact past results -> on-demand complete player/NPC line -> no proof disclosure');
     console.log('PASS competition -> two disciplines -> durable result hold -> one acknowledgement -> fresh week');
     await game({type:'settings',settings:{...view!.career.rider!.settings,mode:'manual'}});
   }

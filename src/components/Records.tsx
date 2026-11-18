@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowUpRight, ChevronDown, Flag, Medal, Shield, Star, Trophy, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { CALENDAR, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, SKILL, SKILLS, STAT_NAMES, STYLE_NAMES } from '../game/data';
+import { meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, SKILL, SKILLS, STAT_NAMES, STYLE_NAMES } from '../game/data';
 import { NAMES, competitor, learned } from '../game/competition';
 import { RIVALS, lineTerms } from '../game/content';
 import { equippedLook, extras, playerPlace } from '../game/economy';
@@ -95,7 +95,7 @@ function CareerLog({r}:{r:Rider}){
     {!recent.length?<p>출전 기록이 쌓이면 대회별 점수와 순위를 비교할 수 있어요.</p>:
       <div className="record-table"><table>
         <thead><tr><th scope="col">대회</th>{DISCIPLINES.map(d=><th scope="col" key={d}>{DISCIPLINE_NAMES[d]}</th>)}</tr></thead>
-        <tbody>{recent.map(meet=><tr key={meet.year+meet.id}><th scope="row">{meet.year}년차 {CALENDAR.find(m=>m.id===meet.id)?.name}</th>
+        <tbody>{recent.map(meet=><tr key={meet.year+meet.id}><th scope="row">{meet.year}년차 {meetById(meet.id)?.name}</th>
           {DISCIPLINES.map(d=>{
             const result=meet.results.find(x=>x.discipline===d);
             return <td key={d}>{result?`${result.run.score.toFixed(1)}점 · ${playerPlace(result)}위`:'—'}</td>;
@@ -156,7 +156,7 @@ function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNod
       <div className="pill-row">{STATS.map(s=><Tag key={s}>{STAT_NAMES[s]} {a.stats[s]}</Tag>)}</div>
       <div className="pill-row">{RIVALS.map(n=><Tag key={n.id}>{n.name} 관계 {a.relations[n.id]??0}</Tag>)}</div>
       <div className="pill-row">{SKILLS.filter(s=>learned(a.skills,s.id)).map(s=><Tag key={s.id}>{s.name} {a.skills[s.id].mastery}%</Tag>)}</div>
-      {[...a.records].reverse().map(m=><div key={m.year+m.id}><span>{m.year}년차 · {CALENDAR.find(x=>x.id===m.id)?.name}</span><span>{m.results.map(res=>`${DISCIPLINE_NAMES[res.discipline]} ${res.standings.find(s=>s.id==='player')?.place}위 / ${res.run.score}점`).join(' · ')||'불참'}</span></div>)}
+      {[...a.records].reverse().map(m=><div key={m.year+m.id}><span>{m.year}년차 · {meetById(m.id)?.name}</span><span>{m.results.map(res=>`${DISCIPLINE_NAMES[res.discipline]} ${res.standings.find(s=>s.id==='player')?.place}위 / ${res.run.score}점`).join(' · ')||'불참'}</span></div>)}
     </div></details>
     <div className="bottom-actions">{actions}</div>
   </article>;

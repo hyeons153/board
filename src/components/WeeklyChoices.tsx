@@ -78,6 +78,7 @@ export function AutoSettings({r,send,saving}:{r:Rider;send:Submit;saving:boolean
   return <section className="panel auto-settings"><h2>자동 육성 설정</h2><p>행동·이벤트·대회·결과 확인까지 자동으로 이어집니다. 선택 장면 2초 → 수행 2초 → 결과 2초 순서로 진행합니다.</p>
     <label>전략<select value={r.settings.strategy} disabled={saving} onChange={e=>void send({type:'settings',settings:{...r.settings,strategy:e.target.value as Rider['settings']['strategy']}})}>{STRATEGIES.map(id=><option key={id} value={id}>{STRATEGY_NAMES[id]}</option>)}</select></label>
     <fieldset><legend>자동 출전 종목</legend>{DISCIPLINES.map(id=><label key={id}><input type="checkbox" checked={r.settings.entries.includes(id)} disabled={saving} onChange={()=>void send({type:'settings',settings:{...r.settings,entries:r.settings.entries.includes(id)?r.settings.entries.filter(d=>d!==id):[...r.settings.entries,id]}})}/>{DISCIPLINE_NAMES[id]}</label>)}</fieldset>
+    <p>일반 대회에 적용합니다. 2·4·6·8년차 국제대회는 설정과 관계없이 3종목 모두 출전합니다.</p>
     <button className="button primary" disabled={saving} onClick={()=>void send({type:'settings',settings:{...r.settings,mode:r.settings.mode==='auto'?'manual':'auto',pauseStory:false,pauseMeet:false,pauseInjury:false}})}>{r.settings.mode==='auto'?'자동 육성 끄기':'자동 육성 시작'} <ArrowRight size={16}/></button>
   </section>;
 }

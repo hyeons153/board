@@ -83,6 +83,19 @@ export const CALENDAR:Meet[] = [
   {id:'festival',month:12,week:52,name:'롱보드 페스티벌',major:true,spot:'river'},
 ];
 
+// Keep the original festival ID readable for existing competition records.
+export const INTERNATIONAL_MEETS:Meet[] = [
+  {id:'international-2',month:12,week:52,name:'롱보드 국제대회 · 서울',major:true,spot:'river',international:true,host:'대한민국 · 서울'},
+  {id:'international-4',month:12,week:52,name:'롱보드 국제대회 · 도쿄',major:true,spot:'plaza',international:true,host:'일본 · 도쿄'},
+  {id:'international-6',month:12,week:52,name:'롱보드 국제대회 · 바르셀로나',major:true,spot:'park',international:true,host:'스페인 · 바르셀로나'},
+  {id:'international-8',month:12,week:52,name:'롱보드 국제대회 · 로스앤젤레스',major:true,spot:'arena',international:true,host:'미국 · 로스앤젤레스'},
+];
+export const calendarFor=(year:number):Meet[]=>{
+  const international=INTERNATIONAL_MEETS.find(meet=>meet.id==='international-'+year);
+  return international?CALENDAR.map(meet=>meet.id==='festival'?international:meet):CALENDAR;
+};
+export const meetById=(id:string|undefined)=>CALENDAR.find(meet=>meet.id===id)??INTERNATIONAL_MEETS.find(meet=>meet.id===id);
+
 const skill = (id:string,name:string,family:Family,kind:Skill['kind'],difficulty:number,points:number,seconds:number,requires:string[]=[],tags:string[]=[]):Skill =>
   ({id,name,family,kind,difficulty,points,seconds,requires,risk:[0,.07,.12,.18,.23][difficulty],tags});
 export const SKILLS = [

@@ -20,6 +20,7 @@ const legacyIntensity=z.enum(['safe','normal','focus']).optional();
 const actionSchema=z.discriminatedUnion('type',[
   z.strictObject({type:z.literal('pulse')}),
   z.strictObject({type:z.literal('continue-training'),record:z.string().max(140)}),
+  z.strictObject({type:z.literal('continue-event'),record:z.string().max(180)}),
   z.strictObject({type:z.literal('start-training'),record:z.string().max(140)}),
   z.strictObject({type:z.literal('spot'),spot:z.enum(SPOTS)}),
   z.strictObject({type:z.literal('continue-meet'),record:z.string().max(140)}),
@@ -66,18 +67,20 @@ async function limitedBody(request:Request){
 
 export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecret?:string){
   const online='actor' in store ? store as OnlineStore : undefined;
-  const view=(row:Row,username?:string,scope?:string):View=>{
+  const view=(row:Row,username?:string,scope?:string,compact=false):View=>{
     const career=row.snapshot.career;
-    const records=(meets:typeof career.hall[number]['records'],opponents:boolean)=>meets.map(meet=>({
-      ...meet,results:meet.results.map(({proof,opponents:replays,...result})=>opponents?{...result,opponents:replays}:result),
-    }));
+    const records=(meets:typeof career.hall[number]['records'],opponents:boolean)=>meets.map(meet=>{
+      const summary=compact&&(!opponents||career.rider?.id+':'+meet.year+':'+meet.id!==row.snapshot.clock.pendingMeet);
+      return {...meet,...(compact?{detail:summary?'summary' as const:'full' as const}:{}),results:meet.results.map(({proof,opponents:replays,...result})=>summary?{...result,run:{...result.run,log:[],highlight:result.run.log.find(move=>move.outcome==='great')??result.run.log.find(move=>move.outcome==='clean')}}:opponents?{...result,opponents:replays}:result)};
+    });
     const hall=career.hall.map(archive=>({...archive,records:records(archive.records,false)}));
     const rider=career.rider?{...career.rider,extras:extras(career.rider),seed:0,season:{...career.rider.season,division:divisionFor(career.rider.year)},records:records(career.rider.records,true)}:null;
     const parked=career.parked?.map(item=>({...item,seed:0,records:records(item.records,false)}));
-    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,stateVersion:row.snapshot.clock.stateVersion??0,remainingMs:remaining(row.snapshot,weekMs),weekMs,fastForward:false,pendingMeet:row.snapshot.clock.pendingMeet,pendingTraining:row.snapshot.clock.pendingTraining,pendingChoice:row.snapshot.clock.pendingChoice,storage:store.kind,username,scope};
+    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,stateVersion:row.snapshot.clock.stateVersion??0,remainingMs:remaining(row.snapshot,weekMs),weekMs,fastForward:false,pendingMeet:row.snapshot.clock.pendingMeet,pendingTraining:row.snapshot.clock.pendingTraining,pendingChoice:row.snapshot.clock.pendingChoice,pendingEvent:row.snapshot.clock.pendingEvent,storage:store.kind,username,scope};
   };
   return async (request:Request):Promise<Response>=>{
     try{
+      const compact=request.headers.get('x-game-view')==='compact';
       if(request.method!=='GET'&&request.method!=='POST') return respond({error:'지원하지 않는 요청입니다.'},405);
       const fetchSite=request.headers.get('sec-fetch-site');
       const origin=request.headers.get('origin');
@@ -96,6 +99,15 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
           return respond({error:'로그인 상태가 바뀌었어요. 새로고침해 주세요.'},401);
         return await onlineRequest(request,online,secure,rateSecret,actor,tokenHash,request.method==='POST'?await limitedBody(request):null);
       }
+      const replay=new URL(request.url).searchParams.get('replay');
+      if(replay!==null){
+        if(request.method!=='GET')return respond({error:'경기 다시 보기는 조회만 가능합니다.'},405);
+        if(!id)return respond({error:'저장 기록에 다시 연결해 주세요.'},401);
+        if(!/^\d{1,2}:[a-z0-9-]{1,60}$/.test(replay))return respond({error:'경기 기록을 확인해 주세요.'},400);
+        const record=(await store.get(id)).snapshot.career.rider?.records.find(meet=>meet.year+':'+meet.id===replay);
+        if(!record)return respond({error:'이 선수의 경기 기록을 찾지 못했어요.'},404);
+        return respond({...record,detail:'full',results:record.results.map(({proof,...result})=>result)});
+      }
       if(request.method==='GET'){
         let cookie:string|undefined;
         if(!id){
@@ -104,7 +116,7 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
           id=await store.createGuest(tokenHash);
           cookie=sessionCookie(token,GUEST_SECONDS,secure);
         }
-        return respond(view(await store.get(id),username,scope()),200,cookie);
+        return respond(view(await store.get(id),username,scope(),compact),200,cookie);
       }
       if(!id) return respond({error:'게스트 세션이 만료됐어요. 새로고침해 주세요.'},401);
       const parsed=input.safeParse(await limitedBody(request));
@@ -114,15 +126,18 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
       for(let attempt=0;attempt<4;attempt++){
         const row=await store.get(id);
         const stale=stateVersion===undefined?version!==row.version:stateVersion!==(row.snapshot.clock.stateVersion??0);
-        if(action.type!=='pulse'&&stale) return respond({conflict:true,view:view(row,username,scope())},409);
+        if(action.type!=='pulse'&&stale) return respond({conflict:true,view:view(row,username,scope(),compact)},409);
         const versionedWeek=secure?RULES.weekMs:weekMs;
         const next=advance(row.snapshot,action,tab,Date.now(),versionedWeek,identity,secure&&store.kind==='neon',!!username);
-        if(next===row.snapshot) return respond(view(row,username,scope()));
+        if(next===row.snapshot){
+          if(action.type==='pulse'&&version===row.version&&request.headers.get('x-game-pulse')==='minimal')return new Response(null,{status:204,headers:{'Cache-Control':'no-store'}});
+          return respond(view(row,username,scope(),compact));
+        }
         const saved=await store.replace(id,row.version,next,tokenHash);
-        if(saved) return respond(view(saved,username,scope()));
+        if(saved) return respond(view(saved,username,scope(),compact));
         if(online&&tokenHash&&!(await online.actor(tokenHash))) return respond({error:'세션이 만료됐어요. 다시 연결해 주세요.'},401);
       }
-      return respond({conflict:true,view:view(await store.get(id),username,scope())},409);
+      return respond({conflict:true,view:view(await store.get(id),username,scope(),compact)},409);
     } catch(e){
       if(e instanceof AccessError) return respond({error:e.message},e.status);
       if(e instanceof GameError) return respond({error:e.message},422);

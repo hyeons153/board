@@ -1,4 +1,4 @@
-import { CALENDAR, RULES } from '../src/game/data.js';
+import { CALENDAR, calendarFor, meetById, RULES } from '../src/game/data.js';
 import { simulateRun } from '../src/game/competition.js';
 import { equippedLook, freshExtras } from '../src/game/economy.js';
 import { chooseEnding, endingName, summarize } from '../src/game/legacy.js';
@@ -18,7 +18,7 @@ function canonical(value:unknown):string {
 }
 export function verifiedResult(archive:Archive,meet:MeetRecord,result:Result){
   const proof=result.proof;
-  if(!proof||proof.version!==RANKING_VERSION||(proof.rules!==undefined&&proof.rules!==1&&proof.rules!==2&&proof.rules!==3)||!CALENDAR.some(item=>item.id===meet.id)) return false;
+  if(!proof||proof.version!==RANKING_VERSION||(proof.rules!==undefined&&proof.rules!==1&&proof.rules!==2&&proof.rules!==3)||!meetById(meet.id)) return false;
   const player=result.standings.find(row=>row.id==='player');
   if(!player||player.name!==archive.name||player.score!==result.run.score) return false;
   const sorted=[...result.standings].sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
@@ -27,7 +27,7 @@ export function verifiedResult(archive:Archive,meet:MeetRecord,result:Result){
     const gear=proof.gear?{...freshExtras(),...proof.gear}:undefined;
     const {stats,energy,injury,skills}=proof;
     const replay=simulateRun({stats,energy,injury,skills,extras:gear},result.discipline,proof.routine,meetRng(proof.seed,meet.year,meet.id,result.discipline),proof.rules??1);
-    const major=CALENDAR.find(item=>item.id===meet.id)!.major;
+    const major=meetById(meet.id)!.major;
     const points=Math.round(RULES.places[Math.min(player.place-1,5)]*(major?RULES.majorMultiplier:1));
     return points===result.points&&canonical(replay)===canonical(result.run);
   }catch{
@@ -45,12 +45,19 @@ export function publicationFor(archive:Archive):{profile:PublicProfile;entries:R
   const entries:RankEntry[]=[];
   const complete=archive.reason==='complete'&&archive.year===RULES.years&&archive.week===RULES.weeks;
   const chronological=archive.records.length===RULES.years*CALENDAR.length&&
-    new Set(archive.records.map(meet=>meet.year+':'+meet.id)).size===RULES.years*CALENDAR.length;
+    new Set(archive.records.map(meet=>meet.year+':'+meet.id)).size===RULES.years*CALENDAR.length&&
+    archive.records.every(meet=>{
+      if(meet.year<1||meet.year>RULES.years)return false;
+      // Existing careers may contain festivals from before the calendar update.
+      const scheduled=calendarFor(meet.year).some(item=>item.id===meet.id);
+      if(!scheduled&&!(archive.calendarVersion!==2&&meet.id==='festival'))return false;
+      return archive.calendarVersion!==2||!meetById(meet.id)?.international||DISCIPLINES.every(d=>meet.results.some(result=>result.discipline===d));
+    });
   const full=complete&&chronological&&archive.rankedStart===RANKING_VERSION&&verified.length>0&&verified.length===all.length;
   let careerPoints:number|null=null;
   if(full){
     const contest=verified.reduce((total,{meet,result,place})=>{
-      const major=CALENDAR.find(item=>item.id===meet.id)?.major?1.5:1;
+      const major=meetById(meet.id)?.major?1.5:1;
       return total+(result.run.score*.6+40*(allowedPlace[place-1]??0))*divisionWeight[meet.division]*major;
     },0);
     careerPoints=Math.round((contest+summary.champions.reduce((sum,c)=>sum+45*divisionWeight[c.division],0))*10)/10;

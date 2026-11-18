@@ -32,6 +32,7 @@ export type CareerExtras = {
   achievements: string[];
   choices: Record<string, { index:number; year:number; week:number }>;
   timeline: { year:number; week:number; title:string; text:string }[];
+  lastEvent?:import('./types.js').EventOutcome;
   lastTraining?: { reaction?:string; grade:'success'|'great'|'learned'|'mastery'|'miss'|'injury'|'recovery'; text:string; skill?:string; year:number; week:number };
 };
 export function freshExtras(): CareerExtras {

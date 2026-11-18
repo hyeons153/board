@@ -114,6 +114,31 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .date-block, .calendar-row.now, .entry-card { background: #e3efe0; border-color: #b4cbb2; color: #325c4c; }
 .calendar-row { background: #faf5e8; }
 .past-meets summary { color: #3d465c; }
+.meet-career-guide { margin: 0 0 .65rem; color: #59677a; font-size: .78rem; line-height: 1.7; }
+.console-replay-loading { position: absolute; z-index: 5; inset: 40% auto auto 50%; transform: translateX(-50%); padding: 1rem 1.5rem; background: #1d3045; color: #fff7e9; border: 1px solid #cbd7b2; border-radius: 9px; }
+.game-console .game-disciplines.is-required button:disabled { opacity: 1; color: #233d36; background: #dfeeac; cursor: default; }
+.meet-calendar-card { overflow: hidden; border: 1px solid #dcd5c5; border-radius: 9px; background: #fffdf6; }
+.meet-calendar-card > .calendar-row { border: 0; border-radius: 0; }
+.meet-results { padding: .7rem; }
+.meet-result-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .5rem; }
+.meet-result-grid > div { display: grid; align-content: start; gap: .35rem; padding: .65rem; border: 1px solid #d9dfce; border-radius: 6px; background: #f1f5e9; }
+.meet-result-grid span { font-size: .78rem; color: #466455; }
+.meet-result-grid strong { font-size: 1.05rem; }
+.meet-result-grid strong small { font-size: .8rem; font-weight: 500; margin-left: .35rem; }
+.meet-result-grid p { margin: 0; font-size: .71rem; line-height: 1.6; color: #546276; }
+.meet-absent { padding: .65rem; font-size: .8rem; color: #637083; }
+.meet-standings summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-top: .4rem; padding: .5rem 0; font-size: .77rem; }
+.meet-standings > div { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 1rem; }
+.meet-standings h4 { margin: .4rem 0; font-size: .85rem; }
+.meet-standings ol { padding: 0; list-style: none; }
+.meet-standings li { display: grid; grid-template-columns: 2rem 1fr auto; gap: .4rem; padding: .35rem; font-size: .75rem; border-bottom: 1px solid #e5dfd2; }
+.meet-standings .is-player { background: #e0edbf; border-radius: 4px; }
+.meet-history { display: grid; gap: .75rem; }
+.meet-history-card { border: 1px solid #dcd5c5; border-radius: 9px; background: #fffdf6; }
+.meet-history-card > header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .6rem; padding: .8rem .8rem 0; }
+.meet-history-card h3 { font-size: .9rem; margin: 0 0 .25rem; }
+.meet-history-card header p { font-size: .73rem; color: #647180; margin: 0; }
+@media(max-width:600px) { .meet-result-grid { grid-template-columns: 1fr; } .meet-calendar-card .calendar-row { flex-wrap: wrap; } }
 .rank-list li.you { background: #e1efde; border-bottom-color: #a3c09a; color: #284f39; }
 .result-summary > div { background: #eaf2e3; border-color: #c3d4b9; }
 .replay-select { display: flex; align-items: center; gap: .6rem; margin: 0 0 .65rem; }

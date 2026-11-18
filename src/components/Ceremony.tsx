@@ -1,6 +1,6 @@
 import { ArrowRight, Flag, Medal, Trophy } from 'lucide-react';
 import { useState } from 'react';
-import { CALENDAR, DISCIPLINE_NAMES, SKILL } from '../game/data';
+import { meetById, DISCIPLINE_NAMES, SKILL } from '../game/data';
 import { RIVAL } from '../game/content';
 import { equippedLook } from '../game/economy';
 import { chooseEnding, endingName, ENDINGS, summarize } from '../game/legacy';
@@ -15,20 +15,20 @@ export default function Ceremony({archive,onHall,onNew}:{archive:Archive;onHall:
   const latest=archive.records.at(-1);
   const highlights=[...archive.records].flatMap(meet=>meet.results.map(result=>({meet,result}))).sort((a,b)=>b.result.run.score-a.result.run.score);
   const best=highlights[0];
-  const moment=best?.result.run.log.find(move=>move.outcome==='great')??best?.result.run.log.find(move=>move.outcome==='clean');
+  const moment=best?.result.run.highlight??best?.result.run.log.find(move=>move.outcome==='great')??best?.result.run.log.find(move=>move.outcome==='clean');
   const rival=ending.friends.length?RIVAL.get(ending.friends[0]):RIVAL.get('sol');
   const descriptor=ENDINGS[ending.kind];
   const motion=step===0?'brake':step===1?ending.kind==='legend'?'win':'great':'rest';
   const title=['마지막 주행','은퇴식','커리어 하이라이트',endingName(ending)][step];
   const story=[
-    archive.reason==='complete'?'12월 롱보드 페스티벌이 끝났다. 마지막 시즌의 성적과 보상이 확정됐다.':'보드를 내려놓기 전, 지나온 시즌을 돌아본다.',
+    archive.reason==='complete'?`${meetById(latest?.id)?.name??'마지막 대회'}가 끝났다. 마지막 시즌의 성적과 보상이 확정됐다.`:'보드를 내려놓기 전, 지나온 시즌을 돌아본다.',
     descriptor.line,
-    best?`${best.meet.year}년차 ${CALENDAR.find(m=>m.id===best.meet.id)?.name} · ${DISCIPLINE_NAMES[best.result.discipline]} ${best.result.run.score.toFixed(1)}점`:'첫 푸시와 그때 만난 사람들이 선수 기록에 남았다.',
+    best?`${best.meet.year}년차 ${meetById(best.meet.id)?.name} · ${DISCIPLINE_NAMES[best.result.discipline]} ${best.result.run.score.toFixed(1)}점`:'첫 푸시와 그때 만난 사람들이 선수 기록에 남았다.',
     '개인 명예의 전당에 기록을 보관했습니다. 계정에서 공개 여부를 선택할 수 있습니다.',
   ][step];
   return <section className={'panel ceremony ceremony-'+ending.kind}>
     <div className="ceremony-stage">
-      <Scene spot={step===0?(CALENDAR.find(m=>m.id===latest?.id)?.spot??descriptor.spot):descriptor.spot}
+      <Scene spot={step===0?(meetById(latest?.id)?.spot??descriptor.spot):descriptor.spot}
         variant={step===2?'race':'event'} look={equippedLook(archive)} guest={step===1?rival?.look:undefined} motion={motion} technique={step===2&&moment?{id:moment.id,outcome:moment.outcome}:undefined}/>
       <div className="scene-shade"/><div className="spot-title"><span><Medal size={15}/> {archive.name} · {archive.year}년차</span><h2>{title}</h2><p>{story}</p></div>
     </div>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { GameAction, View } from './game/types';
+import type { GameAction, MeetRecord, View } from './game/types';
 
 export function useGame(){
   const [view,setView]=useState<View|null>(null);
@@ -23,7 +23,7 @@ export function useGame(){
     if(inFlight.current) await inFlight.current;
     setError('');setSyncNote('');
     try{
-      const response=await fetch('/api/game',{cache:'no-store'});
+      const response=await fetch('/api/game',{cache:'no-store',headers:{'X-Game-View':'compact'}});
       const data=await response.json();
       if(!response.ok)throw new Error(data.error);
       if(current.current?.scope!==data.scope){
@@ -43,7 +43,8 @@ export function useGame(){
     }
     const request=(async()=>{
       try{
-        const response=await fetch('/api/game',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tab:tab.current,version:current.current!.version,stateVersion:current.current!.stateVersion,scope:current.current!.scope,action})});
+        const response=await fetch('/api/game',{method:'POST',headers:{'Content-Type':'application/json','X-Game-View':'compact',...(pulse?{'X-Game-Pulse':'minimal'}:{})},body:JSON.stringify({tab:tab.current,version:current.current!.version,stateVersion:current.current!.stateVersion,scope:current.current!.scope,action})});
+        if(response.status===204&&pulse)return true;
         const data=await response.json();
         if(!response.ok){
           if(data.view)apply(data.view);
@@ -67,6 +68,17 @@ export function useGame(){
       if(!pulse){mutating.current=false;setSaving(false);}
     }
   },[apply]);
+  const loadReplay=useCallback(async(record:MeetRecord)=>{
+    if(record.detail!=='summary')return record;
+    const scope=current.current?.scope,riderId=current.current?.career.rider?.id;
+    try{
+      const response=await fetch('/api/game?replay='+encodeURIComponent(record.year+':'+record.id),{cache:'no-store'});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error);
+      if(current.current?.scope!==scope||current.current?.career.rider?.id!==riderId)return;
+      return data as MeetRecord;
+    }catch(e){setError(e instanceof Error?e.message:'경기 기록을 불러오지 못했어요.');}
+  },[]);
   useEffect(()=>{void load();},[load]);
   useEffect(()=>{if(!syncNote)return;const timer=window.setTimeout(()=>setSyncNote(''),5000);return ()=>window.clearTimeout(timer);},[syncNote]);
   const active=!!view?.career.rider&&view.career.rider.phase!=='retired';
@@ -76,15 +88,19 @@ export function useGame(){
     let stopped=false;
     let timer:number|undefined;
     let ticking=false;
+    const schedule=()=>{
+      const latest=current.current;
+      const running=latest?.career.rider?.plan&&!latest.pendingChoice&&!latest.pendingTraining&&!latest.pendingEvent&&!latest.pendingMeet;
+      const left=latest?latest.remainingMs-(performance.now()-time.current):0;
+      timer=window.setTimeout(tick,running?Math.max(100,left):8000);
+    };
     const tick=async()=>{
       if(ticking)return;
       ticking=true;
-      await send({type:'pulse'});
+      if(!document.hidden)await send({type:'pulse'});
       ticking=false;
       if(stopped)return;
-      const latest=current.current;
-      const remaining=latest?.remainingMs??0;
-      timer=window.setTimeout(tick,remaining>0?Math.min(8000,Math.max(350,remaining)):8000);
+      schedule();
     };
     const wake=()=>{
       if(document.hidden)return;
@@ -93,14 +109,14 @@ export function useGame(){
     const leave=()=>{
       const latest=current.current;
       if(!latest)return;
-      void fetch('/api/game',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({tab:tab.current,version:latest.version,scope:latest.scope,action:{type:'pulse'}})}).catch(()=>{});
+      void fetch('/api/game',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json','X-Game-View':'compact','X-Game-Pulse':'minimal'},body:JSON.stringify({tab:tab.current,version:latest.version,scope:latest.scope,action:{type:'pulse'}})}).catch(()=>{});
     };
     document.addEventListener('visibilitychange',wake);
     window.addEventListener('pagehide',leave);
-    const ticker=window.setInterval(()=>setNow(performance.now()),100);
-    void tick();
+    const ticker=training?window.setInterval(()=>setNow(performance.now()),100):undefined;
+    schedule();
     return ()=>{stopped=true;window.clearTimeout(timer);window.clearInterval(ticker);document.removeEventListener('visibilitychange',wake);window.removeEventListener('pagehide',leave);};
-  },[active,training,view?.pendingTraining,view?.pendingMeet,view?.pendingChoice,view?.fastForward,send]);
+  },[active,training,view?.remainingMs,view?.pendingTraining,view?.pendingEvent?.key,view?.pendingMeet,view?.pendingChoice,view?.fastForward,send]);
   const remaining=view?Math.max(0,view.remainingMs-(now-time.current)):0;
-  return {view,send,saving,error,syncNote,load,remaining,dismiss:()=>setError('')};
+  return {view,send,saving,error,syncNote,load,loadReplay,remaining,dismiss:()=>setError('')};
 }

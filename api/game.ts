@@ -10,6 +10,9 @@ export default {
     if(!url) return Response.json({error:'서버에 Neon DATABASE_URL이 설정되지 않았어요.'},{status:503,headers:{'Cache-Control':'no-store'}});
     const rateSecret=process.env.AUTH_RATE_SECRET;
     handler??=createHandler(databaseStore(productionDatabase(url,true),'neon'),RULES.weekMs,true,rateSecret&&rateSecret.length>=32?rateSecret:undefined);
-    return handler(request);
+    const started=performance.now();
+    const response=await handler(request);
+    response.headers.set('Server-Timing','app;dur='+(performance.now()-started).toFixed(1));
+    return response;
   },
 };

@@ -1,5 +1,5 @@
 import { Activity, ArrowUpRight, CalendarDays, Gauge, HeartPulse, Link2, MoveDiagonal2, Route, Wind } from 'lucide-react';
-import { CALENDAR, DIVISION_NAMES, RULES, STAT_NAMES } from '../game/data';
+import { calendarFor, DIVISION_NAMES, RULES, STAT_NAMES } from '../game/data';
 import { divisionFor, nextMeet } from '../game/career';
 import { lineTerms } from '../game/content';
 import { STATS, type Rider, type GameAction } from '../game/types';
@@ -30,5 +30,5 @@ export function NewsCard({r}:{r:Rider}){
   return <article className="panel news"><div className="card-heading"><span><Activity size={16}/> 라이더 일지</span></div><ul>{r.news.slice(0,5).map((n,i)=><li key={`${n.year}-${n.week}-${i}`}><span>{n.year}Y / {String(n.week).padStart(2,'0')}W</span>{lineTerms(n.text)}</li>)}</ul></article>;
 }
 export function SeasonStrip({r}:{r:Rider}){
-  return <div className="season-strip panel"><Gauge size={18}/><span>시즌 진행</span><b>{String(r.week).padStart(2,'0')} / {RULES.weeks}주</b><div className="strip-ticks">{CALENDAR.map(m=><i key={m.id} title={m.name} className={m.week<=r.week?'done':''}/>)}</div></div>;
+  return <div className="season-strip panel"><Gauge size={18}/><span>시즌 진행</span><b>{String(r.week).padStart(2,'0')} / {RULES.weeks}주</b><div className="strip-ticks">{calendarFor(r.year).map(m=><i key={m.id} title={m.name} className={m.week<=r.week?'done':''}/>)}</div></div>;
 }

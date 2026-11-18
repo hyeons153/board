@@ -30,7 +30,7 @@ export function EquipmentIcon({item}:{item?:Gear}){
 export default function EquipmentPanel({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
   const progress=extras(r),[slot,setSlot]=useState<GearSlot>('deck'),[rarity,setRarity]=useState('all'),[ownership,setOwnership]=useState('all'),[selected,setSelected]=useState('deck_001');
   const [sound,setSound]=useState(soundsEnabled);
-  const disabled=saving||r.phase==='retired'||!!r.plan,available=r.money-(r.plan?.lesson?ECONOMY.lesson:0);
+  const disabled=saving||r.phase==='retired',available=r.money-(r.plan?.lesson?ECONOMY.lesson:0);
   const isEquipped=(id:string)=>Object.values(progress.equipped).includes(id)||(progress.accessories??[]).includes(id);
   const item=ITEM.get(selected)??GEAR.find(item=>item.slot===slot)!;
   const owned=progress.inventory.includes(item.id),equipped=isEquipped(item.id),unlocked=equipmentUnlocked(r,item);
@@ -45,6 +45,7 @@ export default function EquipmentPanel({r,send,saving}:{r:Rider;send:Submit;savi
   return <section className="panel content-panel equipment-panel">
     <div className="workshop-rider"><PixelRider look={equippedLook(r)} label="현재 장비를 장착한 라이더"/><div><h2>장비와 액세서리</h2><p>보유금 <strong>{money(available)}</strong> · 액세서리 {(progress.accessories??[]).length}/3</p></div><ShoppingBag size={24}/></div>
     <button className="text-button equipment-sound" aria-pressed={sound} onClick={()=>{setSound(!sound);setSoundsEnabled(!sound);}}>효과음 {sound?'켜짐':'꺼짐'}</button>
+    {r.plan&&<p className="subtle">진행 중인 훈련에는 시작할 때의 장비가 적용됩니다. 장비 변경은 다음 훈련부터 반영됩니다.</p>}
     <div className="equipment-totals" aria-label="장비 적용 능력치">{STATS.map(stat=><div key={stat}><span>{STAT_NAMES[stat]}</span><b>{total[stat].toFixed(1)}</b><small>기본 {r.stats[stat]} + 장비 {bonus[stat]}</small></div>)}</div>
     <div className="equipment-loadout" aria-label="현재 장착 장비">
       {BASIC_SLOTS.map(slot=>{const item=ITEM.get(progress.equipped[slot]??'');return <div key={slot}><small>{GEAR_NAMES[slot]}</small><EquipmentIcon item={item}/><strong>{item?.name??'미장착'}</strong>{item&&<button className="text-button" aria-label={item.name+' 해제'} disabled={disabled} onClick={()=>void send({type:'unequip',slot})}>해제</button>}</div>;})}

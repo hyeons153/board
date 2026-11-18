@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,readdir,rmdir,unlink} from 'node:fs/promises';
 import {join} from 'node:path';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {JSDOM} from 'jsdom';
 import {createHandler} from '../server/http';
 import {localStore} from '../server/store';
@@ -21,10 +21,12 @@ test('one game frame previews choices on the existing HUD before confirmation, t
   const originalFetch=globalThis.fetch;
   let cookie='',injectClock=false,injectChoice=false,clockRaces=0;
   const pendingRequests=new Set<Promise<Response>>();
+  const requestActions:string[]=[];
   const mockFetch:typeof fetch=async(input,init)=>{
     const url=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url,'http://127.0.0.1');
     const headers=new Headers(init?.headers);headers.set('origin',url.origin);if(cookie)headers.set('cookie',cookie);
     const body=typeof init?.body==='string'?JSON.parse(init.body):undefined;
+    if(body?.action)requestActions.push(body.action.type);
     if(body?.action.type==='plan'&&(injectClock||injectChoice)){
       const action=injectChoice?{type:'fast-forward',enabled:true}:{type:'pulse'};
       injectClock=false;injectChoice=false;clockRaces++;
@@ -40,6 +42,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
   const {default:App}=await import('../src/App');
   const {default:GameStage}=await import('../src/components/GameStage');
   const {WeeklyChoices}=await import('../src/components/WeeklyChoices');
+  const {Meets}=await import('../src/components/Meets');
   const {newRider,command}=await import('../src/game/career');
   const {DEFAULT_LOOK,SKILL}=await import('../src/game/data');
   const {previewTraining}=await import('../src/game/training');
@@ -144,17 +147,29 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.equal(win.document.querySelector('[aria-label="예상 체력 변화"]'),null);
     await click('속도 훈련 선택');injectClock=true;
     assert.ok(!win.document.querySelector('.console-panel'));
+    const beforePlan=requestActions.length;
     await click('확인하고 수행');
+    assert.deepEqual(requestActions.slice(beforePlan),['plan'],'Confirmation must not trigger a redundant background request before the training deadline');
     assert.equal(clockRaces,1);assert.equal(win.document.querySelector('[role="alert"]'),null);
     assert.ok(!win.document.querySelector('.console-panel'));
     assert.ok(win.document.querySelector('[aria-label="행동 진행"]'));
+    await click('상점');assert.ok(win.document.querySelector('.equipment-panel'));
     await settle(2400);
+    assert.ok(win.document.querySelector('.equipment-panel'),'Background completion must not close the equipment menu');
+    await click('메뉴 닫기');
     assert.ok(win.document.querySelector('[aria-label="이번 주 행동 결과"]'));
     await click('확인하고 계속');
     const event=win.document.querySelector('[aria-label="이벤트 선택"]');assert.ok(event);
     const choice=event.querySelector<HTMLButtonElement>('button')!;
     await act(async()=>{choice.click();});await settle();
     await act(async()=>{await Promise.all([...pendingRequests]);});await settle(10);
+    assert.ok(win.document.querySelector('[aria-label="이벤트 결과"]'));
+    assert.equal(win.document.querySelector('[aria-label="이번 주 행동 선택"]'),null);
+    await click('상점');assert.ok(win.document.querySelector('.equipment-panel'));
+    assert.equal(win.document.querySelector('.console-flow-notice'),null);
+    await click('메뉴 닫기');
+    assert.ok(win.document.querySelector('[aria-label="이벤트 결과"]'));
+    await click('결과 확인하고 계속');
     assert.match(win.document.querySelector('.console-rider')!.textContent!,/2주/);
     await click('휴식 선택');
     assert.ok(win.document.querySelector('[aria-label="예상 체력 변화"]'));
@@ -180,6 +195,20 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     const career={rider,hall:[]};
     command(career,{type:'entry',disciplines:['dance','trick']},()=>({id:'automatic-ui',seed:71}));
     const record=structuredClone(rider.records[0]);
+    rider.year=2;rider.week=52;rider.phase='meet';
+    let selectedEntry:unknown;
+    await act(async()=>root.render(createElement(GameStage,{r:rider,send:async action=>{selectedEntry=action;return true;},saving:false,remaining:0,weekMs:2000,fastForward:false,spot:'river',motion:'ride',onDone:()=>{}})));
+    assert.match(win.document.querySelector('[aria-label="대회 출전 선택"]')!.textContent!,/서울|3종목/);
+    assert.equal(win.document.querySelectorAll('.game-disciplines button[aria-pressed="true"]:disabled').length,3);
+    assert.equal([...win.document.querySelectorAll('button')].some(button=>button.textContent==='이번 대회 쉬기'),false);
+    await click('경기장 입장');assert.deepEqual(selectedEntry,{type:'entry',disciplines:['dance','trick','freestyle']});
+    await act(async()=>root.render(createElement(Meets,{r:rider,onPlay:()=>{},onEntry:()=>{}})));
+    const history=win.document.querySelector('.meet-history-card')!;
+    assert.match(history.textContent!,/위|점|상금 ₩|미출전/);
+    assert.equal(history.querySelectorAll('.meet-result-grid > div').length,3);
+    assert.equal(history.querySelectorAll('.meet-standings li').length,14);
+    assert.match(win.document.querySelector('.calendar-list')!.textContent!,/국제대회 · 서울|3종목 필수/);
+    rider.year=1;rider.week=8;rider.phase='plan';
     let continued=0;
     const realNow=Object.getOwnPropertyDescriptor(performance,'now');
     let playbackNow=performance.now();
@@ -224,8 +253,34 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       await settle(1000);
       assert.ok(win.document.querySelector('[aria-label="이번 주 행동 결과"]'),'Result should remain visible for two seconds');
       await settle(1150);
+      if(win.document.querySelector('[aria-label="이벤트 결과"]')){
+        await settle(1000);assert.ok(win.document.querySelector('[aria-label="이벤트 결과"]'),'Automatic event result must remain visible');
+        await settle(1150);
+      }
     }
     assert.match(win.document.querySelector('.console-rider')!.textContent!,/3주/);
+    await act(async()=>root.unmount());await Promise.allSettled([...pendingRequests]);
+    const store=localStore(directory),owner=await store.authenticate(createHash('sha256').update(cookie.split('=')[1]).digest('hex'));
+    assert.ok(owner);const finalRow=await store.get(owner),finalRider=finalRow.snapshot.career.rider!;
+    finalRider.year=8;finalRider.week=52;finalRider.phase='meet';finalRider.plan=null;finalRider.settings.mode='manual';
+    finalRider.season={year:8,division:'master',scores:{dance:{},trick:{},freestyle:{}}};
+    finalRow.snapshot.clock={credit:0,stamp:0,tabs:{},stateVersion:(finalRow.snapshot.clock.stateVersion??0)+1};
+    assert.ok(await store.replace(owner,finalRow.version,finalRow.snapshot));
+    const endingRoot=createRoot(win.document.getElementById('root')!);
+    try{
+      await act(async()=>endingRoot.render(createElement(App)));await settle(100);
+      await click('경기장 입장');
+      for(let discipline=0;discipline<3;discipline++){
+        await click('결과 보기');assert.ok(win.document.querySelector('[aria-label="대회 시상식"]'));
+        if(discipline<2)await click('다음 종목');
+      }
+      await click('육성 계속');
+      assert.ok(win.document.querySelector('[aria-label="커리어 엔딩"]'),'Final international acknowledgement must open the ending');
+      assert.match(win.document.querySelector('.ceremony-stage')!.textContent!,/국제대회 · 로스앤젤레스/);
+      await click('성적 바로 보기');await click('개인 명예의 전당');
+      assert.ok(win.document.querySelector('[aria-label="명예의 전당"]'));
+      const persisted=await store.get(owner);assert.equal(persisted.snapshot.career.hall[0].records.at(-1)!.results.length,3);
+    }finally{await act(async()=>endingRoot.unmount());}
   }finally{
     await act(async()=>root.unmount());await Promise.allSettled([...pendingRequests]);globalThis.fetch=originalFetch;dom.window.close();
     for(const file of await readdir(directory))await unlink(join(directory,file));await rmdir(directory);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CALENDAR, DEFAULT_LOOK, RULES, SKILL, SKILLS } from '../src/game/data';
+import { CALENDAR, calendarFor, INTERNATIONAL_MEETS, DEFAULT_LOOK, RULES, SKILL, SKILLS } from '../src/game/data';
 import { command, divisionFor, GameError, newRider, processWeek } from '../src/game/career';
 import { chance, generateRoutine, learned, routineTime, simulateMeet, simulateRun, validRoutine } from '../src/game/competition';
 import { ECONOMY, equippedLook, extras, playerPlace, SPONSOR } from '../src/game/economy';
@@ -16,7 +16,7 @@ const plan=(p:Plan['action']):Plan=>({action:p,spot:'river'});
 const enterAuto=(c:Career)=>command(c,{type:'settings',settings:{mode:'auto',strategy:'freestyle',entries:[...DISCIPLINES]}},identity);
 
 test('career divisions follow the four age groups and stats grow above 100 up to 200',()=>{
-  assert.deepEqual(Array.from({length:9},(_,year)=>divisionFor(year)),['rookie','rookie','regular','regular','open','open','master','master','master']);
+  assert.deepEqual(Array.from({length:9},(_,year)=>divisionFor(year)),['rookie','rookie','rookie','regular','regular','open','open','master','master']);
   assert.equal(RULES.statCap,200);
   assert.equal(statAfter(199.9,1000),200);
   assert.equal(statAfter(200,10),200);
@@ -46,6 +46,24 @@ test('main map movement persists freely and exposes the actual spot growth bonus
   save=advance(JSON.parse(JSON.stringify(save)),{type:'plan',plan:{action:'trick',spot:'plaza'}},'first',0,RULES.weekMs,identity);
   assert.equal(save.career.rider!.plan!.spot,'plaza');
   assert.throws(()=>advance(save,{type:'spot',spot:'river'},'first',1,RULES.weekMs,identity),GameError);
+});
+
+test('international graduation meets require all disciplines in manual and automatic play, including at zero energy',()=>{
+  for(const year of [2,4,6,8]){
+    const c=career(),r=c.rider!;r.year=year;r.week=52;r.phase='meet';r.energy=0;
+    r.injury={severity:'major',weeks:2,treated:false};
+    r.season={year,division:divisionFor(year),scores:{dance:{},trick:{},freestyle:{}}};
+    assert.throws(()=>command(c,{type:'entry',disciplines:[]},identity),/3종목/);
+    assert.throws(()=>command(c,{type:'entry',disciplines:['dance','trick']},identity),/3종목/);
+    command(c,{type:'entry',disciplines:[...DISCIPLINES]},identity);
+    const record=r.records.at(-1)!;
+    assert.equal(record.id,'international-'+year);assert.equal(record.division,divisionFor(year));assert.deepEqual(record.results.map(result=>result.discipline),[...DISCIPLINES]);
+    assert.equal(r.energy,0);assert.equal(r.phase,year===8?'retired':'plan');
+    if(year===8){assert.equal(c.hall[0].records.at(-1)!.id,'international-8');assert.equal(c.hall[0].calendarVersion,2);}
+  }
+  const c=career(),r=c.rider!;r.year=2;r.week=52;r.phase='meet';
+  command(c,{type:'settings',settings:{mode:'auto',strategy:'dance',entries:[]}},identity);
+  assert.equal(r.records[0].results.length,3,'International entry overrides ordinary auto entry preferences');
 });
 
 test('direct training spends energy, pauses for an event and awards progress only once',()=>{
@@ -111,24 +129,28 @@ test('eight consecutive seasons yield 48 distinct meets, promotion, resets, and 
   for(let i=0;i<52*8;i++){
     assert.equal(processWeek(c),true);
     if(i===51){
-      assert.equal(r.year,2);assert.equal(r.week,1);assert.equal(r.season.division,'regular');
+      assert.equal(r.year,2);assert.equal(r.week,1);assert.equal(r.season.division,'rookie');
       assert.deepEqual(r.records.map(m=>m.id),CALENDAR.map(m=>m.id));
       assert.deepEqual(r.season.scores.dance,{});
       assert.ok(r.seasons[0].scores.dance.player>0);
     }
-    if(i===52*3-1)assert.equal(r.season.division,'open');
-    if(i===52*5-1)assert.equal(r.season.division,'master');
+    if(i===52*4-1)assert.equal(r.season.division,'open');
+    if(i===52*6-1)assert.equal(r.season.division,'master');
   }
   assert.equal(r.phase,'retired');
   assert.equal(c.hall.length,1);
   assert.equal(c.hall[0].reason,'complete');
   assert.equal(r.year,8);assert.equal(r.week,52);
   assert.equal(r.records.at(-1)!.division,'master');
-  assert.equal(r.records.at(-1)!.id,CALENDAR.at(-1)!.id);
-  assert.deepEqual(r.seasons.map(season=>season.division),['rookie','regular','regular','open','open','master','master','master']);
+  assert.equal(r.records.at(-1)!.id,'international-8');
+  assert.deepEqual(r.seasons.map(season=>season.division),['rookie','rookie','regular','regular','open','open','master','master']);
   assert.equal(c.hall[0].seasons.length,8);
   assert.equal(c.hall[0].records.length,48);
   assert.equal(new Set(r.records.map(m=>m.year+'-'+m.id)).size,48);
+  assert.deepEqual(r.records.filter(m=>m.id.startsWith('international-')).map(m=>m.year),[2,4,6,8]);
+  assert.ok(r.records.filter(m=>m.id.startsWith('international-')).every(m=>m.results.length===3));
+  assert.equal(new Set(INTERNATIONAL_MEETS.map(m=>m.host)).size,4);
+  for(let year=1;year<=8;year++)assert.deepEqual(r.records.filter(m=>m.year===year).map(m=>m.id),calendarFor(year).map(m=>m.id));
   assert.ok(r.records.some(m=>m.results.length===3&&m.results[2].energy<m.results[0].energy));
   assert.ok(r.money>RULES.startMoney);
   assert.equal(processWeek(c),false);
@@ -187,7 +209,7 @@ test('sponsors pay once per season, award equipment and pay a recorded podium bo
   const c=career(),r=c.rider!;
   const brand=SPONSOR.get('daybreak')!;
   assert.throws(()=>command(c,{type:'sponsor',id:brand.id},identity),GameError);
-  r.year=2;r.season={year:2,division:'regular',scores:{dance:{},trick:{},freestyle:{}}};r.week=7;r.fame=30;
+  r.year=3;r.season={year:3,division:'regular',scores:{dance:{},trick:{},freestyle:{}}};r.week=7;r.fame=30;
   for(const key of STATS) r.stats[key]=100;
   for(const skill of SKILLS) r.skills[skill.id]={study:100,mastery:100};
   const fixture=simulateMeet(r,CALENDAR[0],['dance']).results[0];
@@ -207,8 +229,8 @@ test('sponsors pay once per season, award equipment and pay a recorded podium bo
   const after=r.money;
   r.week=52;r.phase='meet';
   command(c,{type:'entry',disciplines:[]},identity);
-  assert.equal(r.year,3);
-  assert.equal(extras(r).contract?.year,3);
+  assert.equal(r.year,4);
+  assert.equal(extras(r).contract?.year,4);
   assert.equal(r.money,after+brand.support+ECONOMY.podiumSeason[0]);
   assert.ok(extras(r).timeline.some(item=>item.title==='시즌 순위 보상'));
   assert.equal(extras(r).inventory.filter(item=>item===brand.gift).length,1);
@@ -235,6 +257,12 @@ test('each confirmed action takes two seconds, survives reload and awards one re
   assert.throws(()=>advance(save,{type:'continue-training',record:key},'first',900001,week,identity),GameError);
   save=advance(save,{type:'event',index:0},'first',900001,week,identity);
   assert.equal(save.career.rider!.week,2);assert.equal(remaining(save,week,900001),0);
+  assert.ok(save.clock.pendingEvent);
+  assert.throws(()=>advance(save,{type:'plan',plan:plan('speed')},'first',900002,week,identity),GameError);
+  const resultKey=save.clock.pendingEvent.key;
+  save=advance(JSON.parse(JSON.stringify(save)),{type:'continue-event',record:resultKey},'reopened',900003,week,identity);
+  assert.equal(save.clock.pendingEvent,undefined);
+  assert.throws(()=>advance(save,{type:'continue-event',record:resultKey},'first',900004,week,identity),GameError);
 });
 
 test('automatic play performs one action at a time and waits for its result and tournament before the next week',()=>{
@@ -259,6 +287,7 @@ test('automatic play performs one action at a time and waits for its result and 
     const snapshot=structuredClone(save);assert.deepEqual(advance(save,{type:'pulse'},'other',1000000,week,identity),snapshot);
     save=advance(save,{type:'continue-training',record:save.clock.pendingTraining!},'first',1000000,week,identity);
     assert.ok(save.clock.pendingMeet);assert.equal(save.career.rider!.plan,null);
+    if(save.clock.pendingEvent)save=advance(save,{type:'continue-event',record:save.clock.pendingEvent.key},'first',1000000,week,identity);
     save=advance(save,{type:'continue-meet',record:save.clock.pendingMeet!},'first',1000000,week,identity);
     assert.equal(save.clock.pendingMeet,undefined);
     assert.equal(remaining(save,week,1000000),0);
@@ -313,4 +342,51 @@ test('training previews match recovery and successful stat gains while low stami
   const rest=previewTraining({...r,energy:80},{...p,action:'rest'});assert.equal(rest.energy,20);assert.equal(rest.energyAfter,100);
   const hospital=previewTraining({...r,money:0,energy:0,injury:{severity:'major',weeks:3,treated:false}},{...p,action:'hospital'});
   assert.equal(hospital.energy,24);assert.equal(hospital.money,0);
+});
+
+
+test('management stays available through story, training and result holds without consuming or duplicating outcomes',()=>{
+ const week=2000;let save=advance(blankSave(),{type:'create',name:'Independent menus',look:DEFAULT_LOOK},'tab',0,week,identity);
+ save=advance(save,{type:'plan',plan:{action:'speed',spot:'river'}},'tab',0,week,identity);
+ const control=advance(structuredClone(save),{type:'pulse'},'tab',2000,week,identity);
+ const began=save.clock.readyAt;
+ save=advance(save,{type:'trade',operation:'buy',item:'acc_005'},'tab',500,week,identity);
+ save=advance(save,{type:'trade',operation:'equip',item:'acc_005'},'tab',700,week,identity);
+ assert.equal(save.clock.readyAt,began);
+ save=advance(save,{type:'pulse'},'tab',2000,week,identity);
+ assert.equal(save.career.rider!.energy,control.career.rider!.energy,'Current training keeps its original equipment costs');
+ assert.deepEqual(save.career.rider!.stats,control.career.rider!.stats);
+ const training=save.clock.pendingTraining;assert.ok(training);
+ save=advance(save,{type:'unequip',slot:'accessory',item:'acc_005'},'tab',2100,week,identity);
+ assert.equal(save.clock.pendingTraining,training);
+ save=advance(save,{type:'continue-training',record:training!},'tab',2200,week,identity);
+ assert.equal(save.career.rider!.phase,'event');
+ save=advance(save,{type:'trade',operation:'equip',item:'acc_005'},'tab',2300,week,identity);
+ assert.equal(save.career.rider!.event,'first');
+ save=advance(save,{type:'event',index:1},'tab',2400,week,identity);
+ const result=structuredClone(save.clock.pendingEvent);assert.ok(result);assert.match(result.choice,/균형/);assert.ok(result.details.includes('밸런스 +3'));
+ const balance=save.career.rider!.stats.balance;
+ save=advance(save,{type:'unequip',slot:'accessory',item:'acc_005'},'tab',2500,week,identity);
+ assert.deepEqual(save.clock.pendingEvent,result);assert.equal(save.career.rider!.week,2);
+ assert.equal(advance(save,{type:'pulse'},'tab',100000,week,identity),save,'A held result has no repeated work');
+ assert.throws(()=>advance(save,{type:'event',index:1},'tab',2600,week,identity),GameError);
+ save=advance(JSON.parse(JSON.stringify(save)),{type:'continue-event',record:result.key},'other-tab',2700,week,identity);
+ assert.equal(save.clock.pendingEvent,undefined);assert.equal(save.career.rider!.stats.balance,balance);
+ save=advance(save,{type:'plan',plan:{action:'speed',spot:'river'}},'tab',2800,week,identity);
+ assert.ok(save.clock.trainingSetup);
+});
+
+test('automatic event results hold the next action and management preserves the queued selection',()=>{
+ const week=2000;let save=advance(blankSave(),{type:'create',name:'Auto outcome',look:DEFAULT_LOOK},'tab',0,week,identity);
+ save=advance(save,{type:'settings',settings:{mode:'auto',strategy:'balanced',entries:[]}},'tab',0,week,identity);
+ const choice=save.clock.pendingChoice!;
+ save=advance(save,{type:'trade',operation:'buy',item:'acc_005'},'tab',100,week,identity);assert.equal(save.clock.pendingChoice,choice);
+ save=advance(save,{type:'start-training',record:choice},'tab',2000,week,identity);
+ save=advance(save,{type:'pulse'},'tab',4000,week,identity);assert.ok(save.clock.pendingEvent);assert.ok(save.clock.pendingTraining);
+ save=advance(save,{type:'continue-training',record:save.clock.pendingTraining!},'tab',6000,week,identity);
+ assert.equal(save.clock.pendingChoice,undefined);assert.ok(save.clock.pendingEvent);
+ const result=save.clock.pendingEvent!;
+ save=advance(save,{type:'trade',operation:'equip',item:'acc_005'},'tab',6100,week,identity);
+ assert.equal(save.clock.pendingEvent?.key,result.key);assert.equal(save.clock.pendingChoice,undefined);
+ save=advance(save,{type:'continue-event',record:result.key},'tab',8000,week,identity);assert.ok(save.clock.pendingChoice);
 });

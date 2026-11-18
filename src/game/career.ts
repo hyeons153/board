@@ -1,4 +1,4 @@
-import { ACTION_NAMES, CALENDAR, DISCIPLINE_NAMES, LOCATIONS, RULES, SKILL, SKILLS, START_SKILLS, STAT_NAMES } from './data.js';
+import { ACTION_NAMES, calendarFor, DISCIPLINE_NAMES, LOCATIONS, RULES, SKILL, SKILLS, START_SKILLS, STAT_NAMES } from './data.js';
 import { generateRoutine, learned, simulateMeet, validRoutine } from './competition.js';
 import { autoChoice, canStudy, eventFor, eventPaused, pickEvent } from './events.js';
 import { chooseEnding, honors, mentorFrom } from './legacy.js';
@@ -10,13 +10,13 @@ import { statAfter, trainingCost, trainingFactor, trainingStatGains, trainingSuc
 import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family } from './types.js';
 
 export class GameError extends Error {}
-export const divisionFor=(year:number):Division=>year<=1?'rookie':year<=3?'regular':year<=5?'open':'master';
-export const currentMeet=(r:Rider)=>CALENDAR.find(m=>m.week===r.week);
-export const nextMeet=(r:Rider)=>CALENDAR.find(m=>m.week>=r.week);
+export const divisionFor=(year:number):Division=>year<=2?'rookie':year<=4?'regular':year<=6?'open':'master';
+export const currentMeet=(r:Rider)=>calendarFor(r.year).find(m=>m.week===r.week);
+export const nextMeet=(r:Rider)=>calendarFor(r.year).find(m=>m.week>=r.week);
 const makeSeason=(year:number):Season=>({year,division:divisionFor(year),scores:{dance:{},trick:{},freestyle:{}}});
 export function newRider(id:string,seed:number,name:string,look:Look):Rider {
   return {
-    id,seed,name,look,year:1,week:1,stats:{...RULES.startStats},energy:100,money:RULES.startMoney,fame:0,injury:null,
+    id,seed,name,look,year:1,week:1,calendarVersion:2,stats:{...RULES.startStats},energy:100,money:RULES.startMoney,fame:0,injury:null,
     skills:structuredClone(START_SKILLS),relations:Object.fromEntries(RIVALS.map(n=>[n.id,0])),events:{},extras:freshExtras(),
     settings:{mode:'manual',strategy:'balanced',entries:['dance']},plan:null,spot:'river',phase:'plan',event:null,
     entries:null,routines:{dance:[],trick:[],freestyle:[]},records:[],season:makeSeason(1),seasons:[],
@@ -65,14 +65,15 @@ export function validatePlan(r:Rider,p:Plan) {
   if(p.lesson&&(!p.skill||!['studio','night','arena'].includes(p.spot)||r.money<ECONOMY.lesson))
     throw new GameError('레슨은 실내·야간·대회 연습장에서 기술을 지정하고 레슨비를 확보해야 해요.');
 }
-function train(r:Rider,p:Plan) {
+function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
   const rng=seeded(r.seed,r.year,r.week,'training');
   const injuryBefore=r.injury;
   r.spot=p.spot;
   r.lastPlan=p;
   const names:string[]=[];
   const progress=r.extras=upgradeEquipment(r.extras??freshExtras());
-  const bonuses=gearBonuses(r);
+  const trainingRider=setup?{...r,routines:setup.routines,extras:{...progress,...setup.gear}}:r;
+  const bonuses=gearBonuses(trainingRider);
   const masteryGain=(id:string,amount:number)=>amount*(1+(SKILL[id]?.family==='dance'?bonuses.danceMastery:bonuses.trickMastery));
   let grade: NonNullable<typeof progress.lastTraining>['grade']='success';
   let practiced:string|undefined;
@@ -94,18 +95,18 @@ function train(r:Rider,p:Plan) {
     const practice=RULES.practice;
     const attempted=SKILL[p.skill??''];
     const form=rng();
-    const success=trainingSuccess(r,p);
+    const success=trainingSuccess(trainingRider,p);
     const missed=form<1-success;
     const great=form>1-practice.greatChance-bonuses.great&&!r.injury&&energyBefore>=55;
-    const factor=trainingFactor(r,p,form,great);
+    const factor=trainingFactor(trainingRider,p,form,great);
     const late=RULES.growth[Math.min(7,r.year-1)];
-    const gains=trainingStatGains(r,p,factor);
+    const gains=trainingStatGains(trainingRider,p,factor);
     if(p.lesson){
       r.money-=ECONOMY.lesson;
       names.push(`레슨비 ₩${ECONOMY.lesson.toLocaleString('ko-KR')}.`);
     }
     grade=missed?'miss':great?'great':'success';
-    r.energy=round(clamp(r.energy-trainingCost(r,p)));
+    r.energy=round(clamp(r.energy-trainingCost(trainingRider,p)));
     let difficulty=attempted?.difficulty??1, mastery=attempted?(r.skills[attempted.id]?.mastery??12):60;
     if(missed){
       names.push(`훈련에 실패했다. 훈련 전 체력 ${round(energyBefore)} · 성공률 ${Math.round(success*100)}%. 능력치는 오르지 않았다.`);
@@ -132,7 +133,7 @@ function train(r:Rider,p:Plan) {
 
     } else if(p.action==='rehearsal'){
       const discipline=p.discipline??'freestyle';
-      const ids=r.routines[discipline].length?r.routines[discipline]:generateRoutine(r,discipline,'flow');
+      const ids=trainingRider.routines[discipline].length?trainingRider.routines[discipline]:generateRoutine(trainingRider,discipline,'flow');
       for(const id of [...new Set(ids)].slice(0,4)) trainSkill(r,id,0,masteryGain(id,practice.rehearsalMastery*factor*late.mastery));
 
       if(!great) grade='mastery';
@@ -143,7 +144,7 @@ function train(r:Rider,p:Plan) {
     }
     if(!missed)for(const stat of STATS)r.stats[stat]=round(r.stats[stat]+(gains[stat]??0));
     const risk=RULES.injury;
-    const pInjury=clamp((risk.base+(100-energyBefore)*risk.energy+(difficulty-1)*risk.difficulty-(effectiveStats(r).balance+mastery*.34)*risk.stability)*spot.risk+(r.injury?.03:0)-bonuses.injury,.004,.38);
+    const pInjury=clamp((risk.base+(100-energyBefore)*risk.energy+(difficulty-1)*risk.difficulty-(effectiveStats(trainingRider).balance+mastery*.34)*risk.stability)*spot.risk+(r.injury?.03:0)-bonuses.injury,.004,.38);
     if(rng()<pInjury){
       const major=rng()<clamp(.12+(difficulty-1)*.06+(100-energyBefore)*.002,0,.48) || r.injury?.severity==='major';
       r.injury={severity:major?'major':'minor',weeks:major?risk.majorWeeks:risk.minorWeeks,treated:false};
@@ -161,7 +162,7 @@ function train(r:Rider,p:Plan) {
   }
   r.money=Math.max(RULES.safetyFund,r.money+RULES.weeklyAllowance);
   const text=`${ACTION_NAMES[p.action]} · ${names.join(' ')}`;
-  progress.lastTraining={grade,text,skill:practiced,year:r.year,week:r.week,reaction:equipmentReaction(r,grade)};
+  progress.lastTraining={grade,text,skill:practiced,year:r.year,week:r.week,reaction:equipmentReaction(trainingRider,grade)};
   note(r,'training',text);
 }
 function autoPlan(r:Rider):Plan {
@@ -210,24 +211,33 @@ function applyEvent(r:Rider,index:number){
   r.money=Math.max(0,r.money+(fx.money??0));
   r.fame+=fx.fame??0;
   if(r.energy!==energyBefore) details.push(`체력 ${round(r.energy-energyBefore)>0?'+':''}${round(r.energy-energyBefore)}`);
-  if(r.money!==moneyBefore) details.push(`보유금 ${(r.money-moneyBefore).toLocaleString('ko-KR')}원`);
   if(fx.fame) details.push(`명성 +${fx.fame}`);
   if(fx.stat){
     const before=r.stats[fx.stat];stat(r,fx.stat,fx.gain??0);
     if(r.stats[fx.stat]>before) details.push(`${STAT_NAMES[fx.stat]} +${round(r.stats[fx.stat]-before)}`);
   }
   const relation=(fx.relation??0)+(e.npc&&(fx.relation??0)>0?gearBonuses(r).relation:0);
-  if(e.npc) r.relations[e.npc]=clamp((r.relations[e.npc]??0)+relation);
-  if(e.npc&&fx.relation) details.push(`관계 +${relation}`);
+  if(e.npc){
+    const before=r.relations[e.npc]??0;r.relations[e.npc]=clamp(before+relation);
+    const change=round(r.relations[e.npc]-before);
+    if(change)details.push(`관계 ${change>0?'+':''}${change}`);
+  }
   if(fx.skill&&canStudy(r,fx.skill)){
+    const before={study:r.skills[fx.skill]?.study??0,mastery:r.skills[fx.skill]?.mastery??0};
     trainSkill(r,fx.skill,fx.study??0,4);
-    details.push(`${SKILL[fx.skill]!.name} ${learned(r.skills,fx.skill)?'습련':'학습'}`);
+    const after=r.skills[fx.skill]!;
+    const changes=[after.study>before.study?`학습 +${round(after.study-before.study)}%`:undefined,after.mastery>before.mastery?`숙련 +${round(after.mastery-before.mastery)}%`:undefined].filter(Boolean);
+    if(changes.length)details.push(`${SKILL[fx.skill]!.name} ${changes.join(' · ')}`);
   }
   if(fx.item&&ITEM.has(fx.item)){
-    const items=(r.extras??=freshExtras()).inventory;if(!items.includes(fx.item))items.push(fx.item);details.push(ITEM.get(fx.item)!.name+' 획득');
+    const items=(r.extras??=freshExtras()).inventory;
+    if(!items.includes(fx.item)){items.push(fx.item);details.push(ITEM.get(fx.item)!.name+' 획득');}
+    else details.push(ITEM.get(fx.item)!.name+' 이미 보유');
   }
+  if(r.money!==moneyBefore)details.push(`보유금 ${r.money>moneyBefore?'+':''}${(r.money-moneyBefore).toLocaleString('ko-KR')}원`);
   r.events[e.id]=(r.events[e.id]??0)+1;
   (r.extras ??= freshExtras()).choices[e.id]={index,year:r.year,week:r.week};
+  (r.extras ??= freshExtras()).lastEvent={key:`${r.id}:${r.year}:${r.week}:${e.id}`,eventId:e.id,title:e.title,kind:e.kind,choice:choice.label,details:[...details],year:r.year,week:r.week,npc:e.npc};
   r.event=null;
   const description=`${choice.label}${details.length?' · '+details.join(' / '):''}`;
   note(r,'event',`${e.title} · ${description}`);
@@ -262,7 +272,7 @@ function runMeet(c:Career,r:Rider,disciplines:Discipline[],official:boolean) {
   const meet=currentMeet(r);
   if(!meet) throw new GameError('이번 주에 예정된 대회가 없어요.');
   if(r.records.some(m=>m.year===r.year&&m.id===meet.id)) throw new GameError('이미 끝난 대회입니다.');
-  const entries=r.injury?.severity==='major'&&!r.injury.treated?[]:disciplines;
+  const entries=meet.international?[...DISCIPLINES]:r.injury?.severity==='major'&&!r.injury.treated?[]:disciplines;
   const {results,rankings}=simulateMeet(r,meet,entries,official);
   for(const d of DISCIPLINES){
     const points=r.season.scores[d];
@@ -298,13 +308,13 @@ function afterTraining(c:Career,r:Rider,official:boolean) {
     } else if(r.entries!==null) runMeet(c,r,r.entries,official);
   } else finishWeek(c,r);
 }
-export function processWeek(c:Career,official=false) {
+export function processWeek(c:Career,official=false,setup?:import('./types.js').TrainingSetup) {
   const r=c.rider;
   if(!r||r.phase!=='plan'||(!r.plan&&r.settings.mode==='manual')) return false;
   r.extras=upgradeEquipment(r.extras??freshExtras());
   const plan=r.plan??autoPlan(r);
   validatePlan(r,plan);
-  train(r,plan);
+  train(r,plan,setup);
   r.plan=null;
   if(r.settings.mode==='auto'&&r.settings.pauseInjury&&r.extras?.lastTraining?.grade==='injury'){
     r.phase='injury';
@@ -326,8 +336,8 @@ function finishTraining(c:Career,r:Rider,official:boolean){
 function retire(c:Career,r:Rider,reason:'complete'|'early'){
   r.phase='retired'; r.reason=reason; r.plan=null; r.event=null; r.entries=null;
   const seasons=reason==='complete'?r.seasons:[...r.seasons,r.season];
-  const {id,name,look,year,week,stats,skills,records,relations,fame,events,rankedStart,extras:progression}=r;
-  const archive={id,name,look,year,week,reason,stats,skills,records,seasons,relations,fame,events,rankedStart,extras:progression};
+  const {id,name,look,year,week,stats,skills,records,relations,fame,events,rankedStart,calendarVersion,extras:progression}=r;
+  const archive={id,name,look,year,week,reason,stats,skills,records,seasons,relations,fame,events,rankedStart,calendarVersion,extras:progression};
   c.hall.push(structuredClone({...archive,ending:chooseEnding(archive),honors:honors(archive)}));
   note(r,'system',reason==='complete'?'8년의 커리어를 마치고 명예의 전당에 이름을 남겼다.':'선수 생활을 마치고 명예의 전당에 이름을 남겼다.');
 }
@@ -388,12 +398,13 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
     applyEvent(r,a.index); afterTraining(c,r,official);
   }
   if(a.type==='entry'){
-    if(!currentMeet(r)) throw new GameError('대회 주차에만 출전을 신청할 수 있어요.');
+    const meet=currentMeet(r);
+    if(!meet) throw new GameError('대회 주차에만 출전을 신청할 수 있어요.');
+    if(meet.international&&DISCIPLINES.some(d=>!a.disciplines.includes(d)))throw new GameError('국제대회는 댄싱·트릭·프리스타일 3종목 모두 출전해요.');
     r.entries=a.disciplines;
     if(r.phase==='meet') runMeet(c,r,r.entries,official);
   }
   if(a.type==='trade'||a.type==='unequip'||a.type==='sponsor'||a.type==='makeover'){
-    if(r.plan&&(a.type==='trade'||a.type==='unequip'))throw new GameError('이번 주 행동이 끝난 뒤 장비를 바꿔 주세요.');
     const progress=r.extras ??= freshExtras();
     const reserve=r.plan?.lesson?ECONOMY.lesson:0;
     if(a.type==='trade'){

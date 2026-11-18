@@ -24,18 +24,22 @@ console.log('PASS starter seed, underscored IDs, concurrent purchase paid once, 
 await send({type:'plan',plan:{action:'link',spot:'plaza'}});await new Promise(resolve=>setTimeout(resolve,2200));await send({type:'pulse'});
 assert.ok(view!.pendingTraining);assert.equal(view!.career.rider!.energy,84);assert.ok(view!.career.rider!.stats.link>=14);
 await send({type:'continue-training',record:view!.pendingTraining!});if(view!.career.rider!.phase==='event')await send({type:'event',index:0});
+if(view!.pendingEvent)await send({type:'continue-event',record:view!.pendingEvent.key});
 console.log('PASS equipped training cost and permanent stat gain through HTTP + PostgreSQL');
 await send({type:'settings',settings:{mode:'auto',strategy:'balanced',entries:['dance']}});
 const deadline=Date.now()+50000;
 while(!view!.pendingMeet&&Date.now()<deadline){
   if(view!.pendingTraining)await send({type:'continue-training',record:view!.pendingTraining!});
+  if(view!.pendingEvent)await send({type:'continue-event',record:view!.pendingEvent.key});
   if(view!.pendingMeet)break;
   if(view!.pendingChoice)await send({type:'start-training',record:view!.pendingChoice!});
   await new Promise(resolve=>setTimeout(resolve,2200));await send({type:'pulse'});
 }
 assert.ok(view!.pendingMeet);assert.equal(view!.career.rider!.records[0].results.length,1);
 assert.deepEqual(view!.career.rider!.extras!.equipped,equipment);assert.deepEqual(view!.career.rider!.extras!.accessories,accessories);
-if(view!.pendingTraining)await send({type:'continue-training',record:view!.pendingTraining!});await send({type:'continue-meet',record:view!.pendingMeet!});
+if(view!.pendingTraining)await send({type:'continue-training',record:view!.pendingTraining!});
+  if(view!.pendingEvent)await send({type:'continue-event',record:view!.pendingEvent.key});
+await send({type:'continue-meet',record:view!.pendingMeet!});
 await send({type:'settings',settings:{...view!.career.rider!.settings,mode:'manual'}});
 await send({type:'trade',operation:'sell',item:'acc_001'});await read();assert.ok(!view!.career.rider!.extras!.inventory.includes('acc_001'));
 console.log('PASS automatic tournament keeps the loadout, records one result, then selling persists');
