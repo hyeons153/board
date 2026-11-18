@@ -17,13 +17,13 @@ export default function Scene({spot,look,guest,motion='ride',technique,variant='
   useEffect(()=>{Object.assign(latest.current,{spot,look,guest,motion,technique,variant});},[spot,look,guest,motion,technique,variant]);
   useEffect(()=>{
     let cancelled=false;
-    let game:ReturnType<typeof import('../scene/phaserScene')['createStage']>|undefined;
+    let game:Awaited<ReturnType<typeof import('../scene/phaserScene')['createStage']>>|undefined;
     const media=matchMedia('(prefers-reduced-motion: reduce)');
     const sync=()=>{latest.current.reduce=media.matches;};
     sync();
     media.addEventListener('change',sync);
-    import('../scene/phaserScene').then(({createStage})=>{
-      if(!cancelled&&host.current) game=createStage(host.current,()=>latest.current);
+    import('../scene/phaserScene').then(async({createStage})=>{
+      if(!cancelled&&host.current){const created=await createStage(host.current,()=>latest.current);if(cancelled)created.destroy(true);else game=created;}
     }).catch(()=>{if(!cancelled)setFailed(true);});
     return ()=>{cancelled=true;media.removeEventListener('change',sync);game?.destroy(true);};
   },[]);

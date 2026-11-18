@@ -62,14 +62,14 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await click('새 라이더 등록');
     await click('여성');await click('데크 색상 검정');
     assert.equal(win.document.querySelectorAll('.look-presets button').length,5);
-    await click('추천 코디 2');
+    await click('추천 코디 3');
     assert.equal(win.document.querySelector<HTMLSelectElement>('[aria-label="헤어스타일"]')!.value,'6');
-    assert.equal(win.document.querySelector<HTMLSelectElement>('[aria-label="상의 디자인"]')!.value,'5');
+    assert.equal(win.document.querySelector<HTMLSelectElement>('[aria-label="상의 디자인"]')!.value,'1');
     await click('오른쪽');
     assert.equal(win.document.querySelector('.look-views [aria-pressed="true"]')!.textContent,'오른쪽');
     await click('뒤');await click('정면');
     const hairstyle=win.document.querySelector<HTMLSelectElement>('[aria-label="헤어스타일"]')!;
-    assert.equal(hairstyle.options.length,12);
+    assert.equal(hairstyle.options.length,13);
     await act(async()=>{hairstyle.value='10';hairstyle.dispatchEvent(new win.Event('change',{bubbles:true}));});
     await settle();assert.equal(hairstyle.value,'10');
     assert.equal(win.document.querySelector('[aria-label="데크 색상 검정"]')!.getAttribute('aria-pressed'),'true');
@@ -80,7 +80,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await act(async()=>{Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype,'value')!.set!.call(name,'UI test rider');name.dispatchEvent(new win.Event('input',{bubbles:true}));});
     await click('등록하고 시작');
     const created=await handler(new Request('http://127.0.0.1/api/game',{headers:{cookie}}));
-    const createdView=await created.json();assert.equal(createdView.career.rider.look.hair,10);assert.equal(createdView.career.rider.look.outfit,5);assert.equal(createdView.career.rider.look.bottom,3);
+    const createdView=await created.json();assert.equal(createdView.career.rider.look.hair,10);assert.equal(createdView.career.rider.look.outfit,1);assert.equal(createdView.career.rider.look.bottom,3);
     assert.ok(win.document.querySelector('[aria-label="이번 주 행동 선택"]'));
     assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,9);
     assert.equal(win.document.querySelectorAll('[aria-label="현재 능력치"] meter').length,4);

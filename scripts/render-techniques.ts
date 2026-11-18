@@ -5,6 +5,8 @@ import { DEFAULT_LOOK, SKILLS } from '../src/game/data';
 import { paintRider } from '../src/scene/rider';
 import { ACTOR_WIDTH, ACTOR_HEIGHT } from '../src/scene/techniques';
 import { HEIGHT, WIDTH, paintLandscape } from '../src/scene/landscape';
+import {prepareCharacterReview} from './character-art';
+await prepareCharacterReview();
 
 const folder=resolve('.longboard/animation-review');await mkdir(folder,{recursive:true});
 const frames=[.07,.26,.4,.53,.67,.86,1],scale=1.3,cellWidth=ACTOR_WIDTH*scale,cellHeight=ACTOR_HEIGHT*scale+28;
@@ -24,12 +26,12 @@ for(let page=0;page<3;page++){
 const scene=createCanvas(WIDTH*3,HEIGHT*3),world=createCanvas(WIDTH,HEIGHT),actor=createCanvas(ACTOR_WIDTH,ACTOR_HEIGHT);
 paintLandscape(world.getContext('2d') as unknown as CanvasRenderingContext2D,'river',true);
 paintRider(actor.getContext('2d') as unknown as CanvasRenderingContext2D,DEFAULT_LOOK,'ride',0,{id:'kickflip',progress:.48});
-world.getContext('2d').drawImage(actor,203,52,ACTOR_WIDTH*.9,ACTOR_HEIGHT*.9);
+world.getContext('2d').drawImage(actor,203,16,ACTOR_WIDTH*.9,ACTOR_HEIGHT*.9);
 scene.getContext('2d').imageSmoothingEnabled=false;scene.getContext('2d').drawImage(world,0,0,scene.width,scene.height);
 const path=resolve(folder,'scene.png');await writeFile(path,scene.toBuffer('image/png'));console.log(path);
 const stance=createCanvas(WIDTH*3,HEIGHT*3),stanceWorld=createCanvas(WIDTH,HEIGHT);
 paintLandscape(stanceWorld.getContext('2d') as unknown as CanvasRenderingContext2D,'plaza');
 paintRider(actor.getContext('2d') as unknown as CanvasRenderingContext2D,DEFAULT_LOOK,'ride',0);
-stanceWorld.getContext('2d').drawImage(actor,236,52,ACTOR_WIDTH*.9,ACTOR_HEIGHT*.9);
+stanceWorld.getContext('2d').drawImage(actor,236,16,ACTOR_WIDTH*.9,ACTOR_HEIGHT*.9);
 stance.getContext('2d').imageSmoothingEnabled=false;stance.getContext('2d').drawImage(stanceWorld,0,0,stance.width,stance.height);
 const stancePath=resolve(folder,'stance.png');await writeFile(stancePath,stance.toBuffer('image/png'));console.log(stancePath);

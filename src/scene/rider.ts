@@ -1,8 +1,8 @@
 import { BOARDS } from '../game/data';
-import { characterArm, characterHairBack, characterHead, characterLeg, characterTorso, type Expression } from './character';
+import { paintSpriteCharacter } from './spriteCharacter';
 import type { Look } from '../game/types';
 import type { Motion } from './motion';
-import { ACTOR_HEIGHT, ACTOR_WIDTH, basicPose, boardPoint, techniquePose, type Point, type Pose, type Technique } from './techniques';
+import { ACTOR_HEIGHT, ACTOR_OFFSET, ACTOR_WIDTH, basicPose, boardPoint, techniquePose, type Point, type Pose, type Technique } from './techniques';
 
 type Ctx=CanvasRenderingContext2D;
 const INK='#191e2a';
@@ -45,11 +45,11 @@ function deck(c:Ctx,look:Look,b:Pose['board']){
   poly(c,'#f5eed3',[edge(27,-3),edge(30,-2),edge(30,2),edge(27,3)]);
 }
 function decorations(c:Ctx,look:Look,pose:Pose,shoulder:Point,headY:number,time:number,motion:Motion,night:boolean,great=false){
-  const visuals=look.equipment?.accessories??[],x=shoulder.x,hatY=Math.max(2,headY-23),celebrate=great||['great','success','win'].includes(motion)||pose.cheer;
+  const visuals=look.equipment?.accessories??[],x=shoulder.x,hatY=Math.max(2,headY-38),celebrate=great||['great','success','win'].includes(motion)||pose.cheer;
   // One helmet layer takes precedence; small face and torso accessories remain independent.
   const helmet=visuals.includes('rainbow')?'rainbow':visuals.includes('crown')?'crown':visuals.includes('helmet')?'helmet':undefined;
   if(helmet){
-    oval(c,INK,x-21,hatY,42,19);oval(c,helmet==='crown'?'#edc86e':helmet==='rainbow'?'#f5da77':'#a7c6d6',x-19,hatY+2,38,15);
+    oval(c,INK,x-27,hatY,54,29);oval(c,helmet==='crown'?'#edc86e':helmet==='rainbow'?'#f5da77':'#a7c6d6',x-25,hatY+2,50,25);
     box(c,'#fff3ce',x-10,hatY+5,8,2);
     if(helmet==='crown'){for(const dx of [-11,-2,7])box(c,'#f6d779',x+dx,Math.max(2,hatY-3),5,6);box(c,'#e997a6',x-2,hatY+8,4,3);}
     if(helmet==='rainbow'){box(c,INK,x-8,hatY+8,3,3);box(c,INK,x+5,hatY+8,3,3);box(c,'#efa458',x-3,hatY+12,7,3);}
@@ -64,7 +64,7 @@ function decorations(c:Ctx,look:Look,pose:Pose,shoulder:Point,headY:number,time:
     else if(visual==='camera'){box(c,INK,x-5,shoulder.y+10,11,8);oval(c,'#a9d5d9',x-2,shoulder.y+12,5,5);box(c,'#839aaf',x+3,shoulder.y+11,2,1);}
     else if(visual==='whistle'){box(c,'#e5c477',x-1,shoulder.y+7,2,8);box(c,'#f9db7d',x-3,shoulder.y+14,7,4);}
     else if(visual==='wrists'||visual==='tape'||visual==='led'){
-      const spread=pose.cheer?27:15+Math.max(0,pose.arms)*.9,handY=pose.cheer?shoulder.y-16:shoulder.y+20-Math.max(0,pose.arms)*1.5;
+      const spread=pose.cheer?25:16+Math.max(0,pose.arms)*.8,handY=pose.cheer?shoulder.y-10:shoulder.y+28-Math.max(0,pose.arms)*1.5;
       const color=visual==='led'&&night?'#85ffde':visual==='tape'?'#f1e4c6':'#637e98';
       box(c,color,x+spread-3,handY-4,6,3);if(visual==='led'&&night)for(const dx of [-7,7])box(c,'#afffe3',x+spread+dx,handY-3,2,2);
     }
@@ -84,40 +84,16 @@ function decorations(c:Ctx,look:Look,pose:Pose,shoulder:Point,headY:number,time:
   }
 }
 export function paintRider(c:Ctx,look:Look,motion:Motion,time:number,technique?:Technique,night=false){
-  c.clearRect(0,0,ACTOR_WIDTH,ACTOR_HEIGHT);c.imageSmoothingEnabled=false;
+  c.clearRect(0,0,c.canvas.width,c.canvas.height);c.imageSmoothingEnabled=false;
+  const resolution=c.canvas.height/ACTOR_HEIGHT;c.save();c.scale(resolution,resolution);
   const pose=technique?techniquePose(technique.id,technique.progress??(time%4000/4000),technique.outcome,technique.bodyHeading,technique.boardHeading):basicPose(motion,time);
   // Leave room for nose pivots and airborne techniques. Portraits use a tighter canvas.
-  const padding=(c.canvas.width-128)/2;
-  pose.hip.x+=padding;pose.board.x+=padding;pose.hip.y+=16;pose.board.y+=16;pose.feet.forEach(foot=>{foot.x+=padding;foot.y+=16;});
-  c.globalAlpha=.28;box(c,'#171f30',29+padding,126,70,3);box(c,'#171f30',38+padding,129,51,1);c.globalAlpha=1;
+  const padding=(c.canvas.width/resolution-128)/2;
+  pose.hip.x+=padding;pose.board.x+=padding;pose.hip.y+=ACTOR_OFFSET;pose.board.y+=ACTOR_OFFSET;pose.feet.forEach(foot=>{foot.x+=padding;foot.y+=ACTOR_OFFSET;});
+  c.globalAlpha=.28;box(c,'#171f30',29+padding,166,70,3);box(c,'#171f30',38+padding,169,51,1);c.globalAlpha=1;
   if(look.equipment?.accessories.includes('rainbow')&&pose.fall<.1&&(technique||['ride','accelerate','carve','brake'].includes(motion)))for(const [i,color] of ['#ee92a5','#f0cb81','#c6e99b','#8ed8d1','#bca7de'].entries())box(c,color,pose.board.x-55+i*4,Math.min(ACTOR_HEIGHT-12,pose.board.y+4)+i,42-i*4,2);
   deck(c,look,pose.board);
-  const expression:Expression=pose.fall>.05||motion==='lose'?'sad':pose.cheer||['great','win','success'].includes(motion)?'smile':motion==='wobble'?'surprise':'neutral';
-  if(pose.fall>.05){
-    const f=pose.fall,hip={x:pose.hip.x+f*11,y:pose.hip.y+(116-pose.hip.y)*f};
-    const shoulder={x:hip.x+f*20,y:hip.y-20*(1-f)},headY=Math.min(99,shoulder.y-11*(1-f)-3);
-    characterHairBack(c,look,shoulder.x+f*7,headY,pose.bodyYaw,time);
-    characterLeg(c,look,hip,{x:39+padding,y:120},0);characterLeg(c,look,hip,{x:63+padding,y:125},1);
-    characterTorso(c,look,shoulder,hip,pose.bodyYaw);
-    characterArm(c,look,shoulder,{x:shoulder.x+9,y:124},.6);
-    characterHead(c,look,shoulder.x+f*7,headY,pose.bodyYaw,expression,time);
-    decorations(c,look,pose,shoulder,headY,time,motion,night);return;
-  }
-  const bodyWidth=18+Math.abs(Math.cos(pose.bodyYaw))*9;
-  const shoulder={x:pose.hip.x+pose.lean,y:pose.hip.y-20},headY=shoulder.y-11;
-  characterHairBack(c,look,shoulder.x,headY,pose.bodyYaw,time);
-  const hips=[{x:pose.hip.x-8*Math.cos(pose.bodyYaw),y:pose.hip.y},{x:pose.hip.x+8*Math.cos(pose.bodyYaw),y:pose.hip.y}];
-  // Keep the original foot contacts and draw the farther leg before crossed steps.
-  const order=pose.feet[0].y<pose.feet[1].y?[0,1]:[1,0];
-  for(const i of order)characterLeg(c,look,hips[i],pose.feet[i],i);
-  const spread=pose.cheer?27:15+Math.max(0,pose.arms)*.9;
-  const armY=pose.cheer?shoulder.y-16:shoulder.y+20-Math.max(0,pose.arms)*1.5;
-  characterArm(c,look,{x:shoulder.x-bodyWidth/2,y:shoulder.y+1},{x:shoulder.x-spread,y:armY},-.45);
-  characterTorso(c,look,shoulder,pose.hip,pose.bodyYaw);
-  characterArm(c,look,{x:shoulder.x+bodyWidth/2,y:shoulder.y+1},{x:shoulder.x+spread,y:armY+2},.45);
-  characterHead(c,look,shoulder.x,headY,pose.bodyYaw,expression,time);
-  decorations(c,look,pose,shoulder,headY,time,motion,night,technique?.outcome==='great'&&(technique.progress??0)>.65);
-  if(pose.cheer)for(let i=0;i<8;i++){
-    const angle=i/8*Math.PI*2+time/1400;box(c,['#ffe795','#c3ffc5','#ffad91'][i%3],shoulder.x+Math.cos(angle)*31,headY+Math.sin(angle)*21,2,2);
-  }
+  const art=paintSpriteCharacter(c,look,pose,(!technique||technique.progress===0)&&['rest','ride','lose','carve'].includes(motion),time);
+  if(art){decorations(c,look,pose,art.shoulder,art.headY,time,motion,night,technique?.outcome==='great'&&(technique.progress??0)>.65);c.restore();return;}
+  c.restore();
 }

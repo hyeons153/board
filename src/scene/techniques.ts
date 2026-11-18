@@ -3,7 +3,7 @@ import type { Motion } from './motion';
 import { RULES } from '../game/data';
 
 const TAU=Math.PI*2;
-export const ACTOR_WIDTH=224, ACTOR_HEIGHT=136;
+export const ACTOR_WIDTH=224, ACTOR_HEIGHT=176, ACTOR_OFFSET=56;
 export type Point={x:number;y:number};
 export type Technique={id:string;progress?:number;rate?:number;loop?:boolean;outcome?:Outcome;bodyHeading?:number;boardHeading?:number};
 export type Pose={
@@ -23,7 +23,7 @@ export const TECHNIQUES:Record<string,Profile>={
   'no-com-big':{kind:'no-comply',body:.5,board:1,air:20},bigspin:{kind:'pop',body:.5,board:1,air:23},
   'front-pop':{kind:'pop',board:-.5,air:21},'pop-shuvit':{kind:'pop',board:.5,air:23},
   heelflip:{kind:'pop',flip:-1,air:23},bigger:{kind:'pop',body:.5,board:1.5,air:25},
-  hardflip:{kind:'pop',board:-.5,flip:1,air:25},treflip:{kind:'pop',board:1,flip:1,air:25},varial:{kind:'pop',board:.5,flip:1,air:23},
+  hardflip:{kind:'pop',board:-.5,flip:-1,air:25},treflip:{kind:'pop',board:1,flip:1,air:25},varial:{kind:'pop',board:.5,flip:1,air:23},
 };
 export const clamp=(n:number)=>Math.max(0,Math.min(1,n));
 const smooth=(n:number)=>{const t=clamp(n);return t*t*(3-2*t);};
@@ -88,6 +88,26 @@ export function techniquePose(id:string,progress:number,outcome:Outcome='clean',
       break;
     }
     case 'step':case 'cross':case 'turn': {
+      if(id==='peter-pan'||profile.kind==='cross'||id==='step-180'||id==='step-360'){
+        // Gather/lift one foot while the other supports the rider. The board stays level.
+        // Rechecked against the supplied mini-game's foot positions and step guide.
+        const steps:([number,number,number,number])[]=id==='peter-pan'
+          ? [[48,100,80,100],[78,96,80,100],[78,96,52,102],[65,99,52,102],[48,100,80,100]]
+          : profile.kind==='cross'
+            ? [[45,100,67,103],[74,97,67,103],[74,97,84,102],[88,98,84,102],[48,100,80,100]]
+            : id==='step-180'
+              ? [[48,100,80,100],[80,96,80,100],[80,96,48,102],[80,100,48,100]]
+              : [[48,100,80,100],[80,96,80,100],[80,96,48,102],[48,98,48,102],[48,98,80,100],[48,100,80,100]];
+        const at=q*(steps.length-1),index=Math.min(steps.length-2,Math.floor(at)),fraction=at-index,t=smooth(fraction),a=steps[index],b=steps[index+1];
+        pose.feet=[0,1].map(i=>{
+          const moving=Math.abs(a[i*2]-b[i*2])+Math.abs(a[i*2+1]-b[i*2+1])>1;
+          return {x:lerp(a[i*2],b[i*2],t),y:lerp(a[i*2+1],b[i*2+1],t)-(moving?Math.sin(fraction*Math.PI)*6:0)};
+        }) as [Point,Point];
+        if(id==='back-cross')pose.feet.forEach(foot=>{foot.x=128-foot.x;});
+        pose.hip.x+=(pose.feet[0].x+pose.feet[1].x-128)*.17;pose.lean=Math.sin(q*Math.PI*2)*2;
+        pose.hip.y-=Math.sin(fraction*Math.PI)*1.8;pose.arms=Math.sin(q*Math.PI)*5;
+        break;
+      }
       if(id==='v-spin'){pose.bodyYaw=bodyHeading+TAU*between(p,.3,.63);feetOnDeck();pose.arms=wave*4;}
       const direction=id==='back-cross'?-1:1;
       const steps=profile.kind==='turn'?(id==='step-180'?2:4):4;
@@ -96,10 +116,6 @@ export function techniquePose(id:string,progress:number,outcome:Outcome='clean',
       const crossing=Math.sin(q*Math.PI*2);
       pose.feet[0].x+=crossing*direction*19;pose.feet[1].x-=crossing*direction*19;
       pose.feet[moving].y-=stepLift;
-      if(profile.kind==='cross'){
-        const travel=wave*direction*11;
-        pose.feet.forEach(foot=>foot.x+=travel);pose.hip.x+=travel;
-      }
       pose.feet.forEach(foot=>{foot.x=Math.max(38,Math.min(90,foot.x));});
       pose.hip.y-=Math.abs(Math.sin(stride*Math.PI))*2;pose.lean=crossing*2;
       break;

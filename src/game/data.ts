@@ -37,15 +37,15 @@ export const OUTCOME_NAMES = { miss:'실패', rough:'어설픈 성공', clean:'�
 export const KIND_NAMES = { step:'스텝', technique:'테크닉', spin:'회전', pop:'팝', flip:'플립' };
 export const DIFFICULTY_NAMES = ['','초급','중급','고급','최고급'];
 export const SKINS = ['#e8a877','#f2c59e','#bc825b','#85543d','#f7dcc4','#603f34'];
-export const SHIRTS = ['#cafd67','#f88966','#9f9cf5','#54d3cb','#faf4df','#303749','#ed9bc0','#83b8ed','#376b72','#425b46','#a44e3b','#574569'];
+export const SHIRTS = ['#cafd67','#f88966','#9f9cf5','#54d3cb','#faf4df','#303749','#ed9bc0','#83b8ed','#376b72','#425b46','#a44e3b','#574569','#333e64'];
 export const BOARDS = ['#fab66c','#d5faf1','#bc91ec','#f47a87','#232833','#f6f4e9','#82b9ed','#94d79e'];
 export const BOARD_COLOR_NAMES = ['살구','민트','라벤더','코랄','검정','흰색','하늘','연두'];
 export const HAIR_COLORS = ['#252437','#99513d','#b187c8','#a9c662','#60452f','#e6c983','#eee9dc','#df97ae','#ed814c','#b8c5e0'];
 export const PANTS = ['#574b74','#2b5478','#2f7064','#8d5a55','#262d3c','#e7dfcd','#86a8cf','#cc9caf','#4c5b47','#39333e'];
 export const SHOES = ['#fff2db','#9aeddc','#fcb58d','#d2c9ff','#2c3342','#f4f4ee','#ed91ae','#8fbced','#956348','#503943'];
 export const EYE_COLORS = ['#68443a','#5a467d','#3e5f89','#596747','#34303e','#a36264'];
-export const HAIR_STYLES = ['숏컷','사이드 파트','긴 생머리','캡','스파이크','내추럴 웨이브','트윈테일','단발','묶음머리 · 번','사이드 포니테일','하이 포니테일','롱 웨이브'];
-export const OUTFITS = ['오버핏 후디','바시티 재킷','집업 재킷','반팔 티','크롭 후디','세일러 재킷','루즈핏 니트'];
+export const HAIR_STYLES = ['숏컷','사이드 파트','긴 생머리','캡','스파이크','내추럴 웨이브','트윈테일','단발','묶음머리 · 번','사이드 포니테일','하이 포니테일','롱 웨이브','댄디 슬릭'];
+export const OUTFITS = ['오버핏 후디','바시티 재킷','집업 재킷','워크 재킷','크롭 후디','세일러 재킷','루즈핏 니트'];
 export const BOTTOMS = ['카고 팬츠','조거 팬츠','반바지','플리츠 스커트'];
 export const FOOTWEAR = ['스니커즈','하이탑','워커'];
 export const DEFAULT_LOOK:Look = {hair:0,hairColor:4,skin:1,shirt:10,pants:9,shoes:8,board:4,gender:'male',outfit:2,bottom:0,footwear:2,eyes:0};
@@ -53,16 +53,16 @@ export const DEFAULT_LOOK:Look = {hair:0,hairColor:4,skin:1,shirt:10,pants:9,sho
 // Presets only change appearance. Every part remains available to either gender.
 export const LOOK_PRESETS:Record<'male'|'female',Look[]> = {
   male:[DEFAULT_LOOK,
-    {...DEFAULT_LOOK,hair:1,hairColor:5,shirt:11,pants:0,outfit:1,footwear:0,eyes:1},
-    {...DEFAULT_LOOK,hair:4,hairColor:8,shirt:8,pants:2,outfit:0,footwear:1},
-    {...DEFAULT_LOOK,hair:5,hairColor:0,shirt:5,pants:9,outfit:0,eyes:1},
-    {...DEFAULT_LOOK,hair:1,hairColor:6,shirt:9,pants:8,outfit:3}],
+    {...DEFAULT_LOOK,hair:12,hairColor:5,shirt:11,pants:0,shoes:3,outfit:1,footwear:0,eyes:0},
+    {...DEFAULT_LOOK,hair:4,hairColor:8,shirt:8,pants:2,shoes:2,outfit:0,footwear:1},
+    {...DEFAULT_LOOK,hair:5,hairColor:0,shirt:5,pants:9,shoes:3,outfit:0,footwear:0,eyes:0},
+    {...DEFAULT_LOOK,hair:1,hairColor:6,shirt:9,pants:9,shoes:1,outfit:3,footwear:1}],
   female:[
-    {...DEFAULT_LOOK,gender:'female',hair:11,hairColor:7,shirt:6,pants:9,outfit:2,bottom:3,eyes:5},
-    {...DEFAULT_LOOK,gender:'female',hair:6,hairColor:5,shirt:1,pants:0,outfit:5,bottom:3,footwear:1,eyes:1},
-    {...DEFAULT_LOOK,gender:'female',hair:7,hairColor:0,shirt:2,pants:4,outfit:1,bottom:3,footwear:0,eyes:1},
-    {...DEFAULT_LOOK,gender:'female',hair:8,hairColor:4,shirt:4,pants:9,outfit:4,bottom:1},
-    {...DEFAULT_LOOK,gender:'female',hair:9,hairColor:9,shirt:1,pants:5,outfit:5,bottom:2,footwear:1,eyes:2}],
+    {...DEFAULT_LOOK,gender:'female',hair:7,hairColor:4,shirt:10,pants:9,outfit:2,bottom:0},
+    {...DEFAULT_LOOK,gender:'female',hair:10,hairColor:4,shirt:4,pants:9,outfit:4,bottom:1},
+    {...DEFAULT_LOOK,gender:'female',hair:6,hairColor:1,shirt:9,pants:9,shoes:5,outfit:1,bottom:3,footwear:0},
+    {...DEFAULT_LOOK,gender:'female',hair:2,hairColor:0,shirt:11,pants:5,shoes:3,outfit:0,bottom:3,footwear:0},
+    {...DEFAULT_LOOK,gender:'female',hair:11,hairColor:5,shirt:9,pants:9,shoes:1,outfit:1,bottom:2,footwear:1}],
 };
 
 export const LOCATIONS = {

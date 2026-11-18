@@ -6,19 +6,21 @@ import { RIVALS } from '../src/game/content';
 import type { Look } from '../src/game/types';
 import { paintRider } from '../src/scene/rider';
 import { ACTOR_HEIGHT, ACTOR_WIDTH } from '../src/scene/techniques';
+import {prepareCharacterReview} from './character-art';
+await prepareCharacterReview();
 
 const folder=resolve('.longboard/animation-review');await mkdir(folder,{recursive:true});
 type Sample={look:Look;label:string;heading?:number;technique?:{id:string;progress:number;outcome?:'miss'|'great'};motion?:'rest'|'win'|'wobble'};
 async function sheet(name:string,samples:Sample[],columns:number){
-  const cellWidth=250,cellHeight=290,canvas=createCanvas(cellWidth*columns,cellHeight*Math.ceil(samples.length/columns)),c=canvas.getContext('2d');
+  const cellWidth=250,cellHeight=380,canvas=createCanvas(cellWidth*columns,cellHeight*Math.ceil(samples.length/columns)),c=canvas.getContext('2d');
   c.imageSmoothingEnabled=false;
   for(const [i,sample] of samples.entries()){
-    const x=i%columns*cellWidth,y=Math.floor(i/columns)*cellHeight,actor=createCanvas(ACTOR_WIDTH,ACTOR_HEIGHT);
+    const x=i%columns*cellWidth,y=Math.floor(i/columns)*cellHeight,actor=createCanvas(ACTOR_WIDTH*2,ACTOR_HEIGHT*2);
     const technique=sample.technique??(sample.heading?{id:'peter-pan',progress:0,bodyHeading:sample.heading,boardHeading:sample.heading}:undefined);
     paintRider(actor.getContext('2d') as unknown as CanvasRenderingContext2D,sample.look,sample.motion??'rest',0,technique);
     c.fillStyle=Math.floor(i/columns)%2?'#e7dedf':'#eeeade';c.fillRect(x,y,cellWidth-2,cellHeight-2);
     c.drawImage(actor,x-99,y-4,ACTOR_WIDTH*2,ACTOR_HEIGHT*2);
-    c.fillStyle='#45364b';c.font='bold 14px "Malgun Gothic", sans-serif';c.fillText(sample.label,x+12,y+276);
+    c.fillStyle='#45364b';c.font='bold 14px "Malgun Gothic", sans-serif';c.fillText(sample.label,x+12,y+366);
   }
   const path=resolve(folder,name+'.png');await writeFile(path,canvas.toBuffer('image/png'));console.log(path);
 }

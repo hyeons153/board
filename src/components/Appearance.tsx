@@ -3,6 +3,7 @@ import { BOARD_COLOR_NAMES, BOARDS, BOTTOMS, EYE_COLORS, FOOTWEAR, HAIR_COLORS, 
 import type { Look } from '../game/types';
 import { paintRider } from '../scene/landscape';
 import { ACTOR_HEIGHT } from '../scene/techniques';
+import {loadCharacterSprites} from '../scene/spriteCharacter';
 
 const fields=[
   ['hair','헤어스타일',HAIR_STYLES],
@@ -52,17 +53,18 @@ export function LookFields({look,onChange}:{look:Look;onChange:(look:Look)=>void
 export function PixelRider({look,label,heading=0}:{look:Look;label?:string;heading?:number}){
   const ref=useRef<HTMLCanvasElement>(null);
   useEffect(()=>{
-    const context=ref.current?.getContext('2d');
-    if(context) paintRider(context,look,'rest',0,heading?{id:'peter-pan',progress:0,bodyHeading:heading,boardHeading:heading}:undefined);
+    let cancelled=false;
+    void loadCharacterSprites().then(()=>{const context=ref.current?.getContext('2d');if(context&&!cancelled)paintRider(context,look,'rest',0,heading?{id:'peter-pan',progress:0,bodyHeading:heading,boardHeading:heading}:undefined);}).catch(()=>{});
+    return ()=>{cancelled=true;};
   },[look,heading]);
-  return <canvas ref={ref} className="pixel-rider" width={128} height={ACTOR_HEIGHT} role={label?'img':undefined} aria-label={label} aria-hidden={!label}/>;
+  return <canvas ref={ref} className="pixel-rider" width={256} height={ACTOR_HEIGHT*2} role={label?'img':undefined} aria-label={label} aria-hidden={!label}/>;
 }
 
 export function LookPreview({look,label}:{look:Look;label:string}){
   const [heading,setHeading]=useState(0);
   return <div className="look-preview"><PixelRider look={look} label={label} heading={heading}/><div className="look-views" aria-label="외형 미리보기 방향">
-    {['정면','¾','오른쪽','뒤','왼쪽'].map((name,index)=>{
-      const angle=[0,Math.PI/4,Math.PI/2,Math.PI,-Math.PI/2][index];
+    {['정면','오른쪽','뒤','왼쪽'].map((name,index)=>{
+      const angle=[0,Math.PI/2,Math.PI,-Math.PI/2][index];
       return <button key={name} type="button" aria-pressed={heading===angle} onClick={()=>setHeading(angle)}>{name}</button>;
     })}
   </div></div>;

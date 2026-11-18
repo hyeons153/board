@@ -2,9 +2,11 @@ import * as Phaser from 'phaser';
 import type { Look, Spot } from '../game/types';
 import { HEIGHT, WIDTH, paintLandscape, paintRider, type Motion } from './landscape';
 import { ACTOR_HEIGHT, ACTOR_WIDTH, type Technique } from './techniques';
+import {loadCharacterSprites} from './spriteCharacter';
 
 export type Stage = { spot:Spot; look:Look; guest?:Look; motion:Motion; technique?:Technique; variant:'title'|'dashboard'|'race'|'event'|'preview'; reduce:boolean };
-export function createStage(parent:HTMLElement,latest:()=>Stage){
+export async function createStage(parent:HTMLElement,latest:()=>Stage){
+  await loadCharacterSprites();
   class SpotScene extends Phaser.Scene {
     private art!: Phaser.Textures.CanvasTexture;
     private rider!: Phaser.Textures.CanvasTexture;
@@ -20,11 +22,11 @@ export function createStage(parent:HTMLElement,latest:()=>Stage){
     private progressAt=0;
     create(){
       this.art=this.textures.createCanvas('pixel-landscape',WIDTH,HEIGHT)!;
-      this.rider=this.textures.createCanvas('pixel-rider',ACTOR_WIDTH,ACTOR_HEIGHT)!;
-      this.guestArt=this.textures.createCanvas('pixel-guest',ACTOR_WIDTH,ACTOR_HEIGHT)!;
+      this.rider=this.textures.createCanvas('pixel-rider',ACTOR_WIDTH*2,ACTOR_HEIGHT*2)!;
+      this.guestArt=this.textures.createCanvas('pixel-guest',ACTOR_WIDTH*2,ACTOR_HEIGHT*2)!;
       this.add.image(0,0,'pixel-landscape').setOrigin(0,0);
-      this.guestSprite=this.add.image(370,106,'pixel-guest').setOrigin(0,0).setScale(.56);
-      this.sprite=this.add.image(0,0,'pixel-rider').setOrigin(0,0).setScale(.9);
+      this.guestSprite=this.add.image(370,84,'pixel-guest').setOrigin(0,0).setScale(.28);
+      this.sprite=this.add.image(0,0,'pixel-rider').setOrigin(0,0).setScale(.45);
       this.render(performance.now());
     }
     update(time:number){ if(this.sprite) this.render(time); }
@@ -52,12 +54,12 @@ export function createStage(parent:HTMLElement,latest:()=>Stage){
       const moving=!s.technique&&['ride','accelerate','brake','mount','carve'].includes(s.motion);
       const lurch=s.motion==='accelerate'?Math.min(32,elapsed*.045):s.motion==='brake'?Math.max(0,18-elapsed*.024):0;
       const drift=moving?Math.sin(now/1350)*(competition?38:15):0;
-      this.sprite.setPosition(Math.round(anchor+drift+lurch),52);
+      this.sprite.setPosition(Math.round(anchor+drift+lurch),16);
       this.guestSprite.setVisible(!!s.guest);
       if(s.guest){
         paintRider(this.guestArt.getContext(),s.guest,s.variant==='event'?'rest':'ride',now);
         this.guestArt.refresh();
-        this.guestSprite.setPosition(s.variant==='event'?298:348,s.variant==='event'?95:101);
+        this.guestSprite.setPosition(s.variant==='event'?298:348,s.variant==='event'?73:79);
       }
     }
   }

@@ -54,6 +54,12 @@ async function run(){
       assert.equal(response.status,200,'Built application assets must load');
       await response.body?.cancel();
     }
+    const art=await fetch(new URL('/art/characters/riders-v2.png',base),{signal:AbortSignal.timeout(25000)});
+    assert.equal(art.status,200,'The full-body character atlas must be deployed');
+    const bytes=Buffer.from(await art.arrayBuffer());
+    assert.equal(bytes.subarray(1,4).toString(),'PNG');
+    assert.equal(bytes.readUInt32BE(16),960);assert.equal(bytes.readUInt32BE(20),2688);
+    console.log('PASS detailed full-body character atlas -> 60 directional views served');
   }
   console.log('PASS application page and assets served');
   await load();

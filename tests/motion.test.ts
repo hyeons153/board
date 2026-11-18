@@ -1,6 +1,6 @@
-import test from 'node:test';
+import test,{before} from 'node:test';
 import assert from 'node:assert/strict';
-import { createCanvas } from '@napi-rs/canvas';
+import { createCanvas,loadImage } from '@napi-rs/canvas';
 import { BOARDS, DEFAULT_LOOK, HAIR_STYLES, LOOK_PRESETS, OUTFITS, SKILLS } from '../src/game/data';
 import { lineTerms, RIVALS } from '../src/game/content';
 import { paintRider } from '../src/scene/rider';
@@ -8,8 +8,32 @@ import { NEW_GEAR } from '../src/game/equipmentCatalog';
 import { equippedLook, freshExtras } from '../src/game/economy';
 import { ACTOR_HEIGHT, ACTOR_WIDTH, TECHNIQUES, boardPoint, headingsBefore, techniquePose, trainingTechnique } from '../src/scene/techniques';
 import type { Look, MoveLog } from '../src/game/types';
+import {prepareCharacterReview} from '../scripts/character-art';
+before(prepareCharacterReview);
 
 const near=(actual:number,expected:number)=>assert.ok(Math.abs(actual-expected)<.00001,`${actual} != ${expected}`);
+
+test('idle artwork retains the supplied sprite body proportions and every opaque source pixel',async()=>{
+  const actual=createCanvas(ACTOR_WIDTH*2,ACTOR_HEIGHT*2),expected=createCanvas(ACTOR_WIDTH*2,ACTOR_HEIGHT*2);
+  const atlas=await loadImage('public/art/characters/riders-v2.png');
+  paintRider(actual.getContext('2d') as unknown as CanvasRenderingContext2D,DEFAULT_LOOK,'ride',0);
+  const c=expected.getContext('2d');c.imageSmoothingEnabled=false;
+  c.drawImage(atlas,0,0,192,224,(112.3-48)*2,(156-110)*2,192,224);
+  const a=actual.getContext('2d').getImageData(0,0,actual.width,actual.height).data,b=c.getImageData(0,0,actual.width,actual.height).data;
+  let same=0,total=0;
+  for(let i=0;i<b.length;i+=4)if(b[i+3]===255){total++;if(a[i]===b[i]&&a[i+1]===b[i+1]&&a[i+2]===b[i+2])same++;}
+  assert.ok(total>10000,'The detailed original body must be present');
+  assert.ok(same/total>.995,`Original artwork must survive the idle pose: ${same}/${total}`);
+});
+
+test('Peter Pan and cross-step gather one foot while the other remains planted',()=>{
+  for(const id of ['peter-pan','cross']){
+    const start=techniquePose(id,.18),gather=techniquePose(id,.30);
+    near(start.feet[1].x,gather.feet[1].x);near(start.feet[1].y,gather.feet[1].y);
+    assert.ok(gather.feet[0].y<start.feet[0].y);assert.notEqual(gather.feet[0].x,start.feet[0].x);
+    near(gather.board.yaw,0);near(gather.board.roll,0);
+  }
+});
 
 test('every new equipment appearance renders safely through riding, spinning, jumping and falling',()=>{
   const canvas=createCanvas(ACTOR_WIDTH,ACTOR_HEIGHT),c=canvas.getContext('2d');
@@ -69,7 +93,7 @@ test('step turns, shuvits, flips and compound spins keep their prescribed indepe
     'step-180':[180,0,0],'step-360':[360,0,0],pirouette:[360,0,0],'pirouette-540':[540,0,0],'pirouette-720':[720,0,0],
     pivot:[180,180,0],shuvit:[0,180,0],'pop-shuvit':[0,180,0],'front-pop':[0,-180,0],
     kickflip:[0,0,360],heelflip:[0,0,-360],bigspin:[180,360,0],bigger:[180,540,0],
-    'no-com-big':[180,360,0],hardflip:[0,-180,360],treflip:[0,360,360],varial:[0,180,360],
+    'no-com-big':[180,360,0],hardflip:[0,-180,-360],treflip:[0,360,360],varial:[0,180,360],
   };
   for(const [id,[body,board,flip]] of Object.entries(rotations)){
     const pose=techniquePose(id,1);near(pose.bodyYaw,body*Math.PI/180);near(pose.board.yaw,board*Math.PI/180);near(pose.board.roll,flip*Math.PI/180);
