@@ -13,7 +13,7 @@ export const EXTRA_EVENTS: EventDef[] = [
   {id:'yu-open-final',kind:'라이벌 결말',npc:'yu',title:'바퀴 소리로 남은 박자',body:'유리가 예전 합동 영상의 소리를 재생했다. 오픈부 관중석 뒤에서도 둘은 같은 타이밍에 웃었다.',
     story:true,important:true,when:r=>r.year>=6&&r.week===25&&!!r.events['yu-rematch'],choices:[
       choice('마지막 연계를 함께 맞춘다',{relation:12,stat:'link',gain:2},'dance','freestyle'),
-      choice('각자의 루틴으로 답한다',{relation:9,fame:6},'balanced','trick')]},
+      choice('각자의 라인으로 답한다',{relation:9,fame:6},'balanced','trick')]},
   {id:'jun-open-final',kind:'라이벌 결말',npc:'jun',title:'편집 없이 남긴 영상',body:'준이 오늘 영상은 앞뒤를 하나도 자르지 않겠다고 했다. 그동안의 실패가 없었다면 첫 장면도 없었다고.',
     story:true,important:true,when:r=>r.year>=7&&r.week===46&&!!r.events['jun-jam'],choices:[
       choice('다음 세대에게 영상부터 건넨다',{relation:13,fame:5},'trick','freestyle'),
@@ -35,7 +35,7 @@ export const EXTRA_EVENTS: EventDef[] = [
     choice('중간 전환을 새로 설계한다',{stat:'balance',gain:2,relation:6},'freestyle','trick')]},
   {id:'min-race',kind:'라이벌',npc:'min',title:'첫 승부, 악수 먼저',body:'민재가 지난 대회의 기록지를 들고 왔다. 근소한 차이가 재미있었던 건 처음이라고 한다.',story:true,important:true,when:r=>r.week>=21&&placed(r)&&!!r.events['min-metronome'],choices:[
     choice('다음 대회를 기약하며 내기한다',{relation:13,fame:3,stat:'link',gain:2},'trick','freestyle'),
-    choice('서로의 루틴을 함께 본다',{relation:10,energy:11},'dance','balanced')]},
+    choice('서로의 라인을 함께 본다',{relation:10,energy:11},'dance','balanced')]},
   {id:'neon-invite',kind:'스팟 해금',npc:'noa',title:'광장 불이 꺼진 뒤',body:'노아가 밤에 파란 조명이 들어오는 광장의 위치를 알려 준다. “11시 이후라면 실패도 전부 내 편이야.”',story:true,when:r=>r.week>=10&&r.spot==='plaza',choices:[
     choice('야간 잼에 같이 간다',{relation:10,stat:'balance',gain:2},'trick','freestyle'),
     choice('다음에 갈 위치를 기록한다',{relation:6,energy:8},'balanced','dance')]},
@@ -57,12 +57,12 @@ export const EXTRA_EVENTS: EventDef[] = [
   {id:'jun-quiet',kind:'관계',npc:'jun',title:'큰 소리 없이 착지하는 법',body:'준이 한동안 슬로모션 편집을 쉬었다. 화면 밖의 바퀴 소리도 이제는 꽤 마음에 든다고 한다.',when:r=>r.spot==='plaza'&&chosen(r,'jun-jam',1),choices:[
     choice('노컴플라이를 조용히 반복한다',{skill:'no-comply',study:20,relation:9},'trick','freestyle'),
     choice('발을 얹는 리듬부터 맞춘다',{stat:'link',gain:3,relation:8},'balanced','dance')]},
-  {id:'sol-arena',kind:'대회 전',npc:'sol',title:'결승까지 남은 60초',body:'솔이 시작선을 턱으로 가리킨다. 오늘은 네가 루틴의 첫 기술을 고를 차례다.',when:r=>r.spot==='arena'&&placed(r),choices:[
+  {id:'sol-arena',kind:'대회 전',npc:'sol',title:'결승까지 남은 60초',body:'솔이 시작선을 턱으로 가리킨다. 오늘은 네가 라인의 첫 기술을 고를 차례다.',when:r=>r.spot==='arena'&&placed(r),choices:[
     choice('첫 기술 이후 전환을 연습한다',{stat:'link',gain:4,energy:-4,relation:8},'freestyle','dance'),
     choice('호흡부터 고르고 출발한다',{energy:15,relation:5},'balanced','trick')]},
   {id:'sol-veteran',kind:'경력',npc:'sol',title:'새 번호표, 낡은 보드',body:'솔은 새 선수 이름을 네게 먼저 물어본다. 이제 네가 그들을 처음 맞이할 차례인지도 모른다.',story:true,when:r=>r.year>=3&&r.week<=3,choices:[
     choice('처음 타는 선수와 연습한다',{relation:9,fame:5,stat:'balance',gain:2},'balanced','dance'),
-    choice('오픈부 루틴을 보여 준다',{relation:7,fame:7,energy:-4},'freestyle','trick')]},
+    choice('오픈부 라인을 보여 준다',{relation:7,fame:7,energy:-4},'freestyle','trick')]},
   {id:'snack-run',kind:'일상',title:'편의점 봉지의 무게',body:'두 손 가득 간식을 샀더니 보드를 잡을 손이 사라졌다. 보드보다 새우깡이 먼저 출발한다.',when:r=>r.spot==='plaza'||r.spot==='night',choices:[
     choice('간식을 크루에 나눈다',{energy:15,money:-3_000},'balanced','dance'),
     choice('편의점 앞에서 밸런스를 잡는다',{stat:'balance',gain:2},'trick','freestyle')]},
@@ -76,7 +76,7 @@ export const EXTRA_EVENTS: EventDef[] = [
     choice('보드를 타면서 촬영한다',{money:19_000,fame:3,energy:-5},'dance','freestyle'),
     choice('장비 세팅을 직접 소개한다',{money:13_000,fame:2,stat:'balance',gain:1},'balanced','trick')]},
   {id:'injury-kit',kind:'부상·회복',npc:'min',title:'파란 테이프가 남긴 자리',body:'민재가 테이프를 건네며 오늘은 영상 한 편만 보자고 한다. 연습복 대신 담요도 가져왔다.',story:true,when:r=>!!r.injury,choices:[
-    choice('얼음찜질을 하면서 루틴을 본다',{energy:18,relation:7},'balanced','dance'),
+    choice('얼음찜질을 하면서 라인을 본다',{energy:18,relation:7},'balanced','dance'),
     choice('앉아서 전환 동작을 적어 둔다',{energy:8,stat:'link',gain:2,relation:6},'trick','freestyle')]},
   {id:'back-on-board',kind:'부상·회복',npc:'sol',title:'처음 푸시하던 날처럼',body:'솔은 복귀 첫날에 어려운 동작 대신 한 번만 밀어 보라고 했다. 바퀴를 굴리는 소리가 유난히 크게 들린다.',when:r=>!r.injury&&!!r.events['injury-kit'],choices:[
     choice('편한 속도로 끝까지 탄다',{stat:'speed',gain:2,relation:6},'balanced','dance'),

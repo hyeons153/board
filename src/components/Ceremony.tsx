@@ -4,7 +4,6 @@ import { CALENDAR, DISCIPLINE_NAMES, SKILL } from '../game/data';
 import { RIVAL } from '../game/content';
 import { equippedLook } from '../game/economy';
 import { chooseEnding, endingName, ENDINGS, summarize } from '../game/legacy';
-import { moveMotion } from '../scene/motion';
 import { DISCIPLINES, type Archive } from '../game/types';
 import Scene from './Scene';
 import { Tag } from './Brand';
@@ -19,7 +18,7 @@ export default function Ceremony({archive,onHall,onNew}:{archive:Archive;onHall:
   const moment=best?.result.run.log.find(move=>move.outcome==='great')??best?.result.run.log.find(move=>move.outcome==='clean');
   const rival=ending.friends.length?RIVAL.get(ending.friends[0]):RIVAL.get('sol');
   const descriptor=ENDINGS[ending.kind];
-  const motion=step===0?'brake':step===1?ending.kind==='legend'?'win':'great':step===2&&moment?moveMotion(moment.id,.44,moment.outcome):'rest';
+  const motion=step===0?'brake':step===1?ending.kind==='legend'?'win':'great':'rest';
   const title=['마지막 주행','은퇴식','커리어 하이라이트',endingName(ending)][step];
   const story=[
     archive.reason==='complete'?'12월 롱보드 페스티벌이 끝났다. 마지막 시즌의 성적과 보상이 확정됐다.':'보드를 내려놓기 전, 지나온 시즌을 돌아본다.',
@@ -30,7 +29,7 @@ export default function Ceremony({archive,onHall,onNew}:{archive:Archive;onHall:
   return <section className={'panel ceremony ceremony-'+ending.kind}>
     <div className="ceremony-stage">
       <Scene spot={step===0?(CALENDAR.find(m=>m.id===latest?.id)?.spot??descriptor.spot):descriptor.spot}
-        variant={step===2?'race':'event'} look={equippedLook(archive)} guest={step===1?rival?.look:undefined} motion={motion}/>
+        variant={step===2?'race':'event'} look={equippedLook(archive)} guest={step===1?rival?.look:undefined} motion={motion} technique={step===2&&moment?{id:moment.id,outcome:moment.outcome}:undefined}/>
       <div className="scene-shade"/><div className="spot-title"><span><Medal size={15}/> {archive.name} · {archive.year}년차</span><h2>{title}</h2><p>{story}</p></div>
     </div>
     <div className="ceremony-content">

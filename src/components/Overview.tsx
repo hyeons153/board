@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ACTION_NAMES, CALENDAR, DISCIPLINE_NAMES, DIVISION_NAMES, INTENSITY_NAMES, LOCATIONS, RULES, SKILL, STAT_NAMES, STRATEGY_NAMES } from '../game/data';
 import { divisionFor, currentMeet, nextMeet } from '../game/career';
 import { canStudy, eventFor, eventNpc } from '../game/events';
-import { RIVAL, SPOT_GATE, spotUnlocked } from '../game/content';
+import { RIVAL, SPOT_GATE, spotUnlocked, lineTerms } from '../game/content';
 import { ECONOMY, equippedLook, extras } from '../game/economy';
 import { SKILLS } from '../game/data';
 import { ACTIONS, DISCIPLINES, INTENSITIES, SPOTS, STATS, STRATEGIES, type Action, type Discipline, type GameAction, type Intensity, type Plan, type Rider, type Spot } from '../game/types';
@@ -18,7 +18,7 @@ export const money=(n:number)=>'₩'+n.toLocaleString('ko-KR');
 export const when=(ms:number)=>{const s=Math.ceil(ms/1000);return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;};
 const StatIcon={speed:Wind,carve:Route,link:Link2,balance:MoveDiagonal2};
 const ActionIcon={...StatIcon,dance:Footprints,trick:Aperture,rest:Coffee,hospital:Cross,rehearsal:Flag};
-const actionDetail={speed:'주행 속도와 페이스 유지',carve:'부드러운 방향 전환',link:'흐름과 콤보 연결',balance:'자세와 착지 안정',dance:'스텝·테크닉 습득',trick:'회전·팝·플립 습득',rest:'체력 회복 및 부상 관리',hospital:'회복 기간 단축 · 치료비 지불',rehearsal:'저장한 루틴의 기술과 연계 연습'};
+const actionDetail={speed:'주행 속도와 페이스 유지',carve:'부드러운 방향 전환',link:'흐름과 콤보 연결',balance:'자세와 착지 안정',dance:'스텝·테크닉 습득',trick:'회전·팝·플립 습득',rest:'체력 회복 및 부상 관리',hospital:'회복 기간 단축 · 치료비 지불',rehearsal:'저장한 라인의 기술과 연계 연습'};
 const actionMotion:Record<Action,Motion>={speed:'accelerate',carve:'carve',link:'spin',balance:'land',dance:'step',trick:'jump',rest:'rest',hospital:'rest',rehearsal:'mount'};
 const grades={success:'훈련 성공',great:'높은 훈련 성과',learned:'신규 기술 습득',mastery:'기술 숙련도 상승',miss:'훈련 실패',injury:'부상 발생',recovery:'회복'};
 export type Submit=(action:GameAction)=>Promise<boolean>;
@@ -39,7 +39,7 @@ export function Upcoming({r,onClick}:{r:Rider;onClick:()=>void}){
     <button className="text-button" onClick={onClick}>대회 일정 보기 <ArrowUpRight size={15}/></button></article>;
 }
 export function NewsCard({r}:{r:Rider}){
-  return <article className="panel news"><div className="card-heading"><span><Activity size={16}/> 라이더 일지</span></div><ul>{r.news.slice(0,5).map((n,i)=><li key={`${n.year}-${n.week}-${i}`}><span>{n.year}Y / {String(n.week).padStart(2,'0')}W</span>{n.text}</li>)}</ul></article>;
+  return <article className="panel news"><div className="card-heading"><span><Activity size={16}/> 라이더 일지</span></div><ul>{r.news.slice(0,5).map((n,i)=><li key={`${n.year}-${n.week}-${i}`}><span>{n.year}Y / {String(n.week).padStart(2,'0')}W</span>{lineTerms(n.text)}</li>)}</ul></article>;
 }
 export function TrainingControls({r,send,saving,target,initialAction,onScheduled}:{r:Rider;send:Submit;saving:boolean;target?:string;initialAction?:Action;onScheduled:()=>void}){
   const skill=SKILL[target??''];

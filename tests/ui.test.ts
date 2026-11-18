@@ -7,7 +7,7 @@ import {JSDOM} from 'jsdom';
 import {createHandler} from '../server/http';
 import {localStore} from '../server/store';
 
-test('one game frame handles menus, weekly choice, result/event flow and silent clock rebasing',async()=>{
+test('one game frame handles menus, weekly choice, result/event flow and silent clock rebasing',{timeout:45000},async()=>{
   const directory=await mkdtemp(join(process.cwd(),'.longboard-test-'));
   const dom=new JSDOM('<!doctype html><div id="root"></div>',{url:'http://127.0.0.1/',pretendToBeVisual:true});
   const win=dom.window;
@@ -46,7 +46,10 @@ test('one game frame handles menus, weekly choice, result/event flow and silent 
   const click=async(label:string)=>{
     const button=[...win.document.querySelectorAll('button')].find(button=>(button.getAttribute('aria-label')??button.textContent?.trim())===label);
     assert.ok(button,'Missing button: '+label);
+    for(let attempt=0;button.disabled&&attempt<30;attempt++)await settle(20);
+    assert.equal(button.disabled,false,label+' is still disabled');
     await act(async()=>{button.click();});await settle();
+    await act(async()=>{await Promise.all([...pendingRequests]);});await settle(10);
   };
   try{
     await act(async()=>{root.render(createElement(App));});await settle(80);
@@ -59,6 +62,12 @@ test('one game frame handles menus, weekly choice, result/event flow and silent 
     for(const menu of ['기술','대회','상점','메뉴']){
       await click(menu);assert.equal(win.document.querySelector('.game-console'),frame);assert.ok(win.document.querySelector('.console-panel'));await click('메뉴 닫기');
     }
+    await click('라인');
+    assert.match(win.document.querySelector('.console-panel')!.textContent!,/라인 편집/);
+    assert.doesNotMatch(win.document.querySelector('.console-panel')!.textContent!,/루틴/);
+    await click('피터팬 추가');await click('라인 저장');
+    assert.ok([...win.document.querySelectorAll('button')].some(button=>button.textContent?.includes('저장된 구성')&&button.disabled));
+    await click('메뉴 닫기');
     await click('훈련');injectClock=true;
     await click('선택하고 이번 주 시작');
     assert.equal(clockRaces,1);assert.equal(win.document.querySelector('[role="alert"]'),null);

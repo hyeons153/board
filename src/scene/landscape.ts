@@ -1,7 +1,5 @@
-import { BOARDS, HAIR_COLORS, PANTS, SHIRTS, SHOES, SKINS } from '../game/data';
 import { seeded } from '../game/random';
-import type { Look, Spot } from '../game/types';
-import type { Motion } from './motion';
+import type { Spot } from '../game/types';
 export type { Motion } from './motion';
 
 export const WIDTH=456, HEIGHT=194;
@@ -167,67 +165,4 @@ export function paintLandscape(c:Ctx,spot:Spot,competition=false){
   rect(c,p.edge,0,191,WIDTH,3);
 }
 
-export function paintRider(c:Ctx,look:Look,motion:Motion,time:number){
-  c.clearRect(0,0,64,65);
-  const skin=SKINS[look.skin], shirt=SHIRTS[look.shirt],board=BOARDS[look.board];
-  const ink='#191e2a', shoes=SHOES[look.shoes??0], jeans=PANTS[look.pants??0], highlight='#ffffff45';
-  const hair=HAIR_COLORS[look.hairColor??look.hair];
-  const t=time/1000, cycle=Math.sin(t*8);
-  const air=['jump','flip','heel','shove'].includes(motion);
-  const walking=motion==='step'||motion==='cross'||motion==='mount';
-  const spins=motion==='spin'||motion==='double-spin';
-  const cheering=['great','success','win'].includes(motion);
-  const lift=air?Math.round((.55+.45*Math.sin(t*8))*14):walking?Math.round(cycle*2):0;
-  const offset=spins?Math.round(Math.sin(t*(motion==='spin'?9:18))*7):motion==='carve'?Math.round(cycle*4):0;
-  const bx=motion==='fall'||motion==='wobble'?Math.round(Math.sin(t*14)*5):0;
-  const tilt=motion==='carve'||motion==='wobble'?Math.round(cycle*2):air?2:0;
-  const box=(col:string,x:number,y:number,w:number,h:number)=>rect(c,col,x+bx,y-lift,w,h);
-  c.globalAlpha=.45;rect(c,'#24242e',9,59,47,2);rect(c,'#24242e',16,61,33,1);c.globalAlpha=1;
-  if(motion==='fall'){
-    box(jeans,20,43,20,5);box(shirt,19,37,12,7);box(skin,13,37,6,5);box(ink,12,35,6,3);
-    box(shoes,39,43,7,3);box(board,26,54,22,2);box(ink,28,56,4,3);box(ink,43,56,4,3);return;
-  }
-  const boardWidth=motion==='shove'?Math.max(12,Math.round(Math.abs(Math.cos(t*11))*39)):39;
-  const boardX=32-Math.round(boardWidth/2);
-  const flipping=motion==='flip'||motion==='heel';
-  const boardTop=flipping?Math.round(Math.sin(t*13)*(motion==='heel'?-4:4)):tilt;
-  box(ink,boardX-2,52-boardTop,3,3);box(ink,boardX+boardWidth,52+boardTop,3,3);
-  box(ink,boardX,54,boardWidth,4);box(board,boardX,53,boardWidth,2);
-  if(boardWidth>26){
-    const design=look.deckDesign??0;
-    const color=['#fff0cc','#83ffe1','#ff759c','#c2aaff'][design];
-    box(color,design===2?24:15,53,design===1?23:7,1);
-    if(design===3){box(color,31,53,5,2);box(color,38,53,5,2);}
-  }
-  box(ink,boardX+4,57,5,4);box(ink,boardX+boardWidth-8,57,5,4);
-  box('#8f8291',boardX+6,59,2,1);box('#8f8291',boardX+boardWidth-6,59,2,1);
-  const x=offset, bob=motion==='rest'?0:motion==='lose'?3:motion==='land'?2:Math.round(cycle);
-  const step=walking?Math.round(cycle*(motion==='cross'?8:5)):0;
-  box(ink,23+x,31+bob,15,9);box(ink,21-step,39,7,5);box(ink,18-step,43,7,7);
-  box(jeans,23-step,39,5,5);box(jeans,20-step,43,5,6);box(highlight,21-step,43,2,4);
-  box(ink,34+x,36,7,8);box(jeans,35+x,37,5,7);box(ink,39+x,43,6,7);box(jeans,39+x,43,4,6);
-  box(ink,16-step,49,11,4);box(shoes,17-step,49,8,2);
-  box(ink,38+x,49,10,4);box(shoes,39+x,49,8,2);
-  const ar=cheering?10+Math.round(cycle*2):walking?Math.round(Math.abs(cycle)*5):air?5:motion==='wobble'?7:0;
-  box(ink,19+x,22+bob,21,14);
-  box(shirt,21+x,22+bob,16,12);box('#fff2cb',22+x,23+bob,5,1);
-  box(shirt,18+x,24+bob,5,5);box(shirt,36+x,25+bob,6,4);
-  box(skin,14+x,26+bob-ar,7,3);box(skin,12+x,24+bob-ar,4,3);
-  box(skin,41+x,27+bob-ar,6,3);box(skin,45+x,25+bob-ar,4,3);
-  box(ink,24+x,13+bob,14,8);box(skin,26+x,13+bob,12,6);
-  box(skin,29+x,19+bob,5,4);box('#9c604f',33+x,18+bob,4,1);
-  box(ink,35+x,14+bob,2,2);
-  if(look.hair===0){box(hair,23+x,9+bob,13,5);box(hair,22+x,12+bob,5,5);box(highlight,26+x,10+bob,9,1);}
-  if(look.hair===1){box(hair,24+x,8+bob,12,6);box(highlight,26+x,8+bob,8,2);box(hair,22+x,11+bob,5,9);}
-  if(look.hair===2){box(hair,23+x,9+bob,14,5);box(highlight,25+x,9+bob,9,1);box(hair,22+x,12+bob,5,8);box(hair,21+x,18+bob,4,5);}
-  if(look.hair===3){box(hair,23+x,8+bob,14,6);box(highlight,25+x,8+bob,10,2);box(hair,31+x,13+bob,11,2);box(ink,24+x,14+bob,3,4);}
-  if(motion==='great'||motion==='win'){
-    const stars=['#ffe795','#c3ffc5','#ffad91'];
-    for(let i=0;i<10;i++){
-      const radius=17+(i%3)*4;
-      const angle=(i/10)*Math.PI*2+t;
-      const xx=30+Math.cos(angle)*radius, yy=27+Math.sin(angle)*radius;
-      rect(c,stars[i%3],xx,yy,i%2===0?2:1,2);
-    }
-  }
-}
+export { paintRider } from './rider';

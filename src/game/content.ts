@@ -59,3 +59,5 @@ const descriptions: Record<string,string> = {
   varial:"몸의 방향을 유지하며 데크의 180도 수평 회전과 한 바퀴 킥플립을 동시에 결합합니다.",
 };
 export const skillDescription=(id:string)=>descriptions[id] ?? '';
+// Keep historical journals readable with the current longboard terminology.
+export const lineTerms=(text:string)=>text.replaceAll('루틴','라인');

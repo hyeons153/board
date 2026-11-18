@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowUpRight, ChevronDown, Flag, Medal, Shield, Star, Trophy
 import { useEffect, useState } from 'react';
 import { CALENDAR, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, SKILL, SKILLS, STAT_NAMES, STYLE_NAMES } from '../game/data';
 import { NAMES, competitor, learned } from '../game/competition';
-import { RIVALS } from '../game/content';
+import { RIVALS, lineTerms } from '../game/content';
 import { equippedLook, extras, playerPlace } from '../game/economy';
 import { EVENTS } from '../game/events';
 import { PixelRider } from './Appearance';
@@ -102,7 +102,7 @@ function CareerLog({r}:{r:Rider}){
           })}</tr>)}</tbody>
       </table></div>}
     {!!timeline.length&&<details className="past-meets"><summary>주요 사건과 보상 <ChevronDown size={16}/></summary><div>
-      {timeline.map((item,index)=><div key={item.year+'-'+item.week+'-'+index}><span>{item.year}년차 {item.week}주 · <b>{item.title}</b></span><span>{item.text}</span></div>)}
+      {timeline.map((item,index)=><div key={item.year+'-'+item.week+'-'+index}><span>{item.year}년차 {item.week}주 · <b>{lineTerms(item.title)}</b></span><span>{lineTerms(item.text)}</span></div>)}
     </div></details>}
   </section>;
 }

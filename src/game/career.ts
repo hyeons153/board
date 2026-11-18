@@ -60,8 +60,8 @@ export function validatePlan(r:Rider,p:Plan) {
   if (r.injury && p.intensity==='focus' && p.action!=='rest'&&p.action!=='hospital') throw new GameError('부상 중에는 집중 훈련을 할 수 없어요.');
   if (p.action==='hospital'&&!r.injury) throw new GameError('치료가 필요한 부상이 없어요.');
   if(!spotUnlocked(r,p.spot)) throw new GameError(SPOT_GATE[p.spot]!.hint);
-  if(p.action==='rehearsal'&&p.spot!=='arena') throw new GameError('대회 연습장에서만 루틴 리허설을 할 수 있어요.');
-  if(p.discipline&&p.action!=='rehearsal') throw new GameError('종목 선택은 루틴 리허설에만 사용해요.');
+  if(p.action==='rehearsal'&&p.spot!=='arena') throw new GameError('대회 연습장에서만 라인 리허설을 할 수 있어요.');
+  if(p.discipline&&p.action!=='rehearsal') throw new GameError('종목 선택은 라인 리허설에만 사용해요.');
   if (p.skill && (SKILL[p.skill]?.family!==p.action||!canStudy(r,p.skill))) throw new GameError('아직 연마할 수 없는 기술이에요.');
   if(p.lesson&&(!p.skill||!['studio','night','arena'].includes(p.spot)||r.money<ECONOMY.lesson))
     throw new GameError('레슨은 실내·야간·대회 연습장에서 기술을 지정하고 레슨비를 확보해야 해요.');
@@ -141,7 +141,7 @@ function train(r:Rider,p:Plan) {
       stat(r,'link',practice.rehearsalLink*factor*late.stat);
       if(!great) grade='mastery';
       practiced=ids[0];
-      names.push(`${DISCIPLINE_NAMES[discipline]} 루틴의 연계와 기술 숙련도를 점검했다.`);
+      names.push(`${DISCIPLINE_NAMES[discipline]} 라인의 연계와 기술 숙련도를 점검했다.`);
     } else if (p.action!=='hospital') {
       const before=r.stats[p.action];
       stat(r,p.action,RULES.statGrowth*factor*late.stat*(1-before*.007));
@@ -355,7 +355,7 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
     validatePlan(r,a.plan); r.plan=a.plan; r.spot=a.plan.spot;
   }
   if(a.type==='routine'){
-    if(!validRoutine(r,a.discipline,a.skills)) throw new GameError('종목에 맞는 습득 기술로 60초 이하의 루틴을 구성해 주세요.');
+    if(!validRoutine(r,a.discipline,a.skills)) throw new GameError('종목에 맞는 습득 기술로 60초 이하의 라인을 구성해 주세요.');
     r.routines[a.discipline]=a.skills;
   }
   if(a.type==='settings'){

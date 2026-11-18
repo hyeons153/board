@@ -1,8 +1,9 @@
 import * as Phaser from 'phaser';
 import type { Look, Spot } from '../game/types';
 import { HEIGHT, WIDTH, paintLandscape, paintRider, type Motion } from './landscape';
+import { ACTOR_HEIGHT, ACTOR_WIDTH, type Technique } from './techniques';
 
-export type Stage = { spot:Spot; look:Look; guest?:Look; motion:Motion; variant:'title'|'dashboard'|'race'|'event'|'preview'; reduce:boolean };
+export type Stage = { spot:Spot; look:Look; guest?:Look; motion:Motion; technique?:Technique; variant:'title'|'dashboard'|'race'|'event'|'preview'; reduce:boolean };
 export function createStage(parent:HTMLElement,latest:()=>Stage){
   class SpotScene extends Phaser.Scene {
     private art!: Phaser.Textures.CanvasTexture;
@@ -14,14 +15,17 @@ export function createStage(parent:HTMLElement,latest:()=>Stage){
     private competition=false;
     private lastMotion?:Motion;
     private motionAt=0;
+    private lastTechnique?:string;
+    private progress?:number;
+    private progressAt=0;
     create(){
       this.art=this.textures.createCanvas('pixel-landscape',WIDTH,HEIGHT)!;
-      this.rider=this.textures.createCanvas('pixel-rider',64,65)!;
-      this.guestArt=this.textures.createCanvas('pixel-guest',64,65)!;
+      this.rider=this.textures.createCanvas('pixel-rider',ACTOR_WIDTH,ACTOR_HEIGHT)!;
+      this.guestArt=this.textures.createCanvas('pixel-guest',ACTOR_WIDTH,ACTOR_HEIGHT)!;
       this.add.image(0,0,'pixel-landscape').setOrigin(0,0);
-      this.guestSprite=this.add.image(388,106,'pixel-guest').setOrigin(0,0).setScale(.88);
-      this.sprite=this.add.image(0,0,'pixel-rider').setOrigin(0,0).setScale(1.46);
-      this.render(0);
+      this.guestSprite=this.add.image(370,106,'pixel-guest').setOrigin(0,0).setScale(.56);
+      this.sprite=this.add.image(0,0,'pixel-rider').setOrigin(0,0).setScale(.9);
+      this.render(performance.now());
     }
     update(time:number){ if(this.sprite) this.render(time); }
     private render(time:number){
@@ -34,20 +38,26 @@ export function createStage(parent:HTMLElement,latest:()=>Stage){
         this.competition=competition;
       }
       const now=s.reduce?0:time;
-      if(s.motion!==this.lastMotion){ this.lastMotion=s.motion; this.motionAt=now; }
+      if(s.motion!==this.lastMotion||s.technique?.id!==this.lastTechnique){ this.lastMotion=s.motion; this.lastTechnique=s.technique?.id; this.motionAt=now;this.progress=undefined; }
       const elapsed=now-this.motionAt;
-      paintRider(this.rider.getContext(),s.look,s.motion,elapsed);
+      if(s.technique?.progress!==this.progress){this.progress=s.technique?.progress;this.progressAt=now;}
+      let technique=s.technique;
+      if(technique){
+        const sampled=technique.progress===undefined?elapsed%4000/4000:technique.progress+(now-this.progressAt)/1000*(technique.rate??0);
+        technique={...technique,progress:s.reduce ? .1 : technique.loop ? sampled%1 : Math.min(1,sampled)};
+      }
+      paintRider(this.rider.getContext(),s.look,s.motion,elapsed,technique);
       this.rider.refresh();
-      const anchor=s.variant==='title'?340:competition?259:s.variant==='preview'?194:s.variant==='event'?236:294;
-      const moving=['ride','accelerate','brake','mount','carve'].includes(s.motion);
+      const anchor=s.variant==='title'?280:competition?203:s.variant==='preview'?126:s.variant==='event'?179:236;
+      const moving=!s.technique&&['ride','accelerate','brake','mount','carve'].includes(s.motion);
       const lurch=s.motion==='accelerate'?Math.min(32,elapsed*.045):s.motion==='brake'?Math.max(0,18-elapsed*.024):0;
       const drift=moving?Math.sin(now/1350)*(competition?38:15):0;
-      this.sprite.setPosition(Math.round(anchor+drift+lurch),77+(s.motion==='land'?2:0));
+      this.sprite.setPosition(Math.round(anchor+drift+lurch),52);
       this.guestSprite.setVisible(!!s.guest);
       if(s.guest){
         paintRider(this.guestArt.getContext(),s.guest,s.variant==='event'?'rest':'ride',now);
         this.guestArt.refresh();
-        this.guestSprite.setPosition(s.variant==='event'?337:392,s.variant==='event'?93:106);
+        this.guestSprite.setPosition(s.variant==='event'?298:348,s.variant==='event'?95:101);
       }
     }
   }

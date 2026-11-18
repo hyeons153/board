@@ -56,7 +56,7 @@ function mentorEvents(r:Rider):EventDef[]{
     {id:'mentor-practice',kind:'다회차 · 합동 훈련',npc:'mentor',title:'보드 위에 남은 습관',body:`${mentor.name}이 ${SKILL[mentor.skill??'']?.name??'첫 발 위치'}를 시범으로 보여 주었다. “이 동작을 처음 성공한 날은 아직도 기억나.”`,
       story:true,important:true,when:r=>r.week>=15&&!!r.events['mentor-intro'],choices:[
         option('선배의 동작을 함께 연습한다',{relation:12,skill:mentor.skill,study:42,stat:'link',gain:2},'dance','trick','freestyle'),
-        option('두 사람의 루틴을 찍어 둔다',{relation:9,energy:13},'balanced')]},
+        option('두 사람의 라인을 찍어 둔다',{relation:9,energy:13},'balanced')]},
     {id:'mentor-cheer',kind:'다회차 · 대회 응원',npc:'mentor',title:'관객석의 첫 번째 박수',body:`${mentor.name}이 관객석 맨 앞에 서 있었다. “내 기록은 지난 시즌 얘기야. 오늘 네 기록은 네가 써.”`,
       story:true,when:r=>r.week>=25&&!!r.events['mentor-practice'],choices:[
         option('출발선에서 손을 흔든다',{relation:10,energy:12},'balanced','dance','freestyle'),

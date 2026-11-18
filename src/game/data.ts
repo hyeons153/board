@@ -34,7 +34,7 @@ export const DIVISION_NAMES: Record<Division,string> = { rookie:'뉴비부', reg
 export const STRATEGY_NAMES: Record<Strategy,string> = { balanced:'밸런스형', dance:'댄싱 중심', trick:'트릭 중심', freestyle:'프리스타일 중심' };
 export const INTENSITY_NAMES: Record<Intensity,string> = { safe:'안전형', normal:'균형형', focus:'집중형' };
 export const STYLE_NAMES: Record<RoutineStyle,string> = { stable:'안정형', flow:'연계형', score:'고득점형' };
-export const ACTION_NAMES: Record<Action,string> = { speed:'속도 훈련', carve:'카빙 훈련', link:'연계 훈련', balance:'밸런스 훈련', dance:'댄싱 연마', trick:'트릭 연마', rest:'휴식', hospital:'병원 치료', rehearsal:'루틴 리허설' };
+export const ACTION_NAMES: Record<Action,string> = { speed:'속도 훈련', carve:'카빙 훈련', link:'연계 훈련', balance:'밸런스 훈련', dance:'댄싱 연마', trick:'트릭 연마', rest:'휴식', hospital:'병원 치료', rehearsal:'라인 리허설' };
 export const OUTCOME_NAMES = { miss:'실패', rough:'어설픈 성공', clean:'성공', great:'대성공' };
 export const KIND_NAMES = { step:'스텝', technique:'테크닉', spin:'회전', pop:'팝', flip:'플립' };
 export const DIFFICULTY_NAMES = ['','초급','중급','고급','최고급'];
@@ -52,7 +52,7 @@ export const LOCATIONS = {
   park:{ name:'공원 루프', en:'PARK LOOP', detail:'숲을 따라 굽이치는 완만한 코스.', boosted:['carve','balance'], boost:1.26, risk:.82, npc:'sol' },
   studio:{ name:'실내 연습장', en:'INDOOR STUDIO', detail:'날씨 걱정 없이 지정 기술을 연습하는 곳.', boosted:['dance','trick'], boost:1.15, risk:.7, npc:'sol' },
   night:{ name:'야간 광장', en:'NEON PLAZA', detail:'노아와 준의 심야 잼. 고급 댄싱과 트릭을 깊게 파고들 수 있어요.', boosted:['dance','trick'], boost:1.35, risk:1.18, npc:'noa' },
-  arena:{ name:'대회 연습장', en:'WARM-UP ARENA', detail:'대회 바닥에서 종목별 루틴을 반복하고 연계를 점검해요.', boosted:['link','rehearsal'], boost:1.25, risk:.82, npc:'min' },
+  arena:{ name:'대회 연습장', en:'WARM-UP ARENA', detail:'대회 바닥에서 종목별 라인을 반복하고 연계를 점검해요.', boosted:['link','rehearsal'], boost:1.25, risk:.82, npc:'min' },
 } satisfies Record<Spot,{name:string; en:string; detail:string; boosted:Action[]; boost:number; risk:number; npc:string}>;
 
 export const CALENDAR:Meet[] = [

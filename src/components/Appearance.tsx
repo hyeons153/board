@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { BOARDS, HAIR_COLORS, PANTS, SHIRTS, SHOES, SKINS } from '../game/data';
 import type { Look } from '../game/types';
 import { paintRider } from '../scene/landscape';
+import { ACTOR_HEIGHT } from '../scene/techniques';
 
 const fields=[
   ['hair','헤어스타일',['짧은 머리','옆머리','긴 머리','캡']],
@@ -40,5 +41,5 @@ export function PixelRider({look,label}:{look:Look;label?:string}){
     const context=ref.current?.getContext('2d');
     if(context) paintRider(context,look,'rest',0);
   },[look]);
-  return <canvas ref={ref} className="pixel-rider" width={64} height={65} role={label?'img':undefined} aria-label={label} aria-hidden={!label}/>;
+  return <canvas ref={ref} className="pixel-rider" width={128} height={ACTOR_HEIGHT} role={label?'img':undefined} aria-label={label} aria-hidden={!label}/>;
 }

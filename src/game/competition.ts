@@ -43,7 +43,7 @@ export function generateRoutine(p:Profile,d:Discipline,style:RoutineStyle,signat
 }
 
 export function simulateRun(p:Profile, discipline:Discipline, ids:string[], rng:()=>number):Run {
-  if(!validRoutine(p,discipline,ids)) throw new Error('유효하지 않은 루틴입니다.');
+  if(!validRoutine(p,discipline,ids)) throw new Error('유효하지 않은 라인입니다.');
   let at=0, execution=0, combo=0, comboRaw=0, totalLinks=0, linkedCount=0, previous:Skill|undefined, successes=0;
   const seen=new Map<string,number>(), variety=new Set<string>(), usedFamilies=new Set<string>();
   const bonus=gearBonuses(p);

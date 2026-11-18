@@ -45,7 +45,7 @@ export default function OnlineHall({view,initialId,onSelect}:{view:View;initialI
   </section>;
   return <section className="panel content-panel">
     <SectionTitle code="GLOBAL HALL" title={tab==='ranking'?'글로벌 랭킹':'온라인 명예의 전당'}
-      detail={tab==='ranking'?'은퇴 후 공개한 선수의 서버 검증 기록을 비교합니다.':'다른 라이더가 공개한 은퇴 선수와 대표 루틴을 만나보세요.'}/>
+      detail={tab==='ranking'?'은퇴 후 공개한 선수의 서버 검증 기록을 비교합니다.':'다른 라이더가 공개한 은퇴 선수와 대표 라인을 만나보세요.'}/>
     <div className="pill-row">
       <button className={'pill'+(tab==='directory'?' active':'')} onClick={()=>{setTab('directory');setPage(1);}} aria-pressed={tab==='directory'}>공개 선수</button>
       <button className={'pill'+(tab==='ranking'?' active':'')} onClick={()=>{setTab('ranking');setPage(1);if(metric==='career'||metric==='skills')setDivision('all');}} aria-pressed={tab==='ranking'}>글로벌 랭킹</button>
@@ -106,7 +106,7 @@ function PublicDetail({card,view}:{card:PublicCard;view:View}){
     <div className="archive-stats"><span><Trophy size={16}/> {p.wins}승 · {p.podiums}회 입상</span><span><Flag size={16}/> {p.meets}개 대회 · 시즌 포인트 {p.points.toLocaleString('ko-KR')}</span>
       {p.careerPoints!==null&&<span>종합 커리어 {p.careerPoints.toLocaleString('ko-KR')}점</span>}</div>
     <div className="pill-row">{STATS.map(s=><Tag key={s}>{STAT_NAMES[s]} {p.stats[s]}</Tag>)}</div>
-    <h3 className="public-subhead">종목별 최고점과 대표 루틴</h3>
+    <h3 className="public-subhead">종목별 최고점과 대표 라인</h3>
     {DISCIPLINES.map(d=><details key={d} className="past-meets"><summary>{DISCIPLINE_NAMES[d]} · {p.best[d].toFixed(1)}점</summary>
       <ol className="public-routine">{(p.routines[d]??[]).map((id,index)=><li key={id+index}>{SKILL[id]?.name??id}</li>)}</ol>
       {!p.routines[d]?.length&&<p>출전 기록 없음</p>}</details>)}
