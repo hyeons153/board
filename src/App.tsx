@@ -134,10 +134,11 @@ function NewRider({saving,onCreate}:{saving:boolean;onCreate:(name:string,look:L
   return <form className="console-create" onSubmit={submit}>
     <div className="console-create-preview"><LookPreview look={look} label="새 라이더 외형"/></div>
     <div className="console-create-options">
-      <label>라이더 이름
-        <input aria-label="라이더 이름" value={name} onChange={e=>setName(e.target.value)} required minLength={1} maxLength={16} autoComplete="off"/>
-      </label>
-      <LookFields look={look} onChange={setLook}/>
+      <LookFields look={look} onChange={setLook}>
+        <label className="console-create-name">라이더 이름
+          <input aria-label="라이더 이름" value={name} onChange={e=>setName(e.target.value)} required minLength={1} maxLength={16} autoComplete="off"/>
+        </label>
+      </LookFields>
     </div>
     <button type="submit" className="button primary" disabled={saving||!name.trim()}>등록하고 시작 <ArrowRight size={17}/></button>
   </form>;

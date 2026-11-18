@@ -49,7 +49,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .page-header h1 { color: #283855; }
 .week-chip { background: #e3ebf5; border-color: #cbd9e8; color: #324971; box-shadow: 2px 3px 0 #d6d5cf; }
 .panel, .stat-card { border-radius: 12px; box-shadow: 2px 3px 0 #4d4c3810; }
-.section-title > svg, .section-title .eyebrow { color: #496f60; }
+.section-title .eyebrow { color: #496f60; }
 .spot-stage { border: 2px solid #43536f; }
 .scene-shade { background: linear-gradient(90deg, #1c2843e8, #2733496e 48%, transparent 77%), linear-gradient(0deg, #20253b95, transparent 43%); }
 .spot-title h2 { color: #fff7e7; }

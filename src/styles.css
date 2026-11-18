@@ -146,10 +146,9 @@ small{color:var(--muted)}
 .bar span{display:block;height:100%;background:var(--lime);border-radius:4px;transition:width .25s ease}
 .bar .stat-0{background:var(--lilac)}.bar .stat-1{background:#78d6c8}.bar .stat-2{background:var(--orange)}
 .training-panel,.content-panel,.event-panel{padding:clamp(14px,2.3vw,25px)}
-.section-title{display:flex;justify-content:space-between;align-items:flex-start;gap:.7rem;margin-bottom:15px}
+.section-title{margin-bottom:15px}
 .section-title h2{font-weight:850;font-size:clamp(1.25rem,2.2vw,1.75rem);letter-spacing:-.055em;margin-top:.28rem}
 .section-title p{font-size:.83rem;margin-top:.35rem}
-.section-title>svg{color:var(--lime);margin-top:.3rem}
 .mode-switch{display:inline-flex;flex-wrap:wrap;padding:3px;gap:3px;background:#141819;border:1px solid var(--border);border-radius:8px;margin-bottom:13px}
 .mode-switch button{border:1px solid transparent;border-radius:5px;background:none;color:var(--muted);padding:.35rem .58rem;display:flex;align-items:center;gap:.35rem;font-weight:700;font-size:.78rem;min-height:32px}
 .mode-switch button.active{color:var(--lime);background:#273426;border-color:#435b37}

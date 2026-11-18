@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BOARD_COLOR_NAMES, BOARDS, BOTTOMS, EYE_COLORS, FOOTWEAR, HAIR_COLORS, HAIR_STYLES, LOOK_PRESETS, OUTFITS, PANTS, SHIRTS, SHOES, SKINS } from '../game/data';
 import type { Look } from '../game/types';
 import { paintRider } from '../scene/landscape';
@@ -21,9 +21,10 @@ const fields=[
 ] as const;
 const selectFields=new Set(['hair','outfit','bottom','footwear','deckDesign']);
 
-export function LookFields({look,onChange}:{look:Look;onChange:(look:Look)=>void}){
+export function LookFields({look,onChange,children}:{look:Look;onChange:(look:Look)=>void;children?:ReactNode}){
   return <div className="swatch-grid">
-    <fieldset><legend>성별</legend><div className="gender-options" aria-label="성별">
+    {children}
+    <fieldset className="look-gender"><legend>성별</legend><div className="gender-options" aria-label="성별">
       {(['male','female'] as const).map(gender=><button key={gender} type="button" aria-pressed={(look.gender??'male')===gender} onClick={()=>onChange({...look,gender})}>{gender==='male'?'남성':'여성'}</button>)}
     </div></fieldset>
     <fieldset className="look-presets"><legend>추천 코디</legend><div>

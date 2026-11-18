@@ -67,7 +67,7 @@
   flex:1;
   display:flex;
   overflow:hidden;
-  padding:clamp(10px,1.4vw,20px);
+  padding:clamp(8px,1vw,16px) clamp(10px,1.4vw,20px);
 }
 .console-create {
   display:grid;
@@ -106,20 +106,24 @@
   overscroll-behavior:contain;
   padding:4px 6px 8px;
 }
-.console-create-options > label {
+.console-create-name {
+  grid-area:1 / 1;
   display:grid;
+  align-content:start;
   gap:4px;
-  margin-bottom:10px;
+  width:min(100%,15rem);
 }
-.console-create-options input { min-height:36px; padding:6px 10px; }
+.console-create-name input { min-height:32px; padding:4px 10px; }
 .console-create .swatch-grid {
   grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);
-  gap:9px clamp(10px,1.6vw,22px);
+  gap:5px clamp(10px,1.6vw,22px);
 }
-.console-create .swatch-grid .look-presets { grid-column:auto; }
+.console-create .look-gender { grid-area:2 / 1; }
+.console-create .swatch-grid .look-presets { grid-area:1 / 2 / span 2; }
+.console-create .swatch-grid legend { padding-inline:0; }
 .console-create .swatch-grid fieldset > div { margin-top:4px; }
-.console-create .look-presets .pixel-rider { width:56px; }
-.console-create .swatch-grid select { min-height:33px; }
+.console-create .look-presets .pixel-rider { width:52px; }
+.console-create .swatch-grid select { min-height:30px; }
 .console-create > button { grid-area:submit; }
 
 @media(min-width:721px) and (max-height:510px){
@@ -138,7 +142,8 @@
     gap:10px;
   }
   .console-create-preview .look-preview > .pixel-rider { width:92px; }
-  .console-create .swatch-grid .look-presets { grid-column:1/-1; }
+  .console-create .look-gender { grid-area:1 / 2; }
+  .console-create .swatch-grid .look-presets { grid-area:2 / 1 / auto / -1; }
 }
 @media(max-height:360px), (max-width:720px) and (max-height:510px){
   .console-panel-create .console-panel-body { display:block; overflow:auto; }

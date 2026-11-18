@@ -1,4 +1,4 @@
-import { ArrowUpRight, Zap } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 export const ENGLISH_GAME_NAME = 'Longboarder Tycoon';
 
@@ -12,5 +12,9 @@ export function Tag({children,kind='muted'}:{children:React.ReactNode;kind?:'mut
   return <span className={`tag ${kind}`}>{children}</span>;
 }
 export function SectionTitle({code,title,detail}:{code:string;title:string;detail?:string}){
-  return <header className="section-title"><div><span className="eyebrow">{code}</span><h2>{title}</h2>{detail&&<p>{detail}</p>}</div><ArrowUpRight aria-hidden="true" size={21}/></header>;
+  return <header className="section-title">
+    <span className="eyebrow">{code}</span>
+    <h2>{title}</h2>
+    {detail&&<p>{detail}</p>}
+  </header>;
 }
