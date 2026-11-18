@@ -28,7 +28,7 @@ const presets=[...LOOK_PRESETS.male,...LOOK_PRESETS.female];
 await sheet('character-style',presets.map((look,i)=>({look,label:`${i<5?'M':'F'}${i%5+1} · ${HAIR_STYLES[look.hair]} · ${OUTFITS[look.outfit??0]}`})),5);
 await sheet('character-turnaround',LOOK_PRESETS.female.map(look=>[0,Math.PI/4,Math.PI/2,Math.PI,-Math.PI/2].map((heading,i)=>({look,heading,label:`${HAIR_STYLES[look.hair]} · ${['정면','¾','오른쪽','후면','왼쪽'][i]}`}))).flat(),5);
 await sheet('character-npcs',RIVALS.map(npc=>({look:npc.look,label:npc.name+' · '+HAIR_STYLES[npc.look.hair]})),3);
-await sheet('character-actions',presets.slice(0,1).concat(presets.slice(5,6)).map(look=>[
+await sheet('character-actions',[presets[0],presets[5],presets[6],presets[8]].map(look=>[
   {look,label:'크로스스텝',technique:{id:'cross',progress:.4}},
   {look,label:'피루엣 · 후면',technique:{id:'pirouette',progress:.4}},
   {look,label:'킥플립',technique:{id:'kickflip',progress:.4}},

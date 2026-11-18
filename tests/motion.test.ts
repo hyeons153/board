@@ -35,6 +35,45 @@ test('idle artwork retains the supplied sprite body proportions and every opaque
   assert.ok(same/total>.995,`Original artwork must survive the idle pose: ${same}/${total}`);
 });
 
+test('raised hoodie sleeves connect both hands to the body instead of leaving floating hands',()=>{
+  const canvas=createCanvas(ACTOR_WIDTH*2,ACTOR_HEIGHT*2),c=canvas.getContext('2d');
+  paintRider(c as unknown as CanvasRenderingContext2D,LOOK_PRESETS.female[3],'win',0);
+  const {width,height}=canvas,data=c.getImageData(0,0,width,height).data,connected=new Uint8Array(width*height);
+  // A floating hand may touch the hair. Exclude the head silhouette so the
+  // connection must actually travel through the raised sleeve and shoulder.
+  const head=(x:number,y:number)=>y<92*2&&x>=88*2&&x<=142*2;
+  const start=107*2*width+113*2,queue=[start];connected[start]=1;
+  for(let at=0;at<queue.length;at++){
+    const p=queue[at],x=p%width,y=Math.floor(p/width);
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      const nx=x+dx,ny=y+dy,n=ny*width+nx;
+      if(nx<0||nx>=width||ny<0||ny>=height||connected[n]||data[n*4+3]<128||head(nx,ny))continue;
+      connected[n]=1;queue.push(n);
+    }
+  }
+  for(const [left,right] of [[68,94],[130,157]]){
+    let skin=0,attached=0;
+    for(let y=65*2;y<98*2;y++)for(let x=left*2;x<right*2;x++){
+      if(head(x,y))continue;
+      const p=y*width+x,[r,g,b,a]=data.subarray(p*4,p*4+4);
+      if(a>200&&r>200&&g>145&&b>110&&r>g*1.035&&g>b*1.04){skin++;attached+=connected[p];}
+    }
+    assert.ok(skin>25,'Both raised hands must remain visible');
+    assert.ok(attached/skin>.95,`The sleeve must join its hand to the body: ${attached}/${skin}`);
+  }
+});
+
+test('changing skin color preserves the entire raised sleeve and hand silhouette',()=>{
+  const canvas=createCanvas(ACTOR_WIDTH,ACTOR_HEIGHT),c=canvas.getContext('2d');
+  for(const look of [...LOOK_PRESETS.male,...LOOK_PRESETS.female]){
+    const alpha=(skin:number)=>{
+      paintRider(c as unknown as CanvasRenderingContext2D,{...look,skin},'win',0);
+      return c.getImageData(0,0,ACTOR_WIDTH,ACTOR_HEIGHT).data.filter((_,i)=>i%4===3);
+    };
+    assert.deepEqual(alpha(5),alpha(1),'Skin color must not crop the hands');
+  }
+});
+
 test('Peter Pan and cross-step gather one foot while the other remains planted',()=>{
   for(const id of ['peter-pan','cross']){
     const start=techniquePose(id,.18),gather=techniquePose(id,.30);
@@ -88,7 +127,7 @@ test('all streetwear combinations and NPCs have distinct front/profile/rear view
     for(const heading of [0,Math.PI/2,Math.PI,-Math.PI/2]){
       paintRider(c as unknown as CanvasRenderingContext2D,look,'rest',0,{id:'peter-pan',progress:0,bodyHeading:heading,boardHeading:heading});
       views.push(canvas.toBuffer('image/png').toString('base64'));
-      for(const technique of [{id:'kickflip',progress:.4},{id:'cross',progress:.4},{id:'wood',progress:.5},{id:'treflip',progress:.9,outcome:'miss' as const}]){
+      for(const technique of [{id:'kickflip',progress:.4},{id:'cross',progress:.4},{id:'wood',progress:.5},{id:'treflip',progress:.9,outcome:'miss' as const},{id:'peter-pan',progress:.96,outcome:'great' as const}]){
         paintRider(c as unknown as CanvasRenderingContext2D,look,'ride',0,{...technique,bodyHeading:heading,boardHeading:heading});
         const rgba=c.getImageData(0,0,ACTOR_WIDTH,ACTOR_HEIGHT).data;
         for(let y=0;y<ACTOR_HEIGHT;y++)for(let x=0;x<ACTOR_WIDTH;x++)if(rgba[(y*ACTOR_WIDTH+x)*4+3])assert.ok(x>0&&x<ACTOR_WIDTH-1&&y>0&&y<ACTOR_HEIGHT-1,JSON.stringify(look)+' clips at '+x+','+y);

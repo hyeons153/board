@@ -5,7 +5,9 @@ import type { Point, Pose } from './techniques';
 type Canvas=HTMLCanvasElement;
 type Ctx=CanvasRenderingContext2D;
 type Part='head'|'torso'|'arm0'|'arm1'|'thigh0'|'thigh1'|'shin0'|'shin1'|'shoe0'|'shoe1';
-type Frame={parts:Record<Part,Canvas>;neck:number;hip:number;knee:number;ankle:number;side:boolean;model:number};
+type Sleeve={upper:Canvas;lower:Canvas;shoulder:Point;elbow:Point;wrist:Point};
+type Anchors={shoulder:Point;headY:number;wrist?:Point};
+type Frame={parts:Record<Part,Canvas>;neck:number;hip:number;knee:number;ankle:number;side:boolean;model:number;armArt?:Record<Part,Canvas>;torsoUnderlay?:Canvas;raisedArms?:Sleeve[]};
 const parts:Part[]=['head','torso','arm0','arm1','thigh0','thigh1','shin0','shin1','shoe0','shoe1'];
 let factory:((width:number,height:number)=>Canvas)|undefined;
 const frames=new Map<number,Frame>();
@@ -33,6 +35,24 @@ function recolor(data:Uint8ClampedArray,offset:number,target:string,base:string)
 }
 const skinPixel=(r:number,g:number,b:number)=>r>200&&g>145&&b>110&&r>g*1.035&&g>b*1.04;
 
+function isLongHair(model:number,direction:number,x:number,y:number,neck:number){
+  const distance=Math.abs(x-CENTER),below=y-neck;
+  // Front-facing hair stops above the sleeves. A long rear silhouette must not
+  // turn the front sleeves into part of the stationary head layer.
+  if(direction===0){
+    if(model===6||model===14)return below<10&&distance>25;
+    if(model===7||model===11)return below<20&&distance>32;
+    if(model===8)return below<18&&distance>24;
+    if(model===9||model===10)return below<38&&distance>33;
+    return false;
+  }
+  if(model===6||model===14)return below<30&&(direction===2?distance<22:distance>25);
+  if(model===7||model===11)return below<35&&distance>29;
+  if(model===8)return below<46&&(direction===2?distance<35:distance>22);
+  if(model===9||model===10)return below<43&&(direction===2?distance<44:distance>26);
+  return false;
+}
+
 export function installCharacterSprites(atlas:CanvasImageSource,createCanvas:(width:number,height:number)=>Canvas){
   factory=createCanvas;sourceAtlas=atlas;frames.clear();cache.clear();
 }
@@ -46,7 +66,7 @@ function rawFrame(model:number,direction:number):Frame{
     for(let y=0;y<HEIGHT;y++)for(let x=0;x<SIZE;x++){
       const offset=(y*SIZE+x)*4;if(!source.data[offset+3])continue;
       const distance=Math.abs(x-CENTER);
-      const longHair=model===6||model===14?y<neck+30&&(direction===2?distance<37:distance>25):model===7||model===11?y<neck+35&&distance>29:model===8?y<neck+46&&(direction===2?distance<35:distance>22):model===9||model===10?y<neck+43&&(direction===2?distance<44:distance>26):false;
+      const longHair=isLongHair(model,direction,x,y,neck);
       let part:Part;
       if(y<neck||longHair)part='head';
       else if(y<hip||y<hip+9&&distance>28){
@@ -59,10 +79,6 @@ function rawFrame(model:number,direction:number):Frame{
       buffers[part].data.set(source.data.subarray(offset,offset+4),offset);
     }
     const images=Object.fromEntries(parts.map(part=>{const out=factory!(SIZE,HEIGHT);out.getContext('2d')!.putImageData(buffers[part],0,0);return [part,out];})) as Record<Part,Canvas>;
-    if(side){
-      const out=factory!(SIZE,HEIGHT),under=out.getContext('2d')!;
-      under.fillStyle=SHIRTS[originals[model].shirt];under.fillRect(CENTER-12,neck+13,24,hip-neck-15);under.drawImage(images.torso,0,0);images.torso=out;
-    }
     const frame={parts:images,neck,hip,knee,ankle,side,model};frames.set(index,frame);
     if(frames.size>16)frames.delete(frames.keys().next().value!);
     return frame;
@@ -111,16 +127,34 @@ function styledFrame(look:Look,direction:number):Frame{
     }
     c.putImageData(pixels,0,0);images[part]=image;
   }
-  const result={...bodyFrame,parts:images};cache.set(key,result);
+  const front=direction!==0?styledFrame(look,0):undefined;
+  const result={...bodyFrame,parts:images,armArt:front?.parts??images,torsoUnderlay:bodyFrame.side?front!.parts.torso:undefined};cache.set(key,result);
   if(cache.size>16)cache.delete(cache.keys().next().value!);
   return result;
 }
 function piece(c:Ctx,image:Canvas,anchor:Point,target:Point,rotation=0,scaleX=SCALE,scaleY=SCALE){
   c.save();c.translate(target.x,target.y);c.rotate(rotation);c.scale(scaleX,scaleY);c.drawImage(image,-anchor.x,-anchor.y);c.restore();
 }
-function segment(c:Ctx,image:Canvas,a:Point,b:Point,toA:Point,toB:Point){
+function segment(c:Ctx,image:Canvas,a:Point,b:Point,toA:Point,toB:Point,maxScale=.72){
   const rotation=Math.atan2(toB.y-toA.y,toB.x-toA.x)-Math.atan2(b.y-a.y,b.x-a.x);
-  piece(c,image,a,toA,rotation,SCALE,Math.min(.72,Math.hypot(toB.x-toA.x,toB.y-toA.y)/Math.hypot(b.x-a.x,b.y-a.y)));
+  piece(c,image,a,toA,rotation,SCALE,Math.min(maxScale,Math.hypot(toB.x-toA.x,toB.y-toA.y)/Math.hypot(b.x-a.x,b.y-a.y)));
+}
+function sleeveParts(frame:Frame){
+  return frame.raisedArms??=([0,1].map(i=>{
+    const sign=i===0?-1:1,center=CENTER+sign*29,split=Math.round((frame.neck+frame.hip)/2);
+    const upper=factory!(SIZE,HEIGHT),lower=factory!(SIZE,HEIGHT),image=(frame.armArt??frame.parts)[`arm${i}` as Part];
+    // Locate the hand on the unmodified artwork so darker custom skin colors
+    // cannot accidentally shorten a sleeve or remove its hand.
+    const pixels=rawFrame(frame.model,0).parts[`arm${i}` as Part].getContext('2d')!.getImageData(0,0,SIZE,HEIGHT).data;
+    let end=frame.hip-4;
+    for(let y=frame.hip-16;y<frame.hip+12;y++)for(let x=0;x<SIZE;x++){
+      const offset=(y*SIZE+x)*4;
+      if((x-CENTER)*sign>28&&pixels[offset+3]&&skinPixel(pixels[offset],pixels[offset+1],pixels[offset+2]))end=Math.max(end,y+3);
+    }
+    upper.getContext('2d')!.drawImage(image,0,0,SIZE,split+2,0,0,SIZE,split+2);
+    lower.getContext('2d')!.drawImage(image,0,split-2,SIZE,end-split+2,0,split-2,SIZE,end-split+2);
+    return {upper,lower,shoulder:{x:CENTER+sign*27,y:frame.neck+9},elbow:{x:center,y:split},wrist:{x:center,y:frame.hip-4}};
+  }));
 }
 function kneeAt(hip:Point,foot:Point){
   const dx=foot.x-hip.x,dy=foot.y-hip.y,d=Math.hypot(dx,dy),bend=Math.sqrt(Math.max(0,18*18-d*d/4));
@@ -141,7 +175,7 @@ function headwear(c:Ctx,look:Look,neck:Point){
   c.fillStyle='#29202e';c.fillRect(neck.x-19,neck.y-29,43,4);c.fillStyle='#f4e6ce';c.fillRect(neck.x-9,neck.y-42,7,3);
 }
 
-export function paintSpriteCharacter(c:Ctx,look:Look,pose:Pose,still:boolean,time:number){
+export function paintSpriteCharacter(c:Ctx,look:Look,pose:Pose,still:boolean,time:number):Anchors|undefined{
   if(!characterSpritesReady())return;
   const angle=(pose.bodyYaw%(Math.PI*2)+Math.PI*2)%(Math.PI*2);
   const direction=angle<Math.PI*.25||angle>Math.PI*1.75?0:angle<Math.PI*.75?1:angle<Math.PI*1.25?2:3;
@@ -174,15 +208,33 @@ export function paintSpriteCharacter(c:Ctx,look:Look,pose:Pose,still:boolean,tim
     piece(c,frame.parts[`shoe${i}` as Part],{x:sourceX,y:SOLE},foot);
     legAccessories(c,look,knee,foot);
   }
-  const spread=pose.cheer?25:16+Math.max(0,pose.arms)*.8,handY=pose.cheer?shoulder.y-10:shoulder.y+28-Math.max(0,pose.arms)*1.5;
+  const spread=16+Math.max(0,pose.arms)*.8,handY=shoulder.y+28-Math.max(0,pose.arms)*1.5;
+  let wrist:Point|undefined;
   const drawArm=(i:number)=>{
-    const sign=i===0?-1:1,source={x:frame.side?CENTER:CENTER+sign*27,y:frame.neck+9},target={x:shoulder.x+sign*12*frontWidth,y:shoulder.y+3};
+    if(frame.side&&i!==1)return;
+    const arm=frame.side&&direction===3?0:i,sign=arm===0?-1:1;
+    const source={x:CENTER+sign*27,y:frame.neck+9},target={x:shoulder.x+sign*12*frontWidth,y:shoulder.y+3};
+    if(pose.cheer){
+      const sleeve=sleeveParts(frame)[arm];
+      // Lift the upper sleeve out from the shoulder, then bend the cuff upward.
+      // Keeping the elbow outside the hair silhouette makes the clothed arm visible.
+      const elbow={x:shoulder.x+sign*27,y:shoulder.y+4},hand={x:shoulder.x+sign*32,y:shoulder.y-14};
+      segment(c,sleeve.upper,sleeve.shoulder,sleeve.elbow,target,elbow,.85);
+      segment(c,sleeve.lower,sleeve.elbow,sleeve.wrist,elbow,hand,.85);
+      wrist=hand;
+      return;
+    }
     const rotation=Math.atan2(handY-target.y,shoulder.x+sign*spread-target.x)-Math.PI/2;
-    piece(c,frame.parts[`arm${i}` as Part],source,target,rotation);
+    piece(c,(frame.armArt??frame.parts)[`arm${arm}` as Part],source,target,rotation);
+    wrist={x:shoulder.x+sign*spread,y:handY};
   };
-  drawArm(0);piece(c,frame.parts.torso,{x:CENTER,y:frame.hip},hip,pose.lean*.008);drawArm(1);
+  drawArm(0);
+  // The resting side view hides the torso behind its sleeve. Reuse the actual
+  // shirt artwork underneath the moving sleeve instead of a flat color patch.
+  if(frame.torsoUnderlay)piece(c,frame.torsoUnderlay,{x:CENTER,y:frame.hip},hip,pose.lean*.008,SCALE*.55);
+  piece(c,frame.parts.torso,{x:CENTER,y:frame.hip},hip,pose.lean*.008);drawArm(1);
   // Neck and collar meet at their original source anchor, never at the chest.
   piece(c,frame.parts.head,{x:CENTER,y:frame.neck},shoulder,pose.lean*.004);
   headwear(c,look,shoulder);
-  return {shoulder,headY};
+  return {shoulder,headY,wrist};
 }

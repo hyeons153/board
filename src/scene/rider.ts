@@ -44,7 +44,7 @@ function deck(c:Ctx,look:Look,b:Pose['board']){
   // A permanent nose marker makes half-turns legible even on a plain deck.
   poly(c,'#f5eed3',[edge(27,-3),edge(30,-2),edge(30,2),edge(27,3)]);
 }
-function decorations(c:Ctx,look:Look,pose:Pose,shoulder:Point,headY:number,time:number,motion:Motion,night:boolean,great=false){
+function decorations(c:Ctx,look:Look,pose:Pose,shoulder:Point,headY:number,time:number,motion:Motion,night:boolean,great=false,wrist?:Point){
   const visuals=look.equipment?.accessories??[],x=shoulder.x,hatY=Math.max(2,headY-38),celebrate=great||['great','success','win'].includes(motion)||pose.cheer;
   // One helmet layer takes precedence; small face and torso accessories remain independent.
   const helmet=visuals.includes('rainbow')?'rainbow':visuals.includes('crown')?'crown':visuals.includes('helmet')?'helmet':undefined;
@@ -65,8 +65,9 @@ function decorations(c:Ctx,look:Look,pose:Pose,shoulder:Point,headY:number,time:
     else if(visual==='whistle'){box(c,'#e5c477',x-1,shoulder.y+7,2,8);box(c,'#f9db7d',x-3,shoulder.y+14,7,4);}
     else if(visual==='wrists'||visual==='tape'||visual==='led'){
       const spread=pose.cheer?25:16+Math.max(0,pose.arms)*.8,handY=pose.cheer?shoulder.y-10:shoulder.y+28-Math.max(0,pose.arms)*1.5;
+      const hand=wrist??{x:x+spread,y:handY};
       const color=visual==='led'&&night?'#85ffde':visual==='tape'?'#f1e4c6':'#637e98';
-      box(c,color,x+spread-3,handY-4,6,3);if(visual==='led'&&night)for(const dx of [-7,7])box(c,'#afffe3',x+spread+dx,handY-3,2,2);
+      box(c,color,hand.x-3,hand.y-4,6,3);if(visual==='led'&&night)for(const dx of [-7,7])box(c,'#afffe3',hand.x+dx,hand.y-3,2,2);
     }
     else if(['helmet','crown','rainbow','knees','laces'].includes(visual))continue;
     else if(visual==='duck'||visual==='chick'){oval(c,'#f4d57b',px-3,py-3,8,8);box(c,'#ef995f',px+3,py-1,4,2);box(c,INK,px+1,py-2,1,1);}
@@ -94,6 +95,6 @@ export function paintRider(c:Ctx,look:Look,motion:Motion,time:number,technique?:
   if(look.equipment?.accessories.includes('rainbow')&&pose.fall<.1&&(technique||['ride','accelerate','carve','brake'].includes(motion)))for(const [i,color] of ['#ee92a5','#f0cb81','#c6e99b','#8ed8d1','#bca7de'].entries())box(c,color,pose.board.x-55+i*4,Math.min(ACTOR_HEIGHT-12,pose.board.y+4)+i,42-i*4,2);
   deck(c,look,pose.board);
   const art=paintSpriteCharacter(c,look,pose,(!technique||technique.progress===0)&&['rest','ride','lose','carve'].includes(motion),time);
-  if(art){decorations(c,look,pose,art.shoulder,art.headY,time,motion,night,technique?.outcome==='great'&&(technique.progress??0)>.65);c.restore();return;}
+  if(art){decorations(c,look,pose,art.shoulder,art.headY,time,motion,night,technique?.outcome==='great'&&(technique.progress??0)>.65,art.wrist);c.restore();return;}
   c.restore();
 }
