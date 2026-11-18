@@ -39,7 +39,7 @@ function browser(handler:ReturnType<typeof createHandler>){
     return view;
   };
   const game=async(action:GameAction,version=view.version)=>{
-    const response=await call('',{tab,scope,version,action});
+    const response=await call('',{tab,scope,version,stateVersion:view.stateVersion,action});
     if(response.ok) view=await response.clone().json() as View;
     return response;
   };

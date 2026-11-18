@@ -10,6 +10,7 @@ export function useGame(){
   const mutating=useRef(false);
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState('');
+  const [syncNote,setSyncNote]=useState('');
   const [now,setNow]=useState(0);
   const initial=useRef(false);
   const apply=useCallback((update:View)=>{
@@ -19,7 +20,8 @@ export function useGame(){
   const load=useCallback(async()=>{
     if(initial.current)return;
     initial.current=true;
-    setError('');
+    if(inFlight.current) await inFlight.current;
+    setError('');setSyncNote('');
     try{
       const response=await fetch('/api/game',{cache:'no-store'});
       const data=await response.json();
@@ -33,7 +35,7 @@ export function useGame(){
   },[apply]);
   const send=useCallback(async(action:GameAction)=>{
     const pulse=action.type==='pulse';
-    if(!current.current||mutating.current||(pulse&&inFlight.current)) return false;
+    if(!current.current||initial.current||mutating.current||(pulse&&inFlight.current)) return false;
     if(!pulse){
       mutating.current=true;setSaving(true);
       if(inFlight.current) await inFlight.current;
@@ -41,10 +43,14 @@ export function useGame(){
     }
     const request=(async()=>{
       try{
-        const response=await fetch('/api/game',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tab:tab.current,version:current.current!.version,scope:current.current!.scope,action})});
+        const response=await fetch('/api/game',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tab:tab.current,version:current.current!.version,stateVersion:current.current!.stateVersion,scope:current.current!.scope,action})});
         const data=await response.json();
         if(!response.ok){
           if(data.view)apply(data.view);
+          if(response.status===409&&data.view){
+            if(!pulse)setSyncNote('다른 화면의 변경을 반영했어요. 선택을 다시 확인해 주세요.');
+            return false;
+          }
           throw new Error(data.error);
         }
         apply(data);
@@ -62,7 +68,9 @@ export function useGame(){
     }
   },[apply]);
   useEffect(()=>{void load();},[load]);
+  useEffect(()=>{if(!syncNote)return;const timer=window.setTimeout(()=>setSyncNote(''),5000);return ()=>window.clearTimeout(timer);},[syncNote]);
   const active=!!view?.career.rider&&view.career.rider.phase!=='retired';
+  const training=!!view?.career.rider?.plan;
   useEffect(()=>{
     if(!active)return;
     let stopped=false;
@@ -92,7 +100,7 @@ export function useGame(){
     const ticker=window.setInterval(()=>setNow(performance.now()),1000);
     void tick();
     return ()=>{stopped=true;window.clearTimeout(timer);window.clearInterval(ticker);document.removeEventListener('visibilitychange',wake);window.removeEventListener('pagehide',leave);};
-  },[active,send]);
+  },[active,training,view?.pendingTraining,view?.pendingMeet,view?.fastForward,send]);
   const remaining=view?Math.max(0,view.remainingMs-(now-time.current)):0;
-  return {view,send,saving,error,load,remaining,dismiss:()=>setError('')};
+  return {view,send,saving,error,syncNote,load,remaining,dismiss:()=>setError('')};
 }

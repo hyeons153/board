@@ -15,6 +15,7 @@ const skill=z.string().max(40).regex(/^[a-z0-9-]+$/);
 const disciplines=z.array(z.enum(DISCIPLINES)).max(3).refine(ds=>new Set(ds).size===ds.length);
 const actionSchema=z.discriminatedUnion('type',[
   z.strictObject({type:z.literal('pulse')}),
+  z.strictObject({type:z.literal('continue-training'),record:z.string().max(140)}),
   z.strictObject({type:z.literal('continue-meet'),record:z.string().max(140)}),
   z.strictObject({type:z.literal('fast-forward'),enabled:z.boolean()}),
   z.strictObject({type:z.literal('create'),name:z.string().trim().min(1).max(16).regex(/^[\p{L}\p{N} _.-]+$/u),look}),
@@ -31,7 +32,7 @@ const actionSchema=z.discriminatedUnion('type',[
   z.strictObject({type:z.literal('switch-rider'),id:z.uuid()}),
   z.strictObject({type:z.literal('retire')}),
 ]);
-const input=z.strictObject({version:z.number().int().nonnegative(),tab:z.uuid(),scope:z.string().regex(/^[a-f0-9]{64}$/).optional(),action:actionSchema});
+const input=z.strictObject({version:z.number().int().nonnegative(),stateVersion:z.number().int().nonnegative().optional(),tab:z.uuid(),scope:z.string().regex(/^[a-f0-9]{64}$/).optional(),action:actionSchema});
 const hash=(token:string)=>createHash('sha256').update(token).digest('hex');
 const identity=()=>({id:randomUUID(),seed:randomBytes(4).readUInt32LE()});
 const respond=(data:unknown,status=200,cookie?:string)=>Response.json(data,{status,headers:{
@@ -67,7 +68,7 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
     const rider=career.rider?{...career.rider,seed:0,records:records(career.rider.records,true)}:null;
     const parked=career.parked?.map(item=>({...item,seed:0,records:records(item.records,false)}));
     const fastForward=row.snapshot.clock.fastForward===true;
-    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,remainingMs:remaining(row.snapshot,weekMs),weekMs:weekMs/(fastForward?2:1),fastForward,pendingMeet:row.snapshot.clock.pendingMeet,storage:store.kind,username,scope};
+    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,stateVersion:row.snapshot.clock.stateVersion??0,remainingMs:remaining(row.snapshot,weekMs),weekMs:weekMs/(fastForward?2:1),fastForward,pendingMeet:row.snapshot.clock.pendingMeet,pendingTraining:row.snapshot.clock.pendingTraining,storage:store.kind,username,scope};
   };
   return async (request:Request):Promise<Response>=>{
     try{
@@ -102,11 +103,12 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
       if(!id) return respond({error:'게스트 세션이 만료됐어요. 새로고침해 주세요.'},401);
       const parsed=input.safeParse(await limitedBody(request));
       if(!parsed.success) return respond({error:'입력값을 확인해 주세요. 이름은 한글, 영문, 숫자 등 16자까지 사용할 수 있어요.'},400);
-      const {action,tab,version}=parsed.data;
+      const {action,tab,version,stateVersion}=parsed.data;
       if(online&&parsed.data.scope!==scope()) return respond({error:'다른 탭에서 로그인 상태가 바뀌었어요. 새로고침해 주세요.'},401);
       for(let attempt=0;attempt<4;attempt++){
         const row=await store.get(id);
-        if(action.type!=='pulse'&&version!==row.version) return respond({error:'다른 요청이 먼저 저장됐어요. 최신 기록을 불러왔습니다.',view:view(row,username,scope())},409);
+        const stale=stateVersion===undefined?version!==row.version:stateVersion!==(row.snapshot.clock.stateVersion??0);
+        if(action.type!=='pulse'&&stale) return respond({conflict:true,view:view(row,username,scope())},409);
         const versionedWeek=secure?RULES.weekMs:weekMs;
         const next=advance(row.snapshot,action,tab,Date.now(),versionedWeek,identity,secure&&store.kind==='neon',!!username);
         if(next===row.snapshot) return respond(view(row,username,scope()));
@@ -114,7 +116,7 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
         if(saved) return respond(view(saved,username,scope()));
         if(online&&tokenHash&&!(await online.actor(tokenHash))) return respond({error:'세션이 만료됐어요. 다시 연결해 주세요.'},401);
       }
-      return respond({error:'저장 요청이 겹쳤어요. 잠시 후 다시 시도해 주세요.',view:view(await store.get(id),username,scope())},409);
+      return respond({conflict:true,view:view(await store.get(id),username,scope())},409);
     } catch(e){
       if(e instanceof AccessError) return respond({error:e.message},e.status);
       if(e instanceof GameError) return respond({error:e.message},422);

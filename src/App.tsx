@@ -1,139 +1,114 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, BookOpen, CalendarDays, ChevronRight, CircleAlert, CirclePlay, Flag, LayoutGrid, ListOrdered, Radio, Timer, Trophy, UserRound, X, Zap } from 'lucide-react';
-import { divisionFor } from './game/career';
-import { CALENDAR, DIVISION_NAMES } from './game/data';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Flag, Footprints, HeartPulse, ListOrdered, Menu, NotebookText, Settings, ShoppingBag, Trophy, UserRound, X } from 'lucide-react';
 import { useGame } from './useGame';
-import Start from './components/Start';
-import { Brand, Tag } from './components/Brand';
-import { NewsCard, RiderCard, SeasonStrip, Training, Upcoming, when } from './components/Overview';
+import { ACTION_NAMES, CALENDAR, DEFAULT_LOOK, DIVISION_NAMES, LOCATIONS } from './game/data';
+import { divisionFor } from './game/career';
+import { equippedLook, extras } from './game/economy';
+import { Brand } from './components/Brand';
+import { LookFields, PixelRider } from './components/Appearance';
+import { NewsCard, TrainingControls } from './components/Overview';
 import { Skills, Routines } from './components/Skills';
 import { Meets } from './components/Meets';
 import { Hall, Profile, Rankings } from './components/Records';
 import Workshop from './components/Workshop';
-import { ShoppingBag } from 'lucide-react';
-import { equippedLook } from './game/economy';
-import { PixelRider } from './components/Appearance';
 import Account from './components/Account';
 import OnlineHall from './components/OnlineHall';
 import Ceremony from './components/Ceremony';
-import type { MeetRecord } from './game/types';
+import GameStage from './components/GameStage';
+import Scene from './components/Scene';
+import type { Action, Look, MeetRecord } from './game/types';
 
-const routes=[
-  {id:'overview',name:'육성 홈',icon:LayoutGrid,label:'CAREER HUB'},
-  {id:'skills',name:'기술 도감',icon:BookOpen,label:'TRICK LIBRARY'},
-  {id:'routine',name:'루틴 편집',icon:ListOrdered,label:'ROUTINE STUDIO'},
-  {id:'meets',name:'대회 일정',icon:CalendarDays,label:'COMPETITIONS'},
-  {id:'rank',name:'시즌 랭킹',icon:Flag,label:'SEASON STANDINGS'},
-  {id:'workshop',name:'장비·스폰서',icon:ShoppingBag,label:'BOARD SHOP'},
-  {id:'profile',name:'선수 정보',icon:UserRound,label:'RIDER PROFILE'},
-  {id:'hall',name:'명예의 전당',icon:Trophy,label:'HALL OF FAME'},
-  {id:'online',name:'온라인 명예의 전당',icon:Trophy,label:'GLOBAL HALL'},
-  {id:'account',name:'계정 관리',icon:UserRound,label:'RIDER ACCOUNT'},
-] as const;
-type Route=typeof routes[number]['id'];
+type Screen='home'|'training'|'skills'|'routine'|'meets'|'rank'|'workshop'|'profile'|'hall'|'online'|'account'|'menu'|'new'|'ending'|'journal';
+const names:Record<Screen,string>={home:'스팟',training:'훈련',skills:'기술 도감',routine:'루틴 편집',meets:'대회',rank:'시즌 랭킹',workshop:'장비·스폰서',profile:'선수 정보',hall:'명예의 전당',online:'온라인 명예의 전당',account:'계정',menu:'전체 메뉴',new:'라이더 등록',ending:'커리어 엔딩',journal:'라이더 일지'};
+const dock=[['home','스팟',Footprints],['training','훈련',HeartPulse],['skills','기술',BookOpen],['meets','대회',Flag],['workshop','상점',ShoppingBag],['menu','메뉴',Menu]] as const;
+const allMenus=[['training',Footprints,'훈련 계획과 자동 육성'],['skills',BookOpen,'댄싱·트릭 설명과 연마'],['routine',ListOrdered,'대회에서 펼칠 기술 순서'],['meets',CalendarDays,'일정과 경기 다시 보기'],['rank',Trophy,'이번 시즌 순위'],['workshop',ShoppingBag,'장비 구매·장착과 계약'],['profile',UserRound,'선수·라이벌·커리어 관리'],['hall',Trophy,'은퇴 선수와 공개 설정'],['online',Trophy,'다른 선수의 공개 기록'],['account',Settings,'로그인과 보유 선수'],['journal',NotebookText,'지난 훈련과 이벤트 기록']] as const;
 
 export default function App(){
   const game=useGame();
-  const [route,setRoute]=useState<Route>(()=>new URLSearchParams(location.search).has('rider')?'online':'overview');
+  const [screen,setScreen]=useState<Screen>(()=>new URLSearchParams(location.search).has('rider')?'online':'home');
   const [target,setTarget]=useState<string>();
-  const [title,setTitle]=useState<'new'|'hall'|'account'|'online'|null>(()=>new URLSearchParams(location.search).has('rider')?'online':null);
+  const [initialAction,setInitialAction]=useState<Action>();
   const [publicId,setPublicId]=useState(()=>new URLSearchParams(location.search).get('rider')??undefined);
   const [endingId,setEndingId]=useState<string>();
-  const previous=useRef<{id:string;phase:string}|undefined>(undefined);
   const [replay,setReplay]=useState<MeetRecord>();
-  const view=game.view;
-  const r=view?.career.rider;
-  const lastPhase=r?.phase;
-  const activeId=r?.id;
+  const previous=useRef<{id:string;phase:string}|undefined>(undefined);
+  const panel=useRef<HTMLDivElement>(null);
+  const view=game.view,r=view?.career.rider;
+  const pending=view?.pendingMeet;
+  const trainingResult=view?.pendingTraining;
   useEffect(()=>{
-    if(activeId&&lastPhase==='retired'&&previous.current?.id===activeId&&previous.current.phase!=='retired'&&!view?.pendingMeet) setEndingId(activeId);
-    if(activeId&&lastPhase) previous.current={id:activeId,phase:lastPhase};
-  },[activeId,lastPhase,view?.pendingMeet]);
-  useEffect(()=>{
-    if(r&&(r.phase==='event'||r.phase==='meet'||r.phase==='injury'||view?.pendingMeet)){
-      setRoute('overview');setTitle(null);setTarget(undefined);setReplay(undefined);
+    if(r&&(r.phase==='event'||r.phase==='meet'||r.phase==='injury'||pending||trainingResult)){
+      setScreen('home');setTarget(undefined);setReplay(undefined);
     }
-  },[r?.id,r?.phase,view?.pendingMeet]);
+    if(r?.phase==='retired'&&!pending&&!trainingResult&&previous.current?.id===r.id&&previous.current.phase!=='retired'){
+      setEndingId(r.id);setScreen('ending');
+    }
+    previous.current=r?{id:r.id,phase:r.phase}:undefined;
+  },[r?.id,r?.phase,pending,trainingResult]);
+  useEffect(()=>{if(screen!=='home'){panel.current?.focus({preventScroll:true});panel.current?.scrollTo(0,0);}},[screen]);
+  useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){setScreen('home');setReplay(undefined);}};window.addEventListener('keydown',escape);return ()=>window.removeEventListener('keydown',escape);},[]);
+  const go=(next:Screen)=>{setScreen(next);setTarget(undefined);setInitialAction(undefined);setReplay(undefined);};
   const selectPublic=(id?:string)=>{
-    setPublicId(id);
-    const url=new URL(location.href);
-    if(id) url.searchParams.set('rider',id);else url.searchParams.delete('rider');
+    setPublicId(id);const url=new URL(location.href);
+    if(id)url.searchParams.set('rider',id);else url.searchParams.delete('rider');
     history.replaceState(null,'',url);
   };
-  const go=(next:Route)=>{
-    setRoute(next);setTarget(undefined);setReplay(undefined);setEndingId(undefined);window.scrollTo({top:0,behavior:'instant'});
-    if(next!=='online'&&publicId) selectPublic(undefined);
-  };
-  const notice=game.error&&<div className="toast" role="alert"><CircleAlert size={18}/><span>{game.error}</span>
-    {/세션|로그인 상태/.test(game.error)&&<button className="button secondary small" onClick={()=>location.reload()}>다시 연결</button>}
-    <button className="icon-button" aria-label="오류 닫기" onClick={game.dismiss}><X size={17}/></button></div>;
-  if(!view)return <main className="boot"><Brand/>{game.error?<><p>{game.error}</p><button className="button primary" onClick={()=>void game.load()}>다시 연결 <ArrowRight size={17}/></button></>:<p role="status">라이더 기록을 불러오는 중…</p>}</main>;
-  const archive=view.career.hall.find(item=>item.id===endingId);
-  if(archive)return <div className="start-page hall-page"><header className="start-header"><Brand/><button className="button quiet" onClick={()=>setEndingId(undefined)}>돌아가기</button></header>
-    <Ceremony key={archive.id} archive={archive} onHall={()=>{setEndingId(undefined);if(r&&title!=='new'){setTitle(null);go('hall');}else setTitle('hall');}}
-      onNew={()=>{setEndingId(undefined);setTitle(r?.phase==='retired'||!r?'new':null);go('overview');}}/>
-  </div>;
-  if(title==='hall')return <Hall hall={view.career.hall} view={view} standalone onEnding={setEndingId} onAccount={()=>setTitle('account')} onBack={()=>setTitle(r?'new':null)}/>;
-  if((!r||title==='new')&&(title==='account'||title==='online'||route==='online')){
-    const online=title==='online'||route==='online'&&title!=='account';
-    return <div className="start-page hall-page"><header className="start-header"><Brand/><button className="button quiet" onClick={()=>{setTitle(r?'new':null);go('overview');}}>돌아가기</button></header>
-      {online?<OnlineHall view={view} initialId={publicId} onSelect={selectPublic}/>:<Account view={view} send={game.send} onSwitch={()=>{setTitle(null);go('overview');}}/>}
-    </div>;
-  }
-  if(!r||title==='new')return <>{notice}<Start hasHall={!!view.career.hall.length} username={view.username} saving={game.saving}
-    onHall={()=>setTitle('hall')} onOnline={()=>{setTitle('online');go('online');}} onAccount={()=>{setTitle('account');go('account');}} onCreate={async(name,look)=>{
-    const ok=await game.send({type:'create',name,look});
-    if(ok){setTitle(null);go('overview');}return ok;
-  }}/></>;
-  const screen=title==='account'?'account':route;
-  const active=routes.find(t=>t.id===screen)!;
-  const last=r.records.findLast(m=>m.results.length);
-  const latestMeetLabel=last&&CALENDAR.find(m=>m.id===last.id)?.name;
-  const auto=r.settings.mode==='auto';
-  const pending=view.pendingMeet?r.records.find(m=>r.id+':'+m.year+':'+m.id===view.pendingMeet):undefined;
-  const stageRecord=pending??replay;
-  const openReplay=(record:MeetRecord)=>{go('overview');setReplay(record);};
+  if(!view)return <main className="boot"><Brand/><p role="status">{game.error||'라이더 기록을 불러오는 중…'}</p>{game.error&&<button className="button primary" onClick={()=>void game.load()}>다시 연결</button>}</main>;
+  const stageRecord=r?.records.find(m=>r.id+':'+m.year+':'+m.id===pending)??replay;
+  const busyFlow=!!r&&(!!pending||!!trainingResult||['event','meet','injury'].includes(r.phase));
+  const active=!!r&&r.phase!=='retired';
+  const last=r?.records.findLast(record=>record.results.length);
+  const archive=view.career.hall.find(a=>a.id===endingId);
   const finishMeet=async()=>{
-    if(view.pendingMeet){
-      const ok=await game.send({type:'continue-meet',record:view.pendingMeet});
-      if(ok&&r.phase==='retired')setEndingId(r.id);
-    }else setReplay(undefined);
+    if(pending){if(await game.send({type:'continue-meet',record:pending})){if(r?.phase==='retired'){setEndingId(r.id);setScreen('ending');}}}
+    else setReplay(undefined);
   };
-  return <div className="shell">
-    <a className="skip" href="#main">본문 바로가기</a>
-    <aside className="sidebar">
-      <button className="home-button" onClick={()=>{setTitle(null);go('overview');}} aria-label="LONGBOARD LIFE 홈"><Brand/></button>
-      <nav aria-label="커리어 메뉴">{routes.filter(item=>item.id!=='account').map(item=><button key={item.id} className={screen===item.id?'active':''} aria-label={item.name} title={item.name} aria-current={screen===item.id?'page':undefined} onClick={()=>{setTitle(null);go(item.id);}}><item.icon size={18}/><span>{item.name}</span>{screen===item.id&&<ChevronRight size={14} className="nav-arrow"/>}</button>)}</nav>
-      <div className="side-foot"><div className="mini-rider"><PixelRider look={equippedLook(r)}/></div><div><b>{r.name}</b><small>{DIVISION_NAMES[divisionFor(r.year)]} / {r.year}년차</small></div><span className="dot"/></div>
-    </aside>
-    <div className="workspace">
-      <header className="topbar"><div className="breadcrumbs"><span>LONGBOARD LIFE</span><ChevronRight size={13}/><b>{active.label}</b></div><div className="top-status"><span className="store-state"><span className="dot"/>{view.storage==='neon'?'NEON 저장':'로컬 저장'}</span><Tag kind={auto?'lime':'muted'}>{auto?<Zap size={13}/>:<Radio size={13}/>} {r.phase==='retired'?'은퇴':auto?'자동 육성':'직접 육성'}</Tag>
-        <button className="button quiet small" onClick={()=>{setTitle(null);go('account');}}><UserRound size={14}/> {view.username??'계정·로그인'}</button></div></header>
-      <main className="workspace-main" id="main">
-        <header className="page-header"><div><div className="eyebrow">SEASON {String(r.year).padStart(2,'0')} <span className="text-lime">/</span> WEEK {String(r.week).padStart(2,'0')}</div><h1>{route==='overview'?'라이더 라운지':active.name}</h1><p>{route==='overview'?`${r.name} 라이더, 오늘은 어디에서 타볼까요?`:`${r.name} · ${r.year}년차 ${r.week}주 · ${DIVISION_NAMES[divisionFor(r.year)]}`}</p></div>
-          {r.phase!=='retired'&&<div className="week-chip"><Timer size={18}/><span><small>{view.pendingMeet?'대회 결과 확인 중':r.phase==='event'?'이벤트 선택 대기':r.phase==='meet'?'출전 선택 대기':r.phase==='injury'?'부상 확인 대기':game.remaining===0&&!r.plan&&!auto?'훈련 예약 대기':'다음 주 판정까지'}</small><b>{r.phase==='plan'&&!view.pendingMeet?when(game.remaining):'—'}</b></span></div>}</header>
-        {route==='overview'&&<div className="overview-grid">
-          <div className="stack">
-            {r.phase==='retired'&&!view.pendingMeet&&<div className="meet-notice panel"><Trophy size={22}/><div><b>커리어 종료</b><span>명예의 전당에 {r.name} 선수의 기록이 남았습니다.</span></div><button className="button secondary small" onClick={()=>setEndingId(r.id)}>엔딩 보기</button><button className="button primary small" onClick={()=>setTitle('new')}>새 선수</button></div>}
-            <Training key={r.id+'-'+(target??'weekly')} r={r} send={game.send} saving={game.saving} remaining={game.remaining} weekMs={view.weekMs} fastForward={view.fastForward} target={target} record={stageRecord} onDone={()=>void finishMeet()}/>
-          </div>
-          <aside className="stack overview-aside"><RiderCard r={r}/><Upcoming r={r} onClick={()=>go('meets')}/><SeasonStrip r={r}/>
-            {last&&<div className="panel quick-replay"><CirclePlay size={20}/><div><span>최근 경기</span><b>{latestMeetLabel}</b></div><button className="icon-button" aria-label="최근 경기 재생" onClick={()=>openReplay(last)}><ArrowRight size={17}/></button></div>}
-            <NewsCard r={r}/>
-          </aside>
-        </div>}
-        {route==='skills'&&<Skills r={r} onTrain={id=>{go('overview');setTarget(id);}}/>}
-        {route==='routine'&&<Routines r={r} send={game.send} saving={game.saving}/>}
-        {route==='meets'&&<Meets r={r} onPlay={openReplay} onEntry={()=>go('overview')}/>}
-        {route==='rank'&&<Rankings r={r}/>}
-        {route==='workshop'&&<Workshop key={r.id} r={r} send={game.send} saving={game.saving}/>}
-        {route==='profile'&&<Profile r={r} send={game.send} saving={game.saving} onNew={()=>setTitle('new')} onHall={()=>go('hall')}/>}
-        {screen==='hall'&&<Hall hall={view.career.hall} view={view} onEnding={setEndingId} onAccount={()=>go('account')}/>}
-        {screen==='online'&&<OnlineHall view={view} initialId={publicId} onSelect={selectPublic}/>}
-        {screen==='account'&&<Account view={view} send={game.send} onSwitch={()=>{setTitle(null);go('overview');}}/>}
-        <footer className="workspace-footer"><span>LONGBOARD LIFE · CAREER SIM</span><span>{Math.round(view.weekMs/1000)}초 / 게임 내 1주</span></footer>
-      </main>
+  const openReplay=(record:MeetRecord)=>{go('home');setReplay(record);};
+  const playHome=()=>{go('home');};
+  let content:ReactNode;
+  if(screen==='new')content=<NewRider saving={game.saving} onCreate={async(name,look)=>{const ok=await game.send({type:'create',name,look});if(ok)go('home');return ok;}}/>;
+  else if(screen==='account')content=<Account key={view.scope} view={view} send={game.send} onSwitch={playHome} onSessionChange={game.load}/>;
+  else if(screen==='online')content=<OnlineHall view={view} initialId={publicId} onSelect={selectPublic}/>;
+  else if(screen==='hall')content=<Hall hall={view.career.hall} view={view} onEnding={id=>{setEndingId(id);setScreen('ending');}} onAccount={()=>go('account')}/>;
+  else if(screen==='ending'&&archive)content=<Ceremony key={archive.id} archive={archive} onHall={()=>go('hall')} onNew={()=>go('new')}/>;
+  else if(screen==='menu')content=<div className="console-menu-grid">{allMenus.filter(([id])=>r||['hall','online','account'].includes(id)).map(([id,Icon,detail])=><button key={id} onClick={()=>go(id)}><Icon size={24}/><span><strong>{names[id]}</strong><small>{detail}</small></span><ArrowRight size={16}/></button>)}</div>;
+  else if(r){
+    if(screen==='training')content=busyFlow?<FlowNotice onReturn={playHome}/>:<TrainingControls key={r.id+':'+(target??'weekly')} r={r} send={game.send} saving={game.saving} target={target} initialAction={initialAction} onScheduled={playHome}/>;
+    else if(screen==='skills')content=<Skills r={r} onTrain={id=>{go('training');setTarget(id);}}/>;
+    else if(screen==='routine')content=<Routines r={r} send={game.send} saving={game.saving||busyFlow}/>;
+    else if(screen==='meets')content=<Meets r={r} onPlay={openReplay} onEntry={playHome}/>;
+    else if(screen==='rank')content=<Rankings r={r}/>;
+    else if(screen==='workshop')content=busyFlow?<FlowNotice onReturn={playHome}/>:<Workshop r={r} send={game.send} saving={game.saving}/>;
+    else if(screen==='profile')content=<Profile r={r} send={game.send} saving={game.saving||busyFlow} onNew={()=>go('new')} onHall={()=>go('hall')}/>;
+    else if(screen==='journal')content=<div className="console-journal"><NewsCard r={{...r,news:r.news.slice(0,100)}}/>{r.news.slice(5).map((note,i)=><p key={i}><b>{note.year}년차 {note.week}주</b> {note.text}</p>)}</div>;
+  }
+  return <div className="console-page"><main className="game-console" aria-label="LONGBOARD LIFE 게임">
+    <header className="console-top"><button className="console-brand" onClick={playHome} aria-label="게임 홈"><Brand/></button>
+      {r?<div className="console-rider"><span>{r.name}</span><b>{r.year}년차 {r.week}주</b><small>{DIVISION_NAMES[divisionFor(r.year)]}</small></div>:<span className="console-motto">나만의 롱보드 커리어</span>}
+      <div className="console-top-actions">{active&&<button className={'console-auto '+(r!.settings.mode==='auto'?'is-on':'')} aria-label="자동 진행" aria-pressed={r!.settings.mode==='auto'} disabled={game.saving} onClick={async()=>{if(await game.send({type:'settings',settings:{...r!.settings,mode:r!.settings.mode==='auto'?'manual':'auto',pauseStory:false,pauseMeet:false,pauseInjury:false}}))playHome();}}>{r!.settings.mode==='auto'?'AUTO ON':'AUTO OFF'}</button>}<span className="console-save" role="status">{game.saving?'저장 중':view.storage==='neon'?'저장됨':'로컬 저장'}</span><button aria-label="라이더 일지" onClick={()=>go(r?'journal':'menu')}><NotebookText size={18}/></button><button aria-label="계정" onClick={()=>go('account')}><UserRound size={18}/></button></div>
+    </header>
+    <div className="console-world">
+      <div className="console-stage" inert={screen!=='home'}>{r?<GameStage r={r} send={game.send} saving={game.saving} remaining={game.remaining} weekMs={view.weekMs} fastForward={view.fastForward} spot={r.plan?.spot??r.spot} motion={r.plan?.action==='rest'||r.plan?.action==='hospital'?'rest':'ride'} record={stageRecord} pendingTraining={trainingResult} onDone={()=>void finishMeet()}/>:<><Scene spot="river" look={DEFAULT_LOOK} variant="title"/><div className="console-title-shade"/></>}</div>
+      {r&&<div className="console-vitals" aria-label="선수 상태"><span>체력 <b>{Math.round(r.energy)}</b><i><em style={{width:r.energy+'%'}}/></i></span><span>₩{r.money.toLocaleString('ko-KR')}</span><span>명성 {r.fame}</span>{r.injury&&<span className="console-injury">{r.injury.severity==='major'?'중상':'경상'} · {r.injury.weeks}주</span>}</div>}
+      {screen==='home'&&!busyFlow&&!replay&&(r?<div className="console-home-actions">
+        {r.phase==='retired'?<><button className="console-primary" onClick={()=>{setEndingId(r.id);go('ending');}}>은퇴식 보기 <Trophy size={18}/></button><button onClick={()=>go('new')}>새 선수 육성</button></>:<><button className="console-primary" onClick={()=>go('training')}><Footprints size={22}/><span><strong>{r.settings.mode==='auto'?'자동 육성 설정':r.plan?'이번 주 수행 중':'이번 주 행동 선택'}</strong><small>{r.settings.mode==='auto'?'설정한 전략으로 진행 중':r.plan?ACTION_NAMES[r.plan.action]+' 수행 중':'훈련·휴식·치료 선택 후 주차 시작'}</small></span><ArrowRight size={18}/></button>{r.settings.mode==='manual'&&!r.plan&&<><button onClick={()=>{go('training');setInitialAction('rest');}}>휴식</button><button disabled={!r.injury} onClick={()=>{go('training');setInitialAction('hospital');}}>치료</button></>}<button onClick={()=>go('routine')}><ListOrdered size={18}/> 루틴</button><button onClick={()=>go('profile')}><UserRound size={18}/> 선수</button></>}
+        {last&&<button onClick={()=>openReplay(last)}>최근 경기 <PlayIcon/></button>}
+        {extras(r).lastTraining&&<p className="console-last-training">{extras(r).lastTraining!.text}</p>}
+      </div>:<div className="console-welcome"><span>THE LONGBOARD CAREER SIM</span><h1>LONGBOARD<br/><em>LIFE.</em></h1><p>강변의 첫 푸시부터 마지막 페스티벌까지.<br/>나만의 8년 커리어를 시작하세요.</p><button className="console-primary" onClick={()=>go('new')}>새 라이더 등록 <ArrowRight size={20}/></button><small>게임 내 1주 = 30초 · x2로 15초</small></div>)}
+      {content&&screen!=='home'&&<section className={'console-panel '+(screen==='journal'?'console-panel-journal':'')} aria-label={names[screen]}>
+        <header><button onClick={playHome} aria-label="게임 화면으로 돌아가기"><ArrowLeft size={18}/></button><h1>{names[screen]}</h1><button onClick={playHome} aria-label="메뉴 닫기"><X size={18}/></button></header>
+        <div className="console-panel-body" ref={panel} tabIndex={-1} key={screen}>{content}</div>
+      </section>}
+      {game.syncNote&&<div className="console-sync-note" role="status">{game.syncNote}</div>}
+      {game.error&&<div className="console-error" role="alert"><span>{game.error}</span><button onClick={()=>void game.load()}>다시 연결</button><button onClick={game.dismiss} aria-label="오류 닫기"><X size={16}/></button></div>}
     </div>
-    {notice}
-  </div>;
+    <nav className="console-dock" aria-label="인게임 메뉴">{dock.map(([id,label,Icon])=><button key={id} disabled={!r&&['training','skills','meets','workshop'].includes(id)} aria-current={screen===id?'page':undefined} onClick={()=>go(id)}><Icon size={23}/><span>{label}</span>{screen===id&&<i/>}</button>)}</nav>
+  </main></div>;
+}
+function PlayIcon(){return <ArrowRight size={16}/>;}
+function FlowNotice({onReturn}:{onReturn:()=>void}){return <div className="console-flow-notice"><Flag size={32}/><h2>지금 진행 중인 이야기가 있어요.</h2><p>게임 화면에서 선택이나 대회 결과를 확인하면 계속할 수 있어요.</p><button className="button primary" onClick={onReturn}>게임으로 돌아가기 <ArrowRight size={16}/></button></div>;}
+function NewRider({saving,onCreate}:{saving:boolean;onCreate:(name:string,look:Look)=>Promise<boolean>}){
+  const [name,setName]=useState('');const [look,setLook]=useState<Look>(DEFAULT_LOOK);
+  const submit=(event:FormEvent)=>{event.preventDefault();void onCreate(name.trim(),look);};
+  return <form className="console-create" onSubmit={submit}><div className="console-create-preview"><PixelRider look={look} label="새 라이더 외형"/><p>강변에서 시작할 새 얼굴</p></div><label>라이더 이름<input aria-label="라이더 이름" value={name} onChange={e=>setName(e.target.value)} required minLength={1} maxLength={16} autoComplete="off"/></label><LookFields look={look} onChange={setLook}/><button className="button primary" disabled={saving||!name.trim()}>등록하고 시작 <ArrowRight size={17}/></button></form>;
 }

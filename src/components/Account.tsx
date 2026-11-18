@@ -16,7 +16,7 @@ export async function service<T>(area:'account'|'public',request?:Record<string,
   return data as T;
 }
 
-export default function Account({view,send,onSwitch}:{view:View;send:Submit;onSwitch:()=>void}){
+export default function Account({view,send,onSwitch,onSessionChange}:{view:View;send:Submit;onSwitch:()=>void;onSessionChange?:()=>Promise<void>}){
   const [form,setForm]=useState<'register'|'login'>('register');
   const [username,setUsername]=useState('');
   const [password,setPassword]=useState('');
@@ -28,7 +28,8 @@ export default function Account({view,send,onSwitch}:{view:View;send:Submit;onSw
     setError('');
     try{
       await service('account',action,view.scope);
-      window.location.reload();
+      if(onSessionChange){await onSessionChange();setBusy(false);setPassword('');}
+      else window.location.reload();
     }catch(error){
       setError(error instanceof Error?error.message:'계정에 연결하지 못했어요.');
       setBusy(false);

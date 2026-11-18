@@ -29,7 +29,7 @@ async function request<T>(params:string,body?:unknown,method=body===undefined?'G
 async function load(){view=await request<View>('');return view;}
 async function game(action:GameAction){
   assert.ok(view);
-  view=await request<View>('',{version:view.version,scope:view.scope,tab,action});
+  view=await request<View>('',{version:view.version,stateVersion:view.stateVersion,scope:view.scope,tab,action});
   return view;
 }
 async function waitForWeek(){
@@ -73,6 +73,8 @@ async function run(){
   const riderId=view!.career.rider!.id;
   await game({type:'plan',plan:{action:'speed',spot:'river',intensity:'safe'}});
   await waitForWeek();
+  assert.ok(view!.pendingTraining);
+  await game({type:'continue-training',record:view!.pendingTraining!});
   await game({type:'event',index:0});
   assert.equal(view!.career.rider!.week,2);
   assert.ok(view!.career.rider!.stats.speed>18);
@@ -94,12 +96,11 @@ async function run(){
   if(competition){
     await game({type:'settings',settings:{mode:'auto',strategy:'balanced',intensity:'safe',entries:['dance','trick'],pauseMeet:true,pauseStory:false,pauseInjury:false}});
     const deadline=Date.now()+view!.weekMs*8+30000;
-    while(Date.now()<deadline&&view!.career.rider!.phase!=='meet'){
+    while(Date.now()<deadline&&!view!.pendingMeet){
       await new Promise(resolve=>setTimeout(resolve,2000));
       await game({type:'pulse'});
     }
-    assert.equal(view!.career.rider!.phase,'meet');
-    await game({type:'entry',disciplines:['dance','trick']});
+    assert.ok(view!.pendingMeet);
     const key=view!.pendingMeet;
     assert.ok(key);
     const saved=JSON.stringify(view!.career);

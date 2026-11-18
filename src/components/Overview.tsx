@@ -12,7 +12,6 @@ import Scene from './Scene';
 import { SectionTitle, Tag } from './Brand';
 import { TechniquePreview } from './TechniquePreview';
 import { PixelRider } from './Appearance';
-import GameStage from './GameStage';
 import type { MeetRecord } from '../game/types';
 
 export const money=(n:number)=>'₩'+n.toLocaleString('ko-KR');
@@ -42,10 +41,10 @@ export function Upcoming({r,onClick}:{r:Rider;onClick:()=>void}){
 export function NewsCard({r}:{r:Rider}){
   return <article className="panel news"><div className="card-heading"><span><Activity size={16}/> 라이더 일지</span></div><ul>{r.news.slice(0,5).map((n,i)=><li key={`${n.year}-${n.week}-${i}`}><span>{n.year}Y / {String(n.week).padStart(2,'0')}W</span>{n.text}</li>)}</ul></article>;
 }
-export function Training({r,send,saving,remaining,weekMs,fastForward,target,record,onDone}:{r:Rider;send:Submit;saving:boolean;remaining:number;weekMs:number;fastForward:boolean;target?:string;record?:MeetRecord;onDone:()=>void}){
+export function TrainingControls({r,send,saving,target,initialAction,onScheduled}:{r:Rider;send:Submit;saving:boolean;target?:string;initialAction?:Action;onScheduled:()=>void}){
   const skill=SKILL[target??''];
   const [spot,setSpot]=useState<Spot>(r.plan?.spot??r.spot);
-  const [action,setAction]=useState<Action>(skill?.family??r.plan?.action??'speed');
+  const [action,setAction]=useState<Action>(initialAction??skill?.family??r.plan?.action??'speed');
   const [intensity,setIntensity]=useState<Intensity>(r.plan?.intensity??r.settings.intensity);
   const [targetSkill,setTarget]=useState(skill?.id??r.plan?.skill??'');
   const [lesson,setLesson]=useState(!!r.plan?.lesson);
@@ -57,38 +56,29 @@ export function Training({r,send,saving,remaining,weekMs,fastForward,target,reco
   const auto=r.settings.mode==='auto';
   const viewSpot=auto?r.spot:spot;
   const viewMotion=actionMotion[auto?(r.lastPlan?.action??'speed'):action];
-  const canEdit=!record&&!auto&&r.phase==='plan'&&!saving;
+  const canEdit=!auto&&r.phase==='plan'&&!r.plan&&!saving;
   const choose=(a:Action)=>{setAction(a);setTarget('');setLesson(false);};
   const blocked=(a:Action)=>a==='hospital'&&!r.injury||a==='rehearsal'&&spot!=='arena'||r.injury?.severity==='major'&&!r.injury.treated&&a!=='rest'&&a!=='hospital';
   const visitor=viewSpot==='river'&&r.events['mentor-intro']&&r.mentor?r.mentor:RIVAL.get(LOCATIONS[viewSpot].npc);
   const last=extras(r).lastTraining;
   return <>
-    <GameStage r={r} send={send} saving={saving} remaining={remaining} weekMs={weekMs} fastForward={fastForward} spot={viewSpot} motion={viewMotion} guest={visitor?.look} record={record} onDone={onDone}/>
     <div className="spot-picker expanded" aria-label="훈련 스팟">{SPOTS.map(s=>{
       const locked=!spotUnlocked(r,s);
-      return <button key={s} className={s===viewSpot?'active':''} aria-pressed={s===viewSpot} disabled={!!record||r.phase!=='plan'||auto||locked} title={locked?SPOT_GATE[s]?.hint:LOCATIONS[s].detail}
+      return <button key={s} className={s===viewSpot?'active':''} aria-pressed={s===viewSpot} disabled={!!r.plan||r.phase!=='plan'||auto||locked} title={locked?SPOT_GATE[s]?.hint:LOCATIONS[s].detail}
         onClick={()=>{setSpot(s);if(s!=='arena'&&action==='rehearsal') choose('link');}}>
         <strong>{locked&&<LockKeyhole size={13}/>} {LOCATIONS[s].name}</strong>
         <small>{locked?SPOT_GATE[s]?.hint:LOCATIONS[s].boosted.map(a=>ACTION_NAMES[a]).join(' · ')}</small>
       </button>;
     })}</div>
-    <StatCards r={r}/>
-    {last&&<TrainingReport key={last.year+'-'+last.week} r={r} last={last} auto={auto}/>}
-    {r.phase!=='retired'&&!record&&<section className="panel training-panel">
-      <SectionTitle code="WEEKLY TRAINING" title={auto?'자동 육성 설정':'이번 주 훈련'} detail={auto?'설정한 전략으로 주간 행동과 이벤트 선택을 맡길 수 있어요.':'한 가지 행동을 예약하면 주간 타이머가 끝날 때 실행됩니다.'}/>
+    {r.phase!=='retired'&&<section className="panel training-panel">
+      <SectionTitle code="WEEKLY TRAINING" title={auto?'자동 육성':'이번 주 행동 선택'} detail={auto?'행동·이벤트·대회·결과까지 자동으로 선택합니다. 전략 변경은 다음 주 행동부터 적용됩니다.':r.plan?'이번 주 행동을 수행하고 있어요. 끝난 뒤 다음 주 행동을 선택합니다.':'행동을 고르면 이번 주가 시작됩니다. 훈련·휴식·치료 중 하나를 선택하세요.'}/>
       <div className="mode-switch" aria-label="육성 모드">
         <button disabled={saving} aria-pressed={!auto} className={!auto?'active':''} onClick={()=>void send({type:'settings',settings:{...r.settings,mode:'manual'}})}>직접 육성</button>
-        <button disabled={saving} aria-pressed={auto} className={auto?'active':''} onClick={()=>void send({type:'settings',settings:{...r.settings,mode:'auto'}})}><Zap size={14}/> 자동 육성</button>
+        <button disabled={saving} aria-pressed={auto} className={auto?'active':''} onClick={async()=>{if(await send({type:'settings',settings:{...r.settings,mode:'auto',pauseStory:false,pauseMeet:false,pauseInjury:false}}))onScheduled();}}><Zap size={14}/> 자동 육성</button>
       </div>
       {auto?<div className="auto-controls">
         <label>육성 전략<select value={r.settings.strategy} disabled={saving} onChange={e=>void send({type:'settings',settings:{...r.settings,strategy:e.target.value as Rider['settings']['strategy']}})}>{STRATEGIES.map(s=><option key={s} value={s}>{STRATEGY_NAMES[s]}</option>)}</select></label>
         <label>훈련 강도<select value={r.settings.intensity} disabled={saving} onChange={e=>void send({type:'settings',settings:{...r.settings,intensity:e.target.value as Intensity}})}>{INTENSITIES.map(i=><option key={i} value={i}>{INTENSITY_NAMES[i]}</option>)}</select></label>
-        <label className="checkbox-line"><input type="checkbox" checked={!!r.settings.pauseStory} disabled={saving}
-          onChange={e=>void send({type:'settings',settings:{...r.settings,pauseStory:e.target.checked}})}/> 중요한 라이벌·기술 이벤트에서 일시 정지</label>
-        <label className="checkbox-line"><input type="checkbox" checked={!!r.settings.pauseMeet} disabled={saving}
-          onChange={e=>void send({type:'settings',settings:{...r.settings,pauseMeet:e.target.checked}})}/> 대회 출전 전에 일시 정지</label>
-        <label className="checkbox-line"><input type="checkbox" checked={!!r.settings.pauseInjury} disabled={saving}
-          onChange={e=>void send({type:'settings',settings:{...r.settings,pauseInjury:e.target.checked}})}/> 새 부상 발생 시 일시 정지</label>
         <fieldset><legend>자동 출전 종목 · 선택 해제 시 불참</legend><div className="pill-row">{DISCIPLINES.map(d=><button key={d} disabled={saving} aria-pressed={r.settings.entries.includes(d)} className={`pill ${r.settings.entries.includes(d)?'active':''}`} onClick={()=>void send({type:'settings',settings:{...r.settings,entries:toggleEntry(r.settings.entries,d)}})}>{DISCIPLINE_NAMES[d]}</button>)}</div></fieldset>
       </div>:<>
         <div className="action-grid">{ACTIONS.map(a=>{
@@ -104,28 +94,12 @@ export function Training({r,send,saving,remaining,weekMs,fastForward,target,reco
             {DISCIPLINES.map(d=><option key={d} value={d}>{DISCIPLINE_NAMES[d]}</option>)}</select></label>}
           {canLesson&&<label className="checkbox-line"><input type="checkbox" checked={lesson} disabled={!canEdit}
             onChange={e=>setLesson(e.target.checked)}/> 집중 레슨 {money(ECONOMY.lesson)}</label>}
-          <button className="button primary" disabled={!canEdit||!!blocked(action)||!!queued||!!(desired.lesson&&r.money<ECONOMY.lesson)||(!!r.injury&&intensity==='focus'&&action!=='rest'&&action!=='hospital')} onClick={()=>void send({type:'plan',plan:desired})}>{queued?'예약 완료':r.plan?'예약 변경':'훈련 예약'} <ArrowRight size={16}/></button>
+          <button className="button primary" disabled={!canEdit||!!blocked(action)||!!queued||!!(desired.lesson&&r.money<ECONOMY.lesson)||(!!r.injury&&intensity==='focus'&&action!=='rest'&&action!=='hospital')} onClick={async()=>{if(await send({type:'plan',plan:desired}))onScheduled();}}>{r.plan?'이번 주 수행 중':'선택하고 이번 주 시작'} <ArrowRight size={16}/></button>
         </div>
-        {r.plan&&<p className="subtle"><CirclePlay size={14}/> 예약됨 · {ACTION_NAMES[r.plan.action]} / {LOCATIONS[r.plan.spot].name}</p>}
+        {r.plan&&<p className="subtle"><CirclePlay size={14}/> 수행 중 · {ACTION_NAMES[r.plan.action]} / {LOCATIONS[r.plan.spot].name}</p>}
       </>}
     </section>}
   </>;
-}
-function TrainingReport({r,last,auto}:{r:Rider;last:NonNullable<NonNullable<Rider['extras']>['lastTraining']>;auto:boolean}){
-  const [open,setOpen]=useState(false);
-  const bad=last.grade==='injury'||last.grade==='miss';
-  const good=last.grade==='learned'||last.grade==='great';
-  const motion:Motion=bad?'fall':good?'great':last.grade==='recovery'?'rest':actionMotion[r.lastPlan?.action??'speed'];
-  return <section className="panel training-report">
-    <div className="card-heading"><span><Activity size={17}/> {last.year}년차 {last.week}주 훈련</span>
-      <Tag kind={bad?'orange':good?'lime':'muted'}>{grades[last.grade]}</Tag></div>
-    <p>{!auto||open ? last.text : ACTION_NAMES[r.lastPlan?.action??'rest']}</p>
-    <button className="text-button" aria-expanded={open} onClick={()=>setOpen(!open)}>
-      <CirclePlay size={15}/> {open?'훈련 상세 닫기':'훈련 상세 및 재생'}
-    </button>
-    {open&&(last.skill?<TechniquePreview r={r} id={last.skill} outcome={bad?'miss':good?'great':'clean'}/>:
-      <div className="technique-preview"><Scene spot={r.lastPlan?.spot??r.spot} look={equippedLook(r)} motion={motion} variant="preview"/></div>)}
-  </section>;
 }
 export function toggleEntry(list:Discipline[],d:Discipline){
   return list.includes(d)?list.filter(x=>x!==d):[...list,d];

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { DISCIPLINE_NAMES, DIFFICULTY_NAMES, KIND_NAMES, RULES, SKILLS, SKILL, STYLE_NAMES } from '../game/data';
 import { allowed, chance, generateRoutine, learned, routineTime } from '../game/competition';
 import { canStudy } from '../game/events';
-import { skillDescription } from '../game/content';
+import { skillDescription, TECHNIQUE_REFERENCE } from '../game/content';
 import { TechniquePreview } from './TechniquePreview';
 import { DISCIPLINES, STYLES, type Discipline, type Rider } from '../game/types';
 import { SectionTitle, Tag } from './Brand';
@@ -16,6 +16,7 @@ export function Skills({r,onTrain}:{r:Rider;onTrain:(id:string)=>void}){
   const list=SKILLS.filter(s=>filter==='all'||filter===s.family||filter==='learned'&&learned(r.skills,s.id));
   return <section className="panel content-panel">
     <SectionTitle code="TRICK LIBRARY" title="기술 도감" detail="선행 기술을 익히면 다음 기술이 열립니다. 숙련도를 높여 대회에서 안정적으로 성공하세요."/>
+    <p className="technique-source">공통 기술 동작 참고: <a href={TECHNIQUE_REFERENCE} target="_blank" rel="noreferrer">보드를 타보자! 기술 도감</a> · 점수와 성장 규칙은 이 게임의 기준입니다.</p>
     <div className="filter-line"><div className="pill-row">{([['all','전체'],['dance','댄싱'],['trick','트릭'],['learned','습득']] as const).map(([k,n])=><button key={k} aria-pressed={k===filter} className={`pill ${k===filter?'active':''}`} onClick={()=>{setFilter(k);setPreview(null);}}>{n}</button>)}</div><Tag kind="lime"><BookOpen size={13}/> {ready} / {SKILLS.length} 습득</Tag></div>
     <div className="skill-grid">{list.map(s=>{
       const progress=r.skills[s.id];

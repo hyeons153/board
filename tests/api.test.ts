@@ -21,8 +21,8 @@ test('guest snapshots survive reopening storage; concurrent tournament submissio
     assert.match(set,/HttpOnly; SameSite=Strict/);
     const cookie=set.split(';')[0];
     const tab=randomUUID();
-    const post=(action:unknown,version:number,origin='http://127.0.0.1')=>handler(new Request(base,{
-      method:'POST',body:JSON.stringify({version,tab,action}),headers:{'Content-Type':'application/json',cookie,origin},
+    const post=(action:unknown,version:number,origin='http://127.0.0.1',stateVersion?:number)=>handler(new Request(base,{
+      method:'POST',body:JSON.stringify({version,stateVersion,tab,action}),headers:{'Content-Type':'application/json',cookie,origin},
     }));
     assert.equal((await post({type:'create',name:'Tester',look:DEFAULT_LOOK,money:99_000_000},0)).status,400);
     assert.equal((await post({type:'create',name:'Tester',look:DEFAULT_LOOK},0,'https://other.example')).status,403);
@@ -38,6 +38,16 @@ test('guest snapshots survive reopening storage; concurrent tournament submissio
     const restored:View=await (await handler(new Request(base,{headers:{cookie}}))).json();
     assert.equal(restored.fastForward,true);
     assert.equal(restored.weekMs,500);
+    const heartbeat=await post({type:'pulse'},save.version);
+    const heartbeatView:View=await heartbeat.json();
+    assert.ok(heartbeatView.version>save.version);
+    assert.equal(heartbeatView.stateVersion,save.stateVersion);
+    const planAfterHeartbeat=await post({type:'plan',plan:{action:'speed',intensity:'safe',spot:'river'}},save.version,'http://127.0.0.1',save.stateVersion);
+    assert.equal(planAfterHeartbeat.status,200,'Clock-only saves must not reject the player choice');
+    const staleChoice=await post({type:'fast-forward',enabled:false},save.version,'http://127.0.0.1',save.stateVersion);
+    assert.equal(staleChoice.status,409,'A competing player choice must still be protected');
+    assert.equal((await staleChoice.json()).conflict,true);
+    save=await planAfterHeartbeat.json();
     const owner=await store.authenticate(createHash('sha256').update(cookie.split('=')[1]).digest('hex'));
     assert.ok(owner);
     const row=await store.get(owner);

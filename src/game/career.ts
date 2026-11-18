@@ -199,6 +199,9 @@ function autoPlan(r:Rider):Plan {
   const s=order[0].s;
   return {...base,action:s,spot:s==='speed'?'river':s==='link'?'plaza':'park'};
 }
+export function prepareWeek(r:Rider|undefined|null){
+  if(r?.phase==='plan'&&r.settings.mode==='auto'&&!r.plan){r.plan=autoPlan(r);r.spot=r.plan.spot;}
+}
 function applyEvent(r:Rider,index:number){
   const e=eventFor(r,r.event??'');
   const choice=e?.choices[index];
@@ -296,7 +299,7 @@ function afterTraining(c:Career,r:Rider,official:boolean) {
 export function processWeek(c:Career,official=false) {
   const r=c.rider;
   if(!r||r.phase!=='plan'||(!r.plan&&r.settings.mode==='manual')) return false;
-  const plan=r.settings.mode==='auto'?autoPlan(r):r.plan!;
+  const plan=r.plan??autoPlan(r);
   validatePlan(r,plan);
   train(r,plan);
   r.plan=null;
@@ -346,7 +349,11 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
     return;
   }
   if(!r||r.phase==='retired') throw new GameError('먼저 새 선수를 만들어 주세요.');
-  if(a.type==='plan'){ validatePlan(r,a.plan); r.plan=a.plan; r.spot=a.plan.spot; }
+  if(a.type==='plan'){
+    if(r.plan) throw new GameError('이번 주 행동은 이미 시작했어요. 끝난 뒤 다음 행동을 선택해 주세요.');
+    if(r.settings.mode==='auto') throw new GameError('직접 육성으로 전환한 뒤 행동을 선택해 주세요.');
+    validatePlan(r,a.plan); r.plan=a.plan; r.spot=a.plan.spot;
+  }
   if(a.type==='routine'){
     if(!validRoutine(r,a.discipline,a.skills)) throw new GameError('종목에 맞는 습득 기술로 60초 이하의 루틴을 구성해 주세요.');
     r.routines[a.discipline]=a.skills;
@@ -354,7 +361,6 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
   if(a.type==='settings'){
     r.settings=a.settings;
     if(r.settings.mode==='auto'){
-      r.plan=null;
       if(r.phase==='event'){
         const e=eventFor(r,r.event??'');
         if(e&&eventPaused(r,e)) return;
