@@ -4,8 +4,8 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { users,sessions,careers } from './schema';
-import { blankSave, type Save } from './clock';
+import { users,sessions,careers } from './schema.js';
+import { blankSave, type Save } from './clock.js';
 
 export const GUEST_SECONDS=365*24*60*60;
 export type Row={version:number;snapshot:Save};

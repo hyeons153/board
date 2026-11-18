@@ -1,9 +1,9 @@
-import { RULES, SKILL, SKILLS, START_SKILLS } from './data';
-import { RIVALS, type Rival } from './content';
-import { ECONOMY, equippedLook, gearBonuses } from './economy';
-import { RANKING_VERSION } from './public';
-import { clamp, round, seeded } from './random';
-import { DISCIPLINES, STATS, type Discipline, type Rider, type RoutineStyle, type Run, type Skill, type Meet, type Result, type Stats, type Progress, type Outcome, type Standing } from './types';
+import { RULES, SKILL, SKILLS, START_SKILLS } from './data.js';
+import { RIVALS, type Rival } from './content.js';
+import { ECONOMY, equippedLook, gearBonuses } from './economy.js';
+import { RANKING_VERSION } from './public.js';
+import { clamp, round, seeded } from './random.js';
+import { DISCIPLINES, STATS, type Discipline, type Rider, type RoutineStyle, type Run, type Skill, type Meet, type Result, type Stats, type Progress, type Outcome, type Standing } from './types.js';
 
 export const learned = (skills:Record<string,Progress>, id:string) => (skills[id]?.study ?? 0) >= 100;
 export const allowed = (skill:Skill, discipline:Discipline) => discipline==='freestyle' || skill.family===discipline;

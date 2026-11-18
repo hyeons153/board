@@ -1,7 +1,7 @@
-import { CALENDAR } from './data';
-import { extras, playerPlace } from './economy';
-import type { Rider } from './types';
-import type { EventDef } from './events';
+import { CALENDAR } from './data.js';
+import { extras, playerPlace } from './economy.js';
+import type { Rider } from './types.js';
+import type { EventDef } from './events.js';
 
 const at = (spot:Rider['spot']) => (r:Rider) => r.spot===spot;
 const chosen = (r:Rider,id:string,index:number) => extras(r).choices[id]?.index===index;

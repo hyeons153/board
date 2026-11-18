@@ -4,7 +4,10 @@ import type { GameAction, View } from '../src/game/types';
 import type { Directory, Publication, PublicCard } from '../src/game/public';
 
 const base=new URL(process.argv[2]??'http://127.0.0.1:5185');
-if(!['127.0.0.1','localhost','[::1]'].includes(base.hostname)) throw new Error('Run verification against the local application wired to the target Neon branch.');
+const deployed=process.argv.includes('--deployed');
+const local=['127.0.0.1','localhost','[::1]'].includes(base.hostname);
+if(!local&&!(deployed&&base.protocol==='https:'&&base.hostname.endsWith('.vercel.app')))
+  throw new Error('Use a local Neon-wired server, or explicitly select a Vercel deployment with --deployed.');
 const username='qa_'+randomBytes(7).toString('hex');
 const password=randomBytes(30).toString('base64url');
 const tab=randomUUID();
@@ -28,7 +31,8 @@ async function game(action:GameAction){
   return view;
 }
 async function waitForWeek(){
-  for(let attempt=0;attempt<45;attempt++){
+  const deadline=Date.now()+(view?.weekMs??180000)+30000;
+  while(Date.now()<deadline){
     await new Promise(resolve=>setTimeout(resolve,Math.min(view?.remainingMs??1000,2000)+120));
     await game({type:'pulse'});
     if(view?.career.rider?.phase==='event') return;
@@ -36,6 +40,20 @@ async function waitForWeek(){
   throw new Error('The training event did not arrive in the expected window.');
 }
 async function run(){
+  const page=await fetch(base,{signal:AbortSignal.timeout(25000)});
+  assert.equal(page.status,200,'Application page must load');
+  const html=await page.text();
+  assert.ok(html.includes('<div id="root">'),'React application entry must be served');
+  if(deployed){
+    const assets=[...html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g)].map(match=>match[1]);
+    assert.ok(assets.some(asset=>asset.endsWith('.js')),'Built application script must be linked');
+    for(const asset of assets){
+      const response=await fetch(new URL(asset,base),{signal:AbortSignal.timeout(25000)});
+      assert.equal(response.status,200,'Built application assets must load');
+      await response.body?.cancel();
+    }
+  }
+  console.log('PASS application page and assets served');
   await load();
   assert.equal(view?.storage,'neon');
   console.log('PASS /api/game -> Neon guest session');

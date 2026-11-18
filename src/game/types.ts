@@ -59,5 +59,5 @@ export type GameAction =
   | { type:'resume' }
   | { type:'switch-rider'; id:string }
   | { type:'retire' };
-import type { CareerExtras, GearSlot } from './economy';
+import type { CareerExtras, GearSlot } from './economy.js';
 

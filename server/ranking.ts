@@ -1,9 +1,9 @@
-import { CALENDAR, RULES } from '../src/game/data';
-import { simulateRun } from '../src/game/competition';
-import { equippedLook, freshExtras } from '../src/game/economy';
-import { chooseEnding, endingName, summarize } from '../src/game/legacy';
-import { DISCIPLINES, DIVISIONS, type Archive, type MeetRecord, type Result } from '../src/game/types';
-import { RANKING_VERSION, type Metric, type PublicProfile, type Scope } from '../src/game/public';
+import { CALENDAR, RULES } from '../src/game/data.js';
+import { simulateRun } from '../src/game/competition.js';
+import { equippedLook, freshExtras } from '../src/game/economy.js';
+import { chooseEnding, endingName, summarize } from '../src/game/legacy.js';
+import { DISCIPLINES, DIVISIONS, type Archive, type MeetRecord, type Result } from '../src/game/types.js';
+import { RANKING_VERSION, type Metric, type PublicProfile, type Scope } from '../src/game/public.js';
 
 export type RankEntry={metric:Metric;scope:Scope;score:number};
 const divisionWeight={rookie:1,regular:1.5,open:2.25};
@@ -33,7 +33,7 @@ export function verifiedResult(archive:Archive,meet:MeetRecord,result:Result){
     return false;
   }
 }
-import { seeded } from '../src/game/random';
+import { seeded } from '../src/game/random.js';
 export const meetRng=(seed:number,year:number,id:string,discipline:Result['discipline'])=>seeded(seed,year,id,discipline,'player');
 
 export function publicationFor(archive:Archive):{profile:PublicProfile;entries:RankEntry[]} {

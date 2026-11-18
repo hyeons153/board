@@ -1,12 +1,12 @@
-import { ACTION_NAMES, CALENDAR, DISCIPLINE_NAMES, LOCATIONS, RULES, SKILL, SKILLS, START_SKILLS, STAT_NAMES } from './data';
-import { generateRoutine, learned, simulateMeet, validRoutine } from './competition';
-import { autoChoice, canStudy, eventFor, eventPaused, pickEvent } from './events';
-import { chooseEnding, honors, mentorFrom } from './legacy';
-import { RANKING_VERSION } from './public';
-import { RIVALS, SPOT_GATE, spotUnlocked } from './content';
-import { ECONOMY, eligibleSponsor, extras, freshExtras, gearBonuses, ITEM, maintainedSponsor, milestone, playerPlace, SPONSOR, supply } from './economy';
-import { clamp, round, seeded } from './random';
-import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family } from './types';
+import { ACTION_NAMES, CALENDAR, DISCIPLINE_NAMES, LOCATIONS, RULES, SKILL, SKILLS, START_SKILLS, STAT_NAMES } from './data.js';
+import { generateRoutine, learned, simulateMeet, validRoutine } from './competition.js';
+import { autoChoice, canStudy, eventFor, eventPaused, pickEvent } from './events.js';
+import { chooseEnding, honors, mentorFrom } from './legacy.js';
+import { RANKING_VERSION } from './public.js';
+import { RIVALS, SPOT_GATE, spotUnlocked } from './content.js';
+import { ECONOMY, eligibleSponsor, extras, freshExtras, gearBonuses, ITEM, maintainedSponsor, milestone, playerPlace, SPONSOR, supply } from './economy.js';
+import { clamp, round, seeded } from './random.js';
+import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family } from './types.js';
 
 export class GameError extends Error {}
 export const divisionFor=(year:number):Division=>year===1?'rookie':year<=3?'regular':'open';

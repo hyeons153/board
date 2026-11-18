@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { blankSave, type Save } from './clock';
-import type { Database, Query } from './database';
-import { mergeCareers } from '../src/game/legacy';
-import { RANKING_VERSION, type Directory, type Metric, type Publication, type PublicCard, type PublicProfile, type Scope } from '../src/game/public';
-import type { Row, Store } from './store';
-import { publicationFor } from './ranking';
+import { blankSave, type Save } from './clock.js';
+import type { Database, Query } from './database.js';
+import { mergeCareers } from '../src/game/legacy.js';
+import { RANKING_VERSION, type Directory, type Metric, type Publication, type PublicCard, type PublicProfile, type Scope } from '../src/game/public.js';
+import type { Row, Store } from './store.js';
+import { publicationFor } from './ranking.js';
 
 export const ACCOUNT_SECONDS=30*24*60*60;
 const GUEST_SECONDS=365*24*60*60;

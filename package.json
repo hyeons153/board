@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && tsc -p tsconfig.server.json && vite build",
     "test": "tsx --test tests/career.test.ts tests/api.test.ts tests/online.test.ts",
     "simulate": "tsx scripts/simulate.ts",
     "verify:neon": "tsx scripts/verify-neon.ts",

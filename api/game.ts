@@ -1,7 +1,7 @@
-import { createHandler } from '../server/http';
-import { databaseStore } from '../server/databaseStore';
-import { productionDatabase } from '../server/database';
-import { RULES } from '../src/game/data';
+import { createHandler } from '../server/http.js';
+import { databaseStore } from '../server/databaseStore.js';
+import { productionDatabase } from '../server/database.js';
+import { RULES } from '../src/game/data.js';
 
 let handler:ReturnType<typeof createHandler>|undefined;
 export default {

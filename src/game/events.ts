@@ -1,8 +1,8 @@
-import { SKILL } from './data';
-import { RIVAL } from './content';
-import { extras } from './economy';
-import { EXTRA_EVENTS } from './extraEvents';
-import type { Family, Rider, Stat, Strategy } from './types';
+import { SKILL } from './data.js';
+import { RIVAL } from './content.js';
+import { extras } from './economy.js';
+import { EXTRA_EVENTS } from './extraEvents.js';
+import type { Family, Rider, Stat, Strategy } from './types.js';
 
 type Effect = { energy?:number; money?:number; fame?:number; relation?:number; skill?:string; study?:number; stat?:Stat; gain?:number };
 type Choice = { label:string; effect:Effect; tags:Strategy[] };

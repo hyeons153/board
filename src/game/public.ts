@@ -1,4 +1,4 @@
-import type { Discipline, Division, Ending, Look, Stats } from './types';
+import type { Discipline, Division, Ending, Look, Stats } from './types.js';
 export const METRICS=['career','dance','trick','freestyle','wins','skills'] as const;
 export type Metric=typeof METRICS[number];
 export type Scope='all'|Division;

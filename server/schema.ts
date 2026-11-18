@@ -1,6 +1,6 @@
 import { boolean, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
-import type { Save } from './clock';
-import type { PublicProfile } from '../src/game/public';
+import type { Save } from './clock.js';
+import type { PublicProfile } from '../src/game/public.js';
 
 export const users = pgTable('rider_users', {
   id:uuid().primaryKey(),

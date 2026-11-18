@@ -1,5 +1,5 @@
-import { command, processWeek } from '../src/game/career';
-import type { Career, GameAction } from '../src/game/types';
+import { command, processWeek } from '../src/game/career.js';
+import type { Career, GameAction } from '../src/game/types.js';
 
 export type Save = { format:1; career:Career; clock:{credit:number; stamp:number; tabs:Record<string,number>} };
 export const blankSave=():Save=>({format:1,career:{rider:null,hall:[]},clock:{credit:0,stamp:0,tabs:{}}});

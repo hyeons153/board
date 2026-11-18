@@ -1,8 +1,8 @@
 import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
-import { AccessError, ACCOUNT_SECONDS, type Actor, type OnlineStore } from './databaseStore';
-import { METRICS } from '../src/game/public';
-import { DIVISIONS } from '../src/game/types';
+import { AccessError, ACCOUNT_SECONDS, type Actor, type OnlineStore } from './databaseStore.js';
+import { METRICS } from '../src/game/public.js';
+import { DIVISIONS } from '../src/game/types.js';
 
 const username=z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,23}$/);
 const password=z.string().min(12).max(96).refine(value=>Buffer.byteLength(value,'utf8')<=256);

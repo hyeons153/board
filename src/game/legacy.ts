@@ -1,6 +1,6 @@
-import { CALENDAR, DISCIPLINE_NAMES, SKILLS } from './data';
-import { equippedLook } from './economy';
-import { DISCIPLINES, STATS, type Archive, type Career, type Discipline, type Ending, type Look, type Mentor, type Rider } from './types';
+import { CALENDAR, DISCIPLINE_NAMES, SKILLS } from './data.js';
+import { equippedLook } from './economy.js';
+import { DISCIPLINES, STATS, type Archive, type Career, type Discipline, type Ending, type Look, type Mentor, type Rider } from './types.js';
 
 type CareerRecord = Pick<Archive,'name'|'year'|'week'|'stats'|'skills'|'records'|'relations'|'seasons'|'extras'> & { reason?: Rider['reason']; season?: Rider['season']; events?: Rider['events'] };
 export const ENDING_RULES = { openWins:24, majors:8, openChampionships:2, seniorChampionships:1, advancedSkillCount:6, mastery:82, friendship:30 } as const;

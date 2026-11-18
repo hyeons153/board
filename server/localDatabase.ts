@@ -2,9 +2,9 @@ import { PGlite } from '@electric-sql/pglite';
 import { readMigrationFiles } from 'drizzle-orm/migrator';
 import { readFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Database, Query } from './database';
-import { databaseStore } from './databaseStore';
-import type { Row } from './store';
+import type { Database, Query } from './database.js';
+import { databaseStore } from './databaseStore.js';
+import type { Row } from './store.js';
 
 export async function connectLocal(path?:string){
   if(path) await mkdir(path,{recursive:true});

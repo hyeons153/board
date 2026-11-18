@@ -1,4 +1,4 @@
-import type { Discipline, Look, Result, Rider } from './types';
+import type { Discipline, Look, Result, Rider } from './types.js';
 
 export const GEAR_SLOTS = ['deck', 'trucks', 'wheels', 'bearings'] as const;
 export type GearSlot = typeof GEAR_SLOTS[number];

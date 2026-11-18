@@ -1,4 +1,4 @@
-import type { Family, Meet, Skill, Spot, Action, Stats, Discipline, Division, Intensity, RoutineStyle, Strategy, Look, Progress } from './types';
+import type { Family, Meet, Skill, Spot, Action, Stats, Discipline, Division, Intensity, RoutineStyle, Strategy, Look, Progress } from './types.js';
 
 export const RULES = {
   weekMs:180_000, weeks:52, years:8, runSeconds:60, transition:1, recovery:2.5,

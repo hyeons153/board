@@ -1,13 +1,13 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { ACTIONS, DISCIPLINES, INTENSITIES, SPOTS, STRATEGIES, type View } from '../src/game/types';
-import { RULES } from '../src/game/data';
-import { GEAR_SLOTS } from '../src/game/economy';
-import { GameError } from '../src/game/career';
-import { advance, remaining } from './clock';
-import { GUEST_SECONDS, type Row, type Store } from './store';
-import { AccessError, type OnlineStore } from './databaseStore';
-import { onlineRequest, rawSession, sessionCookie, sessionScope } from './online';
+import { ACTIONS, DISCIPLINES, INTENSITIES, SPOTS, STRATEGIES, type View } from '../src/game/types.js';
+import { RULES } from '../src/game/data.js';
+import { GEAR_SLOTS } from '../src/game/economy.js';
+import { GameError } from '../src/game/career.js';
+import { advance, remaining } from './clock.js';
+import { GUEST_SECONDS, type Row, type Store } from './store.js';
+import { AccessError, type OnlineStore } from './databaseStore.js';
+import { onlineRequest, rawSession, sessionCookie, sessionScope } from './online.js';
 
 const color=z.number().int().min(0).max(3);
 const look=z.strictObject({hair:color,skin:color,shirt:color,board:color,hairColor:color.optional(),pants:color.optional(),shoes:color.optional(),deckDesign:color.optional()});

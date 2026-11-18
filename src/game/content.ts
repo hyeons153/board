@@ -1,4 +1,4 @@
-import type { Discipline, Look, Rider, RoutineStyle, Spot, Stats } from './types';
+import type { Discipline, Look, Rider, RoutineStyle, Spot, Stats } from './types.js';
 
 export type Rival = {
   id:string; name:string; style:string; personality:string; line:string; stats:Stats; favorite:Discipline;
