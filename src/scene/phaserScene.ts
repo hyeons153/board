@@ -46,7 +46,7 @@ export function createStage(parent:HTMLElement,latest:()=>Stage){
         const sampled=technique.progress===undefined?elapsed%4000/4000:technique.progress+(now-this.progressAt)/1000*(technique.rate??0);
         technique={...technique,progress:s.reduce ? .1 : technique.loop ? sampled%1 : Math.min(1,sampled)};
       }
-      paintRider(this.rider.getContext(),s.look,s.motion,elapsed,technique);
+      paintRider(this.rider.getContext(),s.look,s.motion,elapsed,technique,s.spot==='night');
       this.rider.refresh();
       const anchor=s.variant==='title'?280:competition?203:s.variant==='preview'?126:s.variant==='event'?179:236;
       const moving=!s.technique&&['ride','accelerate','brake','mount','carve'].includes(s.motion);

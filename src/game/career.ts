@@ -4,9 +4,9 @@ import { autoChoice, canStudy, eventFor, eventPaused, pickEvent } from './events
 import { chooseEnding, honors, mentorFrom } from './legacy.js';
 import { RANKING_VERSION } from './public.js';
 import { RIVALS, SPOT_GATE, spotUnlocked } from './content.js';
-import { ECONOMY, eligibleSponsor, extras, freshExtras, gearBonuses, ITEM, maintainedSponsor, milestone, playerPlace, SPONSOR, supply } from './economy.js';
+import { ECONOMY, effectiveStats, eligibleSponsor, equipmentReaction, equipmentUnlocked, extras, freshExtras, gearBonuses, ITEM, maintainedSponsor, milestone, playerPlace, SPONSOR, STARTER_IDS, supply, unlockEquipment, upgradeEquipment } from './economy.js';
 import { clamp, round, seeded } from './random.js';
-import { statAfter, trainingFactor, trainingSuccess } from './training.js';
+import { statAfter, trainingCost, trainingFactor, trainingStatGains, trainingSuccess } from './training.js';
 import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family } from './types.js';
 
 export class GameError extends Error {}
@@ -71,12 +71,14 @@ function train(r:Rider,p:Plan) {
   r.spot=p.spot;
   r.lastPlan=p;
   const names:string[]=[];
-  const progress=r.extras ??= freshExtras();
+  const progress=r.extras=upgradeEquipment(r.extras??freshExtras());
+  const bonuses=gearBonuses(r);
+  const masteryGain=(id:string,amount:number)=>amount*(1+(SKILL[id]?.family==='dance'?bonuses.danceMastery:bonuses.trickMastery));
   let grade: NonNullable<typeof progress.lastTraining>['grade']='success';
   let practiced:string|undefined;
   if(p.action==='rest') {
     grade='recovery';
-    r.energy=round(clamp(r.energy+RULES.restEnergy));
+    r.energy=round(clamp(r.energy+RULES.restEnergy+bonuses.rest));
     names.push('체력을 회복했다.');
   } else if(p.action==='hospital'&&r.injury) {
     grade='recovery';
@@ -94,55 +96,54 @@ function train(r:Rider,p:Plan) {
     const form=rng();
     const success=trainingSuccess(r,p);
     const missed=form<1-success;
-    const great=form>1-practice.greatChance&&!r.injury&&energyBefore>=55;
+    const great=form>1-practice.greatChance-bonuses.great&&!r.injury&&energyBefore>=55;
     const factor=trainingFactor(r,p,form,great);
     const late=RULES.growth[Math.min(7,r.year-1)];
+    const gains=trainingStatGains(r,p,factor);
     if(p.lesson){
       r.money-=ECONOMY.lesson;
       names.push(`레슨비 ₩${ECONOMY.lesson.toLocaleString('ko-KR')}.`);
     }
     grade=missed?'miss':great?'great':'success';
-    r.energy=round(clamp(r.energy-RULES.energy[p.action]));
+    r.energy=round(clamp(r.energy-trainingCost(r,p)));
     let difficulty=attempted?.difficulty??1, mastery=attempted?(r.skills[attempted.id]?.mastery??12):60;
     if(missed){
       names.push(`훈련에 실패했다. 훈련 전 체력 ${round(energyBefore)} · 성공률 ${Math.round(success*100)}%. 능력치는 오르지 않았다.`);
     } else if (p.action==='dance'||p.action==='trick') {
       const candidates=SKILLS.filter(s=>s.family===p.action&&canStudy(r,s.id));
       const reachable=candidates.filter(s=>!learned(r.skills,s.id));
-      const target=p.skill?attempted:(rng()<practice.discovery&&reachable.length?reachable[Math.floor(rng()*reachable.length)]:undefined);
+      const target=p.skill?attempted:(rng()<practice.discovery+bonuses.discovery&&reachable.length?reachable[Math.floor(rng()*reachable.length)]:undefined);
       if(target){
         difficulty=target.difficulty; mastery=r.skills[target.id]?.mastery??12;
         practiced=target.id;
         const learnedBefore=learned(r.skills,target.id);
         const gain=RULES.study*factor*late.study*(p.skill?practice.targeted:1)/(1+practice.difficultyCost*(difficulty-1));
-        if(trainSkill(r,target.id,gain,RULES.mastery*factor*late.mastery)) grade='learned';
+        if(trainSkill(r,target.id,gain,masteryGain(target.id,RULES.mastery*factor*late.mastery))) grade='learned';
         else if(learnedBefore&&!great) grade='mastery';
         names.push(`${target.name} · ${learned(r.skills,target.id)?'숙련도 '+r.skills[target.id].mastery+'%':'학습 '+r.skills[target.id].study+'%'}.`);
       }
       const ready=candidates.filter(s=>s.id!==target?.id&&learned(r.skills,s.id));
       if(!p.skill && ready.length) {
         const first=Math.floor(rng()*ready.length);
-        for(const s of [...ready.slice(first),...ready.slice(0,first)].slice(0,2)) trainSkill(r,s.id,0,RULES.mastery*factor*late.mastery*.66);
+        for(const s of [...ready.slice(first),...ready.slice(0,first)].slice(0,2)) trainSkill(r,s.id,0,masteryGain(s.id,RULES.mastery*factor*late.mastery*.66));
         names.push('배운 기술의 숙련도가 올랐다.');
         if(grade==='success') grade='mastery';
       }
-      stat(r,p.action==='dance'?'carve':'balance',RULES.secondaryGrowth*factor*late.stat);
+
     } else if(p.action==='rehearsal'){
       const discipline=p.discipline??'freestyle';
       const ids=r.routines[discipline].length?r.routines[discipline]:generateRoutine(r,discipline,'flow');
-      for(const id of [...new Set(ids)].slice(0,4)) trainSkill(r,id,0,practice.rehearsalMastery*factor*late.mastery);
-      stat(r,'link',practice.rehearsalLink*factor*late.stat);
+      for(const id of [...new Set(ids)].slice(0,4)) trainSkill(r,id,0,masteryGain(id,practice.rehearsalMastery*factor*late.mastery));
+
       if(!great) grade='mastery';
       practiced=ids[0];
       names.push(`${DISCIPLINE_NAMES[discipline]} 라인의 연계와 기술 숙련도를 점검했다.`);
     } else if (p.action!=='hospital') {
-      const before=r.stats[p.action];
-      stat(r,p.action,RULES.statGrowth*factor*late.stat*(1-before/RULES.statCap*.7));
-      stat(r,p.action==='link'?'balance':'link',RULES.secondaryGrowth*factor*late.stat*.52);
-      names.push(`주 능력치 +${round(r.stats[p.action]-before)}.`);
+      names.push(`주 능력치 +${gains[p.action]??0}.`);
     }
+    if(!missed)for(const stat of STATS)r.stats[stat]=round(r.stats[stat]+(gains[stat]??0));
     const risk=RULES.injury;
-    const pInjury=clamp((risk.base+(100-energyBefore)*risk.energy+(difficulty-1)*risk.difficulty-(r.stats.balance+mastery*.34)*risk.stability)*spot.risk+(r.injury?.03:0),.004,.38);
+    const pInjury=clamp((risk.base+(100-energyBefore)*risk.energy+(difficulty-1)*risk.difficulty-(effectiveStats(r).balance+mastery*.34)*risk.stability)*spot.risk+(r.injury?.03:0)-bonuses.injury,.004,.38);
     if(rng()<pInjury){
       const major=rng()<clamp(.12+(difficulty-1)*.06+(100-energyBefore)*.002,0,.48) || r.injury?.severity==='major';
       r.injury={severity:major?'major':'minor',weeks:major?risk.majorWeeks:risk.minorWeeks,treated:false};
@@ -155,9 +156,12 @@ function train(r:Rider,p:Plan) {
     r.injury.weeks=Math.max(r.injury.severity==='major'&&!r.injury.treated?1:0,r.injury.weeks-1);
     if(r.injury.weeks<=0){ r.injury=null; names.push('부상이 회복되었다.'); }
   }
+  if(r.injury?.severity==='minor'&&!r.injury.taped&&bonuses.minorRecovery){
+    r.injury.weeks-=bonuses.minorRecovery;r.injury.taped=true;names.push('테이핑 키트로 경상 회복 1주 단축.');if(r.injury.weeks<=0)r.injury=null;
+  }
   r.money=Math.max(RULES.safetyFund,r.money+RULES.weeklyAllowance);
   const text=`${ACTION_NAMES[p.action]} · ${names.join(' ')}`;
-  progress.lastTraining={grade,text,skill:practiced,year:r.year,week:r.week};
+  progress.lastTraining={grade,text,skill:practiced,year:r.year,week:r.week,reaction:equipmentReaction(r,grade)};
   note(r,'training',text);
 }
 function autoPlan(r:Rider):Plan {
@@ -212,11 +216,15 @@ function applyEvent(r:Rider,index:number){
     const before=r.stats[fx.stat];stat(r,fx.stat,fx.gain??0);
     if(r.stats[fx.stat]>before) details.push(`${STAT_NAMES[fx.stat]} +${round(r.stats[fx.stat]-before)}`);
   }
-  if(e.npc) r.relations[e.npc]=clamp((r.relations[e.npc]??0)+(fx.relation??0));
-  if(e.npc&&fx.relation) details.push(`관계 +${fx.relation}`);
+  const relation=(fx.relation??0)+(e.npc&&(fx.relation??0)>0?gearBonuses(r).relation:0);
+  if(e.npc) r.relations[e.npc]=clamp((r.relations[e.npc]??0)+relation);
+  if(e.npc&&fx.relation) details.push(`관계 +${relation}`);
   if(fx.skill&&canStudy(r,fx.skill)){
     trainSkill(r,fx.skill,fx.study??0,4);
     details.push(`${SKILL[fx.skill]!.name} ${learned(r.skills,fx.skill)?'습련':'학습'}`);
+  }
+  if(fx.item&&ITEM.has(fx.item)){
+    const items=(r.extras??=freshExtras()).inventory;if(!items.includes(fx.item))items.push(fx.item);details.push(ITEM.get(fx.item)!.name+' 획득');
   }
   r.events[e.id]=(r.events[e.id]??0)+1;
   (r.extras ??= freshExtras()).choices[e.id]={index,year:r.year,week:r.week};
@@ -268,7 +276,7 @@ function runMeet(c:Career,r:Rider,disciplines:Discipline[],official:boolean) {
       result.prize+=brand.podium;
       milestone(r,'스폰서 입상 보너스',`${brand.name} · ₩${brand.podium.toLocaleString('ko-KR')}`);
     }
-    r.energy=result.energy; r.money+=result.prize; r.fame+=result.fame;
+    r.energy=result.energy; r.money+=result.prize; r.fame=round(r.fame+result.fame);
     const landed=new Set(result.run.log.filter(l=>l.outcome!=='miss').map(l=>l.id));
     for(const id of landed) trainSkill(r,id,0,1.4);
   }
@@ -278,6 +286,7 @@ function runMeet(c:Career,r:Rider,disciplines:Discipline[],official:boolean) {
     if(results.some(result=>playerPlace(result)===1)) award(r,'win','첫 종목 우승');
     milestone(r,meet.name,results.map(result=>`${DISCIPLINE_NAMES[result.discipline]} ${playerPlace(result)}위 · ${result.run.score}점`).join(' / '));
   }
+  unlockEquipment(r);
   note(r,'meet',`${meet.name} · ${results.length?results.map(x=>`${DISCIPLINE_NAMES[x.discipline]} ${x.standings.find(s=>s.id==='player')!.place}위`).join(' / '):'불참'}`);
   finishWeek(c,r);
 }
@@ -292,6 +301,7 @@ function afterTraining(c:Career,r:Rider,official:boolean) {
 export function processWeek(c:Career,official=false) {
   const r=c.rider;
   if(!r||r.phase!=='plan'||(!r.plan&&r.settings.mode==='manual')) return false;
+  r.extras=upgradeEquipment(r.extras??freshExtras());
   const plan=r.plan??autoPlan(r);
   validatePlan(r,plan);
   train(r,plan);
@@ -342,6 +352,8 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
     return;
   }
   if(!r||r.phase==='retired') throw new GameError('먼저 새 선수를 만들어 주세요.');
+  r.extras=upgradeEquipment(r.extras??freshExtras());
+  unlockEquipment(r);
   if(a.type==='spot'){
     if(r.phase!=='plan'||r.plan||r.settings.mode==='auto')throw new GameError('직접 육성의 행동 선택 중에 스팟을 바꿀 수 있어요.');
     if(!spotUnlocked(r,a.spot))throw new GameError(SPOT_GATE[a.spot]!.hint);
@@ -381,6 +393,7 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
     if(r.phase==='meet') runMeet(c,r,r.entries,official);
   }
   if(a.type==='trade'||a.type==='unequip'||a.type==='sponsor'||a.type==='makeover'){
+    if(r.plan&&(a.type==='trade'||a.type==='unequip'))throw new GameError('이번 주 행동이 끝난 뒤 장비를 바꿔 주세요.');
     const progress=r.extras ??= freshExtras();
     const reserve=r.plan?.lesson?ECONOMY.lesson:0;
     if(a.type==='trade'){
@@ -388,6 +401,7 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
       if(!item) throw new GameError('없는 장비입니다.');
       const owned=progress.inventory.includes(item.id);
       if(a.operation==='buy'){
+        if(item.unlock||STARTER_IDS.includes(item.id))throw new GameError('이 아이템은 해금 또는 기본 지급으로 획득합니다.');
         if(owned||r.money-reserve<item.price) throw new GameError('이미 가진 장비이거나 구매 가능 금액이 부족해요.');
         r.money-=item.price;
         progress.inventory.push(item.id);
@@ -395,6 +409,13 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
         note(r,'system',item.name+' 구매 완료');
       } else if(!owned) throw new GameError('보유한 장비만 사용할 수 있어요.');
       else if(a.operation==='equip'){
+        if(!equipmentUnlocked(r,item))throw new GameError('해금 조건을 먼저 달성해 주세요.');
+        if(item.slot==='accessory'){
+          const list=progress.accessories??=[];
+          if(list.includes(item.id))return;
+          if(list.length>=3)throw new GameError('액세서리는 최대 3개입니다. 한 칸을 해제한 뒤 장착해 주세요.');
+          list.push(item.id);milestone(r,'액세서리 장착',item.name);return;
+        }
         if(progress.equipped[item.slot]!==item.id){
           progress.equipped[item.slot]=item.id;
           milestone(r,'장비 교체',item.name);
@@ -402,7 +423,9 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
         }
       }
       else {
-        if(progress.equipped[item.slot]===item.id) delete progress.equipped[item.slot];
+        if(STARTER_IDS.includes(item.id)||item.unlock)throw new GameError('기본 지급·특별 해금 아이템은 판매할 수 없어요.');
+        if(item.slot==='accessory')progress.accessories=progress.accessories?.filter(id=>id!==item.id);
+        else if(progress.equipped[item.slot]===item.id)delete progress.equipped[item.slot];
         progress.inventory=progress.inventory.filter(id=>id!==item.id);
         r.money+=Math.floor(item.price*ECONOMY.sellRate);
         milestone(r,'장비 판매',item.name);
@@ -410,8 +433,11 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
       }
     }
     if(a.type==='unequip'){
-      const item=ITEM.get(progress.equipped[a.slot]??'');
-      delete progress.equipped[a.slot];
+      if(a.slot==='accessory'&&!a.item)throw new GameError('해제할 액세서리를 선택해 주세요.');
+      const id=a.slot==='accessory'?a.item:a.slot==='bearings'?progress.legacyEquipment?.original.bearings:progress.equipped[a.slot];
+      const item=ITEM.get(id??'');
+      if(a.slot==='accessory'||a.slot==='bearings')progress.accessories=progress.accessories?.filter(candidate=>candidate!==id);
+      else delete progress.equipped[a.slot];
       if(item) milestone(r,'장비 해제',item.name);
     }
     if(a.type==='makeover'){

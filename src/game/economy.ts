@@ -1,22 +1,12 @@
 import type { Discipline, Look, Result, Rider } from './types.js';
 
-export const GEAR_SLOTS = ['deck', 'trucks', 'wheels', 'bearings'] as const;
-export type GearSlot = typeof GEAR_SLOTS[number];
+import { BASIC_SLOTS, GEAR, GEAR_SLOTS, ITEM, LEGACY_BONUSES, STARTER_IDS, type Effects, type Gear, type GearSlot } from './equipmentCatalog.js';
+import { STATS, type Stats } from './types.js';
+import { round } from './random.js';
+export { GEAR, ITEM, GEAR_SLOTS, BASIC_SLOTS, STARTER_IDS } from './equipmentCatalog.js';
+export type { GearSlot, Gear, Effects } from './equipmentCatalog.js';
 export type Bonus = { danceLink?: number; trickLand?: number; carve?: number; speed?: number; practice?: number; fatigue?: number };
-type Gear = { id: string; slot: GearSlot; name: string; price: number; description: string; bonus: Bonus; design?: number };
-export const GEAR: Gear[] = [
-  { id:'deck-flow', slot:'deck', name:'리버 플로우 데크', price:94_000, description:'댄싱 연계 +3%p · 댄싱/트릭 연마 +3%', bonus:{ danceLink:.03, practice:.03 }, design:1 },
-  { id:'deck-pop', slot:'deck', name:'킥테일 팝 데크', price:98_000, description:'트릭 성공률 +2.5%p', bonus:{ trickLand:.025 }, design:2 },
-  { id:'deck-cruise', slot:'deck', name:'선셋 올데이 데크', price:85_000, description:'카빙·속도 점수 +2', bonus:{ carve:2, speed:2 }, design:3 },
-  { id:'trucks-carve', slot:'trucks', name:'아크 트럭', price:75_000, description:'카빙 점수 +4', bonus:{ carve:4 } },
-  { id:'trucks-soft', slot:'trucks', name:'플로트 트럭', price:71_000, description:'댄싱 연계 +2%p · 트릭 성공률 +1%p', bonus:{ danceLink:.02, trickLand:.01 } },
-  { id:'wheels-grip', slot:'wheels', name:'코너 그립 휠', price:68_000, description:'카빙 점수 +3 · 기술 연마 +4%', bonus:{ carve:3, practice:.04 } },
-  { id:'wheels-slide', slot:'wheels', name:'스냅 휠', price:72_000, description:'트릭 성공률 +2%p · 속도 점수 +1', bonus:{ trickLand:.02, speed:1 } },
-  { id:'bearings-quiet', slot:'bearings', name:'새벽 베어링', price:60_000, description:'속도 점수 +4', bonus:{ speed:4 } },
-  { id:'bearings-endurance', slot:'bearings', name:'마일 베어링', price:65_000, description:'종목당 체력 소모 −2', bonus:{ fatigue:2 } },
-];
-export const ITEM = new Map(GEAR.map(item => [item.id, item]));
-export const GEAR_NAMES: Record<GearSlot,string> = { deck:'데크', trucks:'트럭', wheels:'휠', bearings:'베어링' };
+export const GEAR_NAMES: Record<GearSlot,string> = { deck:'데크', trucks:'트럭', wheels:'휠', accessory:'액세서리' };
 export const ECONOMY = {
   lesson:18_000, makeover:12_000, sellRate:.55, participation:8_000, podiumSeason:[95_000,65_000,40_000],
   achievements:{ learn:35_000, meet:25_000, win:80_000, variety:65_000 },
@@ -33,31 +23,106 @@ export const SPONSORS: Sponsor[] = [
 export const SPONSOR = new Map(SPONSORS.map(brand => [brand.id, brand]));
 export type CareerExtras = {
   inventory: string[];
-  equipped: Partial<Record<GearSlot,string>>;
+  equipped: Partial<Record<'deck'|'trucks'|'wheels'|'bearings',string>>;
+  accessories?:string[];
+  equipmentVersion?:2;
+  legacyEquipment?:{original:Record<string,string>;unmapped:string[];overflow:string[]};
   contract: { id:string; year:number } | null;
   signedYear: number;
   achievements: string[];
   choices: Record<string, { index:number; year:number; week:number }>;
   timeline: { year:number; week:number; title:string; text:string }[];
-  lastTraining?: { grade:'success'|'great'|'learned'|'mastery'|'miss'|'injury'|'recovery'; text:string; skill?:string; year:number; week:number };
+  lastTraining?: { reaction?:string; grade:'success'|'great'|'learned'|'mastery'|'miss'|'injury'|'recovery'; text:string; skill?:string; year:number; week:number };
 };
 export function freshExtras(): CareerExtras {
-  return { inventory:[], equipped:{}, contract:null, signedYear:0, achievements:[], choices:{}, timeline:[] };
+  return { inventory:[...STARTER_IDS], equipped:{deck:'deck_001',trucks:'truck_001',wheels:'wheel_001'},accessories:[],equipmentVersion:2,contract:null,signedYear:0,achievements:[],choices:{},timeline:[] };
 }
-export function extras(rider: Pick<Rider,'extras'>): CareerExtras { return rider.extras ?? freshExtras(); }
-export function gearBonuses(rider: Pick<Rider,'extras'>): Required<Bonus> {
-  const total = { danceLink:0, trickLand:0, carve:0, speed:0, practice:0, fatigue:0 };
-  if(!rider.extras) return total;
-  for (const id of Object.values(rider.extras.equipped)) {
-    const item = ITEM.get(id);
-    if (!item || !rider.extras.inventory.includes(id)) continue;
-    for (const key of Object.keys(total) as (keyof Bonus)[]) total[key] += item.bonus[key] ?? 0;
+/** Pure and idempotent: no old ID, unknown item, archive or proof is deleted. */
+export function upgradeEquipment(original:CareerExtras):CareerExtras {
+  if(original.equipmentVersion===2)return original;
+  const result=structuredClone(original),old={...result.equipped};
+  result.inventory=[...new Set([...result.inventory,...STARTER_IDS])];
+  for(const id of Object.values(old))if(!result.inventory.includes(id))result.inventory.push(id);
+  const accessories=[...new Set(result.accessories??[])],unmapped:string[]=[];
+  if(old.bearings){
+    if(!result.inventory.includes(old.bearings))result.inventory.push(old.bearings);
+    if(ITEM.get(old.bearings)?.slot==='accessory')accessories.push(old.bearings);else unmapped.push(old.bearings);
+  }
+  for(const [slot,id] of Object.entries(old))if(!ITEM.has(id)){
+    if(!result.inventory.includes(id))result.inventory.push(id);unmapped.push(id);
+  }
+  const unique=[...new Set(accessories)],overflow=unique.slice(3);
+  result.accessories=unique.slice(0,3);
+  result.equipped={};
+  for(const [index,slot] of BASIC_SLOTS.entries()){
+    const candidate=old[slot];result.equipped[slot]=candidate&&ITEM.get(candidate)?.slot===slot&&result.inventory.includes(candidate)?candidate:STARTER_IDS[index];
+  }
+  result.legacyEquipment={original:old,unmapped:[...new Set(unmapped)],overflow};
+  result.equipmentVersion=2;
+  return result;
+}
+export function extras(rider: Pick<Rider,'extras'>): CareerExtras { return rider.extras?upgradeEquipment(rider.extras):freshExtras(); }
+export function equippedItems(rider:Pick<Rider,'extras'>):Gear[]{
+  const progress=extras(rider),ids=[...BASIC_SLOTS.flatMap(slot=>{const id=progress.equipped[slot];return id&&ITEM.get(id)?.slot===slot?[id]:[];}),...[...new Set(progress.accessories??[])].filter(id=>ITEM.get(id)?.slot==='accessory').slice(0,3)];
+  return [...new Set(ids)].flatMap(id=>{const item=ITEM.get(id);return item&&progress.inventory.includes(id)?[item]:[];});
+}
+const emptyEffects=():Effects=>({injury:0,cost:0,rest:0,minorRecovery:0,danceMastery:0,trickMastery:0,linkGrowth:0,danceLink:0,discovery:0,great:0,podiumFame:0,fame:0,prize:0,entryEnergy:0,eventChance:0,specialWeight:0,relation:0,trickLand:0,practice:0,fatigue:0,carve:0,speed:0});
+export function gearBonuses(rider:Pick<Rider,'extras'>):Effects {
+  const total=emptyEffects();
+  if(!rider.extras)return total;
+  for(const item of equippedItems(rider))for(const [key,value] of Object.entries(item.effects))total[key as keyof Effects]+=value;
+  const caps:Partial<Effects>={injury:.02,great:.01,danceMastery:.06,trickMastery:.06,linkGrowth:.06,prize:.06,fame:.06,podiumFame:.06,practice:.06,danceLink:.06,trickLand:.06,eventChance:.03,discovery:.03,relation:1,minorRecovery:1};
+  for(const [key,value] of Object.entries(caps))total[key as keyof Effects]=Math.min(total[key as keyof Effects],value);
+  return total;
+}
+export function legacyBonuses(rider:Pick<Rider,'extras'>):Required<Bonus>{
+  const total={danceLink:0,trickLand:0,carve:0,speed:0,practice:0,fatigue:0};
+  for(const id of Object.values(rider.extras?.equipped??{})){
+    if(!rider.extras?.inventory.includes(id))continue;
+    for(const key of Object.keys(total) as (keyof Bonus)[])total[key]+=LEGACY_BONUSES[id]?.[key]??0;
   }
   return total;
 }
-export function equippedLook(rider: Pick<Rider,'look'|'extras'>): Look {
-  const deck = ITEM.get(extras(rider).equipped.deck ?? '');
-  return deck?.design === undefined ? rider.look : { ...rider.look, deckDesign:deck.design };
+export function equipmentStats(rider:Pick<Rider,'extras'>):Stats{
+  const result:Stats={speed:0,carve:0,link:0,balance:0};
+  if(!rider.extras)return result;
+  for(const item of equippedItems(rider).filter(item=>item.slot!=='accessory'))for(const stat of STATS)result[stat]+=item.stats[stat]??0;
+  return result;
+}
+export function effectiveStats(rider:Pick<Rider,'stats'|'extras'>):Stats{
+  const bonus=equipmentStats(rider);return Object.fromEntries(STATS.map(stat=>[stat,round(rider.stats[stat]+bonus[stat])])) as Stats;
+}
+export function equipmentUnlocked(rider:Rider,item:Gear):boolean{
+  const wins=rider.records.flatMap(meet=>meet.results).filter(result=>playerPlace(result)===1).length;
+  if(!item.unlock)return true;
+  if(item.unlock==='win')return wins>=1;
+  if(item.unlock==='rainbow')return rider.year>=4&&wins>=6;
+  return !!rider.events[item.unlock==='sticker'?'crew-sticker':'red-scarf'];
+}
+export const unlockText=(item:Gear)=>item.unlock==='win'?'첫 우승 달성':item.unlock==='rainbow'?'4년차 이상 · 통산 6승':item.unlock==='sticker'?'선배 스티커 이벤트':item.unlock==='scarf'?'빨간 머플러 이벤트':'구매 가능';
+export function unlockEquipment(rider:Rider){
+  const progress=rider.extras??=freshExtras();
+  for(const item of GEAR.filter(item=>item.unlock==='win'||item.unlock==='rainbow'))if(equipmentUnlocked(rider,item)&&!progress.inventory.includes(item.id)){
+    progress.inventory.push(item.id);milestone(rider,'특별 장비 해금',item.name+' · 인벤토리에 지급했습니다.');
+  }
+}
+export function equippedLook(rider:Pick<Rider,'look'|'extras'>):Look {
+  const progress=extras(rider),deck=ITEM.get(progress.equipped.deck??''),trucks=ITEM.get(progress.equipped.trucks??''),wheels=ITEM.get(progress.equipped.wheels??'');
+  return {...rider.look,...(deck?.design!==undefined?{deckDesign:deck.design}:{}),equipment:{
+    deck:deck?{shape:deck.shape??0,color:deck.color}:undefined,
+    trucks:trucks?.partColor,wheels:wheels?{color:wheels.partColor,size:wheels.wheelSize??5}:undefined,
+    accessories:equippedItems(rider).flatMap(item=>item.visual?[item.visual]:[]),
+  }};
+}
+export const equipmentEvents=(rider:Pick<Rider,'extras'>)=>equippedItems(rider).flatMap(item=>item.event?[item.event]:[]);
+export function equipmentReaction(rider:Pick<Rider,'extras'>,grade:string){
+  const visuals=equippedItems(rider).map(item=>item.visual);
+  if((grade==='injury'||grade==='miss')&&visuals.includes('chick'))return '삐약! 인형이 먼저 비명을 질렀다. 괜찮아, 다음 착지는 같이 하자.';
+  if((grade==='great'||grade==='learned')&&visuals.includes('disco'))return '키링이 반짝! 오늘 스팟은 작은 디스코 무대다.';
+  if(visuals.includes('cactus'))return '발이 잠깐 꼬여도 선인장은 끝까지 춤춘다.';
+  if(visuals.includes('snail'))return '달팽이의 한마디: 천천히 가도, 오늘은 앞으로 갔다.';
+  if(visuals.includes('duck'))return '꽥. 오리도 오늘의 주행에 한 표를 보냈다.';
+  return undefined;
 }
 export const playerPlace = (result: Result) => result.standings.find(row => row.id === 'player')?.place ?? Infinity;
 export function eligibleSponsor(rider: Rider, brand: Sponsor) {

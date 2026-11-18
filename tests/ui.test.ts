@@ -46,7 +46,9 @@ test('one game frame previews choices on the existing HUD before confirmation, t
   const root=createRoot(win.document.getElementById('root')!);
   const settle=async(ms=40)=>{await act(async()=>{await new Promise(resolve=>setTimeout(resolve,ms));});};
   const click=async(label:string)=>{
-    const button=[...win.document.querySelectorAll('button')].find(button=>(button.getAttribute('aria-label')??button.textContent?.trim())===label);
+    const find=()=>[...win.document.querySelectorAll('button')].find(button=>(button.getAttribute('aria-label')??button.textContent?.trim())===label);
+    let button=find();
+    for(let attempt=0;!button&&attempt<80;attempt++){await settle(25);button=find();}
     assert.ok(button,'Missing button: '+label);
     for(let attempt=0;button.disabled&&attempt<30;attempt++)await settle(20);
     assert.equal(button.disabled,false,label+' is still disabled');
@@ -54,7 +56,8 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await act(async()=>{await Promise.all([...pendingRequests]);});await settle(10);
   };
   try{
-    await act(async()=>{root.render(createElement(App));});await settle(80);
+    await act(async()=>{root.render(createElement(App));});
+    for(let attempt=0;!win.document.querySelector('.game-console')&&attempt<80;attempt++)await settle(25);
     const frame=win.document.querySelector('.game-console');assert.ok(frame);
     await click('새 라이더 등록');
     await click('여성');await click('데크 색상 검정');
@@ -87,7 +90,20 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.doesNotMatch(win.document.querySelector('.auto-settings')!.textContent!,/훈련 강도|안전형|집중형/);
     await click('메뉴 닫기');
     for(const menu of ['기술','대회','상점','메뉴']){
-      await click(menu);assert.equal(win.document.querySelector('.game-console'),frame);assert.ok(win.document.querySelector('.console-panel'));await click('메뉴 닫기');
+      await click(menu);assert.equal(win.document.querySelector('.game-console'),frame);assert.ok(win.document.querySelector('.console-panel'));
+      if(menu==='상점'){
+        assert.equal(win.document.querySelectorAll('.equipment-choice').length,8);
+        assert.equal(win.document.querySelectorAll('.equipment-loadout > div').length,6);
+        await click('액세서리');assert.equal(win.document.querySelectorAll('.equipment-choice').length,30);
+        await click('튼튼한 헬멧 상세');assert.ok(win.document.querySelector('[aria-label="튼튼한 헬멧 착용 미리보기"]'));
+        await click('구매 ₩8,000');await click('장착');
+        assert.match(win.document.querySelector('.equipment-panel .workshop-rider')!.textContent!,/액세서리 1\/3/);
+        await click('튼튼한 헬멧 해제');
+        const rarity=win.document.querySelector<HTMLSelectElement>('[aria-label="희귀도 필터"]')!;
+        await act(async()=>{rarity.value='legendary';rarity.dispatchEvent(new win.Event('change',{bubbles:true}));});
+        assert.equal(win.document.querySelectorAll('.equipment-choice').length,3);
+      }
+      await click('메뉴 닫기');
     }
     await click('라인');
     assert.match(win.document.querySelector('.console-panel')!.textContent!,/라인 편집/);
@@ -177,7 +193,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     }finally{
       if(realNow)Object.defineProperty(performance,'now',realNow);else Reflect.deleteProperty(performance,'now');
     }
-    cookie='';
+    await act(async()=>{await Promise.all([...pendingRequests]);});cookie='';
     await act(async()=>root.render(createElement(App,{key:'automatic-cycle'})));await settle(100);
     await click('새 라이더 등록');
     const autoName=win.document.querySelector<HTMLInputElement>('input[aria-label="라이더 이름"]')!;

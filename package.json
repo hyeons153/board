@@ -9,12 +9,15 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && tsc -p tsconfig.server.json && vite build",
-    "test": "tsx --test tests/career.test.ts tests/api.test.ts tests/online.test.ts tests/ui.test.ts tests/motion.test.ts",
+    "test": "tsx --test tests/career.test.ts tests/api.test.ts tests/online.test.ts tests/ui.test.ts tests/motion.test.ts tests/equipment.test.ts",
     "review:animation": "tsx scripts/render-techniques.ts",
     "simulate": "tsx scripts/simulate.ts",
     "verify:neon": "tsx scripts/verify-neon.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx server/migrate.ts"
+    "db:migrate": "tsx server/migrate.ts",
+    "review:equipment": "tsx scripts/render-equipment.ts",
+    "db:inspect-equipment": "tsx scripts/inspect-equipment-upgrade.ts",
+    "verify:equipment": "tsx scripts/verify-equipment.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.16",

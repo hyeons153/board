@@ -18,7 +18,7 @@ function canonical(value:unknown):string {
 }
 export function verifiedResult(archive:Archive,meet:MeetRecord,result:Result){
   const proof=result.proof;
-  if(!proof||proof.version!==RANKING_VERSION||(proof.rules!==undefined&&proof.rules!==1&&proof.rules!==2)||!CALENDAR.some(item=>item.id===meet.id)) return false;
+  if(!proof||proof.version!==RANKING_VERSION||(proof.rules!==undefined&&proof.rules!==1&&proof.rules!==2&&proof.rules!==3)||!CALENDAR.some(item=>item.id===meet.id)) return false;
   const player=result.standings.find(row=>row.id==='player');
   if(!player||player.name!==archive.name||player.score!==result.run.score) return false;
   const sorted=[...result.standings].sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));

@@ -4,10 +4,25 @@ import { createCanvas } from '@napi-rs/canvas';
 import { BOARDS, DEFAULT_LOOK, SKILLS } from '../src/game/data';
 import { lineTerms } from '../src/game/content';
 import { paintRider } from '../src/scene/rider';
+import { NEW_GEAR } from '../src/game/equipmentCatalog';
+import { equippedLook, freshExtras } from '../src/game/economy';
 import { ACTOR_HEIGHT, ACTOR_WIDTH, TECHNIQUES, boardPoint, headingsBefore, techniquePose, trainingTechnique } from '../src/scene/techniques';
 import type { Look, MoveLog } from '../src/game/types';
 
 const near=(actual:number,expected:number)=>assert.ok(Math.abs(actual-expected)<.00001,`${actual} != ${expected}`);
+
+test('every new equipment appearance renders safely through riding, spinning, jumping and falling',()=>{
+  const canvas=createCanvas(ACTOR_WIDTH,ACTOR_HEIGHT),c=canvas.getContext('2d');
+  for(const item of NEW_GEAR){
+    const extra=freshExtras();extra.inventory.push(item.id);if(item.slot==='accessory')extra.accessories=[item.id];else extra.equipped[item.slot]=item.id;
+    const look=equippedLook({look:DEFAULT_LOOK,extras:extra});
+    for(const technique of [undefined,{id:'kickflip',progress:.4},{id:'pirouette',progress:.9},{id:'wood',progress:.5},{id:'treflip',progress:.9,outcome:'miss' as const}]){
+      paintRider(c as unknown as CanvasRenderingContext2D,look,'ride',320,technique,true);
+      const rgba=c.getImageData(0,0,ACTOR_WIDTH,ACTOR_HEIGHT).data;
+      for(let y=0;y<ACTOR_HEIGHT;y++)for(let x=0;x<ACTOR_WIDTH;x++)if(rgba[(y*ACTOR_WIDTH+x)*4+3])assert.ok(x>0&&x<ACTOR_WIDTH-1&&y>0&&y<ACTOR_HEIGHT-1,item.id+' clips at '+x+','+y);
+    }
+  }
+});
 
 test('rounded male and female riders retain every hairstyle, black/white decks and safe motion bounds',()=>{
   const canvas=createCanvas(ACTOR_WIDTH,ACTOR_HEIGHT),c=canvas.getContext('2d');

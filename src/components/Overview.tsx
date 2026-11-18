@@ -3,6 +3,7 @@ import { CALENDAR, DIVISION_NAMES, RULES, STAT_NAMES } from '../game/data';
 import { divisionFor, nextMeet } from '../game/career';
 import { lineTerms } from '../game/content';
 import { STATS, type Rider, type GameAction } from '../game/types';
+import { effectiveStats, equipmentStats } from '../game/economy';
 import { Tag } from './Brand';
 
 export const money=(n:number)=>'₩'+n.toLocaleString('ko-KR');
@@ -10,9 +11,10 @@ const StatIcon={speed:Wind,carve:Route,link:Link2,balance:MoveDiagonal2};
 export type Submit=(action:GameAction)=>Promise<boolean>;
 
 export function StatCards({r}:{r:Rider}){
+  const total=effectiveStats(r),bonus=equipmentStats(r);
   return <div className="stat-grid">{STATS.map((s,i)=>{
     const Icon=StatIcon[s];
-    return <article className="stat-card" key={s}><div className="stat-label"><Icon size={16}/><span>{STAT_NAMES[s]}</span></div><div className="stat-value">{r.stats[s]}<span> / {RULES.statCap}</span></div><div className="bar"><span className={`stat-fill stat-${i}`} style={{width:r.stats[s]/RULES.statCap*100+'%'}}/></div></article>;
+    return <article className="stat-card" key={s}><div className="stat-label"><Icon size={16}/><span>{STAT_NAMES[s]}</span></div><div className="stat-value">{total[s]}<span> / {RULES.statCap+bonus[s]}</span></div><div className="bar"><span className={`stat-fill stat-${i}`} style={{width:total[s]/(RULES.statCap+bonus[s])*100+'%'}}/></div><p className="stat-equipment">기본 {r.stats[s]} + 장비 {bonus[s]}</p></article>;
   })}</div>;
 }
 export function RiderCard({r}:{r:Rider}){

@@ -1,6 +1,7 @@
 import { Aperture, ArrowRight, Check, Coffee, Cross, Flag, Footprints, Link2, MoveDiagonal2, Route, Wind, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { ACTION_NAMES, DISCIPLINE_NAMES, RULES, SKILL, SKILLS, STAT_NAMES, STRATEGY_NAMES } from '../game/data';
+import { effectiveStats, equipmentStats } from '../game/economy';
 import { validatePlan } from '../game/career';
 import { spotUnlocked } from '../game/content';
 import { canStudy } from '../game/events';
@@ -15,13 +16,15 @@ const signed=(n:number)=>(n>0?'+':'')+n.toFixed(1).replace('.0','');
 const range=(min:number,max:number)=>min===max?signed(min):signed(min)+' ~ '+signed(max);
 
 export function StatusGauges({r,preview}:{r:Rider;preview?:TrainingPreview}){
+  const total=effectiveStats(r),bonus=equipmentStats(r);
   return <div className="console-stats" aria-label="현재 능력치">{STATS.map(stat=>{
     const gain=preview?.gains[stat],rising=!!gain&&gain.max>0;
     return <div key={stat} className={'status-gauge stat-'+stat+(rising?' has-projection':'')}>
-      <span>{STAT_NAMES[stat]}</span><b>{r.stats[stat].toFixed(1)}</b>
-      <div className="status-track"><meter min={0} max={RULES.statCap} value={r.stats[stat]} aria-label={STAT_NAMES[stat]}/>
-        {rising&&<span className="status-projection" style={{left:r.stats[stat]/RULES.statCap*100+'%',width:gain.max/RULES.statCap*100+'%'}} aria-hidden="true"><i style={{width:gain.min/gain.max*100+'%'}}/></span>}
+      <span>{STAT_NAMES[stat]}</span><b>{total[stat].toFixed(1)}</b>
+      <div className="status-track"><meter min={0} max={RULES.statCap+bonus[stat]} value={total[stat]} aria-label={STAT_NAMES[stat]}/>
+        {rising&&<span className="status-projection" style={{left:total[stat]/(RULES.statCap+bonus[stat])*100+'%',width:gain.max/(RULES.statCap+bonus[stat])*100+'%'}} aria-hidden="true"><i style={{width:gain.min/gain.max*100+'%'}}/></span>}
       </div>
+      {!!bonus[stat]&&<small className="status-equipment">기본 {r.stats[stat]} + 장비 {bonus[stat]}</small>}
       {rising&&<strong className="status-delta" aria-label={STAT_NAMES[stat]+' 예상 상승'}>{range(gain.min,gain.max)}</strong>}
     </div>;
   })}</div>;

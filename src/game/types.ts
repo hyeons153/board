@@ -14,18 +14,18 @@ export type Strategy = typeof STRATEGIES[number];
 export type RoutineStyle = typeof STYLES[number];
 export type Action = typeof ACTIONS[number];
 export type Family = 'dance'|'trick';
-export type Look = { hair: number; skin: number; shirt: number; board: number; gender?:'male'|'female'; hairColor?:number; pants?:number; shoes?:number; deckDesign?:number };
+export type Look = { hair: number; skin: number; shirt: number; board: number; gender?:'male'|'female'; hairColor?:number; pants?:number; shoes?:number; deckDesign?:number; equipment?:{deck?:{shape:number;color?:number};trucks?:string;wheels?:{color?:string;size:number};accessories:import('./equipmentCatalog.js').Visual[]} };
 export type Plan = { action: Action; spot: Spot; skill?: string; lesson?:boolean; discipline?:Discipline };
 export type Settings = { mode: 'manual'|'auto'; strategy: Strategy; entries: Discipline[]; pauseStory?:boolean; pauseMeet?:boolean; pauseInjury?:boolean };
 export type Skill = { id:string; name:string; family:Family; kind:'step'|'technique'|'spin'|'pop'|'flip'; difficulty:number; points:number; seconds:number; requires:string[]; risk:number; tags:readonly string[] };
 export type Progress = { study:number; mastery:number };
-export type Injury = { severity:'minor'|'major'; weeks:number; treated:boolean };
+export type Injury = { severity:'minor'|'major'; weeks:number; treated:boolean; taped?:boolean };
 export type Meet = { id:string; month:number; week:number; name:string; major:boolean; spot:Spot };
 export type Outcome = 'miss'|'rough'|'clean'|'great';
 export type MoveLog = { id:string; at:number; end:number; outcome:Outcome; linked:boolean|null; combo:number; points:number };
 export type Run = { score:number; parts:Partial<Record<'execution'|'link'|'combo'|'carve'|'speed',number>>; log:MoveLog[] };
 export type Standing = { id:string; name:string; score:number; place:number };
-export type RunProof = { version:number; rules?:1|2; seed:number; routine:string[]; stats:Stats; energy:number; injury:Injury|null; skills:Record<string,Progress>; gear?:Pick<CareerExtras,'inventory'|'equipped'> };
+export type RunProof = { version:number; rules?:1|2|3; seed:number; routine:string[]; stats:Stats; energy:number; injury:Injury|null; skills:Record<string,Progress>; gear?:Pick<CareerExtras,'inventory'|'equipped'|'accessories'|'equipmentVersion'> };
 export type Result = { discipline:Discipline; run:Run; standings:Standing[]; points:number; prize:number; fame:number; energy:number; opponents?:Record<string,Run>; sponsorBonus?:number; participation?:number; look?:Look; proof?:RunProof };
 export type MeetRecord = { year:number; id:string; division:Division; results:Result[] };
 export type Season = { year:number; division:Division; scores:Record<Discipline,Record<string,number>> };
@@ -56,7 +56,8 @@ export type GameAction =
   | { type:'event'; index:number }
   | { type:'routine'; discipline:Discipline; skills:string[] }
   | { type:'trade'; operation:'buy'|'sell'|'equip'; item:string }
-  | { type:'unequip'; slot:GearSlot }
+  | { type:'claim-gear' }
+  | { type:'unequip'; slot:GearSlot|'bearings'; item?:string }
   | { type:'makeover'; look:Look }
   | { type:'sponsor'; id:string }
   | { type:'resume' }

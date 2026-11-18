@@ -1,5 +1,5 @@
 import { CALENDAR } from './data.js';
-import { extras, playerPlace } from './economy.js';
+import { extras, playerPlace, STARTER_IDS } from './economy.js';
 import type { Rider } from './types.js';
 import type { EventDef } from './events.js';
 
@@ -69,7 +69,7 @@ export const EXTRA_EVENTS: EventDef[] = [
   {id:'packed-studio',kind:'스팟',npc:'noa',title:'거울에 비친 다섯 번째 라이더',body:'연습장의 거울이 워낙 깨끗해 서로 부딪칠 뻔했다. 노아가 거울 속 라이더에게 먼저 사과했다.',when:at('studio'),choices:[
     choice('거울을 보며 발끝을 맞춘다',{stat:'balance',gain:3,relation:5},'trick','balanced'),
     choice('거울 없이 한 번 더 탄다',{stat:'link',gain:3,relation:5},'freestyle','dance')]},
-  {id:'board-tune',kind:'장비',npc:'min',title:'딸깍, 휘파람, 침묵',body:'새 장비에서 나던 소리를 민재가 잡아냈다. 원인은 베어링이 아니라 바지 지퍼였다.',when:r=>extras(r).inventory.length>0,choices:[
+  {id:'board-tune',kind:'장비',npc:'min',title:'딸깍, 휘파람, 침묵',body:'새 장비에서 나던 소리를 민재가 잡아냈다. 원인은 베어링이 아니라 바지 지퍼였다.',when:r=>extras(r).inventory.some(id=>!STARTER_IDS.includes(id)),choices:[
     choice('장비도 함께 점검한다',{stat:'balance',gain:2,relation:7},'trick','freestyle'),
     choice('지퍼를 고치고 쉰다',{energy:16,relation:4},'balanced','dance')]},
   {id:'brand-photos',kind:'스폰서',title:'브랜드 화보에 없는 포즈',body:'첫 촬영에서 넘어지기 직전의 표정이 제일 자연스럽다는 피드백을 받았다.',story:true,when:r=>!!extras(r).contract,choices:[

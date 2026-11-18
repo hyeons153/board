@@ -6,5 +6,6 @@ import './online.css';
 import './in-game.css';
 import './console.css';
 import './weekly.css';
+import './equipment.css';
 
 createRoot(document.getElementById('root')!).render(<App />);

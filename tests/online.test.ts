@@ -14,6 +14,7 @@ import { simulateRun } from '../src/game/competition';
 import { seeded } from '../src/game/random';
 import { RULES } from '../src/game/data';
 import { CALENDAR, DEFAULT_LOOK, SKILLS } from '../src/game/data';
+import { freshExtras } from '../src/game/economy';
 import { chooseEnding } from '../src/game/legacy';
 import { DISCIPLINES, type Career, type GameAction, type View } from '../src/game/types';
 import type { Directory, Publication, PublicCard } from '../src/game/public';
@@ -53,6 +54,26 @@ async function status(response:Promise<Response>,expected:number){
   assert.equal(value.status,expected,await value.clone().text());
   return value;
 }
+
+test('existing PostgreSQL bearing snapshots upgrade only on mutation and keep currency, base stats and records',async()=>{
+  const pg=await connectLocal();
+  try{
+    const store=databaseStore(pg.db,'neon'),handle=createHandler(store,1000,true,'equipment-test-rate-secret-12345678'),owner=browser(handle);
+    await owner.read();await status(owner.game({type:'create',name:'기존 장비 보존',look:DEFAULT_LOOK}),200);
+    const actor=(await store.actor(sessionHash(owner.token())))!,before=await store.get(actor.id),r=before.snapshot.career.rider!;
+    r.extras={...freshExtras(),equipmentVersion:undefined,accessories:undefined,inventory:['deck-flow','bearings-endurance','unknown-collectible'],equipped:{deck:'deck-flow',bearings:'bearings-endurance'}};
+    r.money=48200;const stats=structuredClone(r.stats),records=structuredClone(r.records);
+    const raw=await store.replace(actor.id,before.version,before.snapshot);assert.ok(raw);
+    const reading=await owner.read();assert.equal(reading.career.rider!.extras!.equipmentVersion,2);
+    assert.equal((await store.get(actor.id)).snapshot.career.rider!.extras!.equipmentVersion,undefined,'Reading must not write a migration');
+    await status(owner.game({type:'claim-gear'}),200);
+    const converted=(await store.get(actor.id)).snapshot.career.rider!;
+    assert.equal(converted.extras!.equipmentVersion,2);assert.deepEqual(converted.extras!.accessories,['bearings-endurance']);
+    assert.ok(converted.extras!.inventory.includes('unknown-collectible'));assert.equal(converted.money,48200);assert.deepEqual(converted.stats,stats);assert.deepEqual(converted.records,records);
+    const inventory=[...converted.extras!.inventory];await status(owner.game({type:'claim-gear'}),200);
+    assert.deepEqual((await store.get(actor.id)).snapshot.career.rider!.extras!.inventory,inventory);
+  }finally{await pg.close();}
+});
 
 test('PostgreSQL applies the phase-three migration over a populated phase-two snapshot',async()=>{
   const pg=new PGlite();
@@ -226,7 +247,7 @@ test('previous competition proofs replay under their original stamina rules',()=
   command(career,{type:'entry',disciplines:['dance']},()=>({id:randomUUID(),seed:517}),true);
   command(career,{type:'retire'},()=>({id:randomUUID(),seed:517}),true);
   const archive=career.hall[0],meet=archive.records[0],result=meet.results[0],proof=result.proof!;
-  assert.equal(proof.rules,2);assert.ok(verifiedResult(archive,meet,result));
+  assert.equal(proof.rules,3);assert.ok(verifiedResult(archive,meet,result));
   delete proof.rules;
   result.run=simulateRun({stats:proof.stats,energy:proof.energy,injury:proof.injury,skills:proof.skills},'dance',proof.routine,seeded(proof.seed,meet.year,meet.id,'dance','player'),1);
   result.standings.find(row=>row.id==='player')!.score=result.run.score;

@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ACTIONS, DISCIPLINES, SPOTS, STRATEGIES, type View } from '../src/game/types.js';
 import { BOARDS, HAIR_COLORS, PANTS, RULES, SHIRTS, SHOES, SKINS } from '../src/game/data.js';
-import { GEAR_SLOTS } from '../src/game/economy.js';
+import { extras, GEAR_SLOTS } from '../src/game/economy.js';
 import { divisionFor, GameError } from '../src/game/career.js';
 import { advance, remaining } from './clock.js';
 import { GUEST_SECONDS, type Row, type Store } from './store.js';
@@ -13,6 +13,7 @@ const style=z.number().int().min(0).max(3);
 const color=(palette:readonly string[])=>z.number().int().min(0).max(palette.length-1);
 const look=z.strictObject({hair:style,skin:color(SKINS),shirt:color(SHIRTS),board:color(BOARDS),gender:z.enum(['male','female']).optional(),hairColor:color(HAIR_COLORS).optional(),pants:color(PANTS).optional(),shoes:color(SHOES).optional(),deckDesign:style.optional()});
 const skill=z.string().max(40).regex(/^[a-z0-9-]+$/);
+const itemId=z.string().max(60).regex(/^[a-z0-9_-]+$/);
 const disciplines=z.array(z.enum(DISCIPLINES)).max(3).refine(ds=>new Set(ds).size===ds.length);
 // Older open clients can still submit this retired field; it is discarded.
 const legacyIntensity=z.enum(['safe','normal','focus']).optional();
@@ -29,8 +30,9 @@ const actionSchema=z.discriminatedUnion('type',[
   z.strictObject({type:z.literal('entry'),disciplines}),
   z.strictObject({type:z.literal('event'),index:z.number().int().min(0).max(5)}),
   z.strictObject({type:z.literal('routine'),discipline:z.enum(DISCIPLINES),skills:z.array(skill).max(16)}),
-  z.strictObject({type:z.literal('trade'),operation:z.enum(['buy','sell','equip']),item:skill}),
-  z.strictObject({type:z.literal('unequip'),slot:z.enum(GEAR_SLOTS)}),
+  z.strictObject({type:z.literal('trade'),operation:z.enum(['buy','sell','equip']),item:itemId}),
+  z.strictObject({type:z.literal('claim-gear')}),
+  z.strictObject({type:z.literal('unequip'),slot:z.enum([...GEAR_SLOTS,'bearings']),item:itemId.optional()}),
   z.strictObject({type:z.literal('makeover'),look}),
   z.strictObject({type:z.literal('sponsor'),id:skill}),
   z.strictObject({type:z.literal('resume')}),
@@ -70,7 +72,7 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
       ...meet,results:meet.results.map(({proof,opponents:replays,...result})=>opponents?{...result,opponents:replays}:result),
     }));
     const hall=career.hall.map(archive=>({...archive,records:records(archive.records,false)}));
-    const rider=career.rider?{...career.rider,seed:0,season:{...career.rider.season,division:divisionFor(career.rider.year)},records:records(career.rider.records,true)}:null;
+    const rider=career.rider?{...career.rider,extras:extras(career.rider),seed:0,season:{...career.rider.season,division:divisionFor(career.rider.year)},records:records(career.rider.records,true)}:null;
     const parked=career.parked?.map(item=>({...item,seed:0,records:records(item.records,false)}));
     return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,stateVersion:row.snapshot.clock.stateVersion??0,remainingMs:remaining(row.snapshot,weekMs),weekMs,fastForward:false,pendingMeet:row.snapshot.clock.pendingMeet,pendingTraining:row.snapshot.clock.pendingTraining,pendingChoice:row.snapshot.clock.pendingChoice,storage:store.kind,username,scope};
   };

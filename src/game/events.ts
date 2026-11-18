@@ -1,14 +1,22 @@
 import { SKILL } from './data.js';
 import { RIVAL } from './content.js';
-import { extras } from './economy.js';
+import { equipmentEvents as itemEvents, extras, gearBonuses } from './economy.js';
 import { EXTRA_EVENTS } from './extraEvents.js';
 import type { Family, Rider, Stat, Strategy } from './types.js';
 
-type Effect = { energy?:number; money?:number; fame?:number; relation?:number; skill?:string; study?:number; stat?:Stat; gain?:number };
+type Effect = { energy?:number; money?:number; fame?:number; relation?:number; skill?:string; study?:number; stat?:Stat; gain?:number; item?:string };
 type Choice = { label:string; effect:Effect; tags:Strategy[] };
-export type EventDef = { id:string; kind:string; title:string; body:string; npc?:string; story?:boolean; important?:boolean; repeat?:boolean; when:(r:Rider)=>boolean; choices:Choice[] };
+export type EventDef = { id:string; kind:string; title:string; body:string; npc?:string; story?:boolean; important?:boolean; repeat?:boolean; special?:boolean; when:(r:Rider)=>boolean; choices:Choice[] };
 const option=(label:string,effect:Effect,...tags:Strategy[]):Choice=>({label,effect,tags});
 export const EVENTS:EventDef[] = [
+  {id:'crew-sticker',kind:'장비 선물',npc:'sol',title:'떼어도 남는 응원',body:'선배가 낡은 스티커를 건넸다. 접힌 귀퉁이마다 함께 탄 날의 흔적이 남아 있다.',story:true,when:r=>r.week>=8&&Math.max(0,...Object.values(r.relations))>=15,choices:[
+    option('보드에 붙이고 한 바퀴 더 탄다',{item:'acc_021',relation:5},'dance','trick','freestyle'),option('연습 노트에 소중히 붙인다',{item:'acc_021',energy:8},'balanced')]},
+  {id:'red-scarf',kind:'라이벌 선물',npc:'yu',title:'다음 바람에게',body:'유리가 빨간 머플러를 풀어 네게 건넨다. “이제 누군가에게 먼저 손을 흔들 차례야.”',story:true,important:true,when:r=>r.year>=4&&(r.relations.yu??0)>=35&&!!r.events['yu-film'],choices:[
+    option('다음 라이더를 함께 맞이한다',{item:'acc_024',relation:8,fame:3},'balanced','dance'),option('우리의 다음 라인을 약속한다',{item:'acc_024',relation:8,stat:'link',gain:2},'trick','freestyle')]},
+  {id:'duck-blessing',kind:'오리의 가호',npc:'sol',title:'꽥, 하고 먼저 응원',body:'고무오리 키링이 흔들릴 때마다 동료들이 웃는다. 오늘의 코치는 말 대신 꽥을 고집한다.',repeat:true,special:true,when:r=>itemEvents(r).includes('duck-blessing'),choices:[option('오리 코치에게 인사한다',{energy:8,relation:3},'balanced','dance'),option('오리와 출발 박자를 맞춘다',{stat:'link',gain:2},'trick','freestyle')]},
+  {id:'cactus-groove',kind:'선인장 잼',title:'박자가 조금 달라도',body:'내 스텝은 엇박인데 선인장은 당당하게 춤춘다. 누구도 음악을 끄지 않았다.',repeat:true,special:true,when:r=>itemEvents(r).includes('cactus-groove'),choices:[option('같이 스텝을 밟는다',{stat:'carve',gain:2,energy:4},'dance','freestyle'),option('작은 무대의 관객이 된다',{energy:10,fame:1},'balanced','trick')]},
+  {id:'snail-day',kind:'느긋한 오후',title:'빠르지 않아도 한 바퀴',body:'달팽이는 한 바퀴를 다 돌 때까지 풍경을 놓치지 않았다. 오늘만큼은 기록계도 쉬어 간다.',repeat:true,special:true,when:r=>itemEvents(r).includes('snail-day'),choices:[option('달팽이 속도로 스팟을 돈다',{energy:10},'balanced','dance'),option('가장 좋아하는 코너를 알려 준다',{stat:'carve',gain:2},'trick','freestyle')]},
+  {id:'scarf-epilogue',kind:'라이벌 후속 이야기',npc:'yu',title:'빨간 선을 따라',body:'새 라이더가 머플러를 보고 길을 물었다. 유리는 오늘은 네가 먼저 설명해 보라고 눈짓했다.',story:true,important:true,when:r=>r.year>=6&&itemEvents(r).includes('scarf-epilogue'),choices:[option('첫 발부터 함께 연습한다',{relation:10,fame:4},'dance','balanced'),option('서로 다른 라인을 하나로 잇는다',{relation:8,stat:'link',gain:3},'trick','freestyle')]},
   {id:'first',kind:'성장',title:'강바람의 첫인사',body:'유리가 네 보드에 붙은 가격표를 떼 주었다. “첫 연습이지? 넘어지면 강물 탓 하면 돼.”',npc:'yu',story:true,when:r=>r.year===1&&r.week===1,choices:[
     option('함께 스텝을 맞춰 본다',{skill:'mango',study:42,energy:-4,relation:8},'dance','freestyle'),
     option('균형 잡는 요령을 묻는다',{stat:'balance',gain:3,relation:4},'balanced','trick')]},
@@ -75,7 +83,11 @@ export function pickEvent(r:Rider,rng:()=>number) {
   if(story) return story;
   const fresh=eligible.filter(e=>!r.events[e.id]);
   const pool=fresh.length?fresh:eligible;
-  return pool.length&&rng()<.35 ? pool[Math.floor(rng()*pool.length)] : undefined;
+  const effects=gearBonuses(r);
+  if(!pool.length||rng()>=.35+effects.eventChance)return;
+  const weights=pool.map(event=>event.special||event.kind==='스팟'?1+effects.specialWeight:1);
+  let roll=rng()*weights.reduce((sum,weight)=>sum+weight,0);
+  return pool.find((_,index)=>(roll-=weights[index])<0)??pool.at(-1);
 }
 export function autoChoice(r:Rider,e:EventDef) {
   if(r.energy<35 || r.injury) return e.choices.reduce((best,c,i)=> (c.effect.energy??0)>(e.choices[best].effect.energy??0)?i:best,0);
