@@ -12,6 +12,7 @@ import { PixelRider } from './Appearance';
 
 type Submit=(action:GameAction)=>Promise<boolean>;
 const money=(n:number)=>'₩'+n.toLocaleString('ko-KR');
+const partNames={execution:'기술 수행',link:'연계',combo:'콤보',carve:'카빙',speed:'속도'};
 const when=(ms:number)=>{const s=Math.ceil(ms/1000);return Math.floor(s/60).toString().padStart(2,'0')+':'+(s%60).toString().padStart(2,'0');};
 function useDialogueFocus(key:string,active=true){
   const ref=useRef<HTMLDivElement>(null);
@@ -107,7 +108,13 @@ function Playback({record,index,r,saving,onNext}:{record:MeetRecord;index:number
     <div className="game-caption"><Trophy size={16}/> {DISCIPLINE_NAMES[result.discipline]} 시상식</div><h2>{r.name} · {playerPlace(result)}위</h2>
     <div className="game-podium">{podium.map(row=><div key={row.id} className={'place-'+row.place}><PixelRider look={row.id==='player'?result.look??equippedLook(r):RIVAL.get(row.id)?.look??r.look}/><strong>{row.name}</strong><small>{row.score.toFixed(1)}점</small><b>{row.place}</b></div>)}</div>
     <p className="game-reward">내 점수 {result.run.score.toFixed(1)} · 시즌 +{result.points}점 · 보상 {money(result.prize)}</p>
-    <details className="game-scoreboard"><summary>전체 순위와 채점 보기</summary><ol>{result.standings.map(row=><li key={row.id}><b>{row.place}</b><span>{row.name}</span><strong>{row.score.toFixed(1)}</strong></li>)}</ol><p>성공률 {Math.round(run.log.filter(log=>log.outcome!=='miss').length/Math.max(1,run.log.length)*100)}% · 최고 {Math.max(0,...run.log.map(log=>log.combo))}콤보</p></details>
+    <details className="game-scoreboard"><summary>전체 순위와 채점 보기</summary>
+      <ol>{result.standings.map(row=><li key={row.id}><b>{row.place}</b><span>{row.name}</span><strong>{row.score.toFixed(1)}</strong></li>)}</ol>
+      <p>{standing.name} · 성공률 {Math.round(run.log.filter(log=>log.outcome!=='miss').length/Math.max(1,run.log.length)*100)}% · 최고 {Math.max(0,...run.log.map(log=>log.combo))}콤보</p>
+      <dl className="game-parts">{Object.entries(run.parts).map(([key,value])=><div key={key}><dt>{partNames[key as keyof typeof partNames]}</dt><dd>{value.toFixed(1)}</dd></div>)}</dl>
+      <p>내 경기 후 체력 {Math.round(result.energy)} · 명성 +{result.fame}{result.participation?' · 참가 보상 '+money(result.participation):''}{result.sponsorBonus?' · 스폰서 보너스 '+money(result.sponsorBonus):''}</p>
+      <details><summary>{standing.name} 기술별 경기 로그</summary><ol>{run.log.map(log=><li key={log.at}><span>{log.at.toFixed(1)}초 · {SKILL[log.id]?.name} · {OUTCOME_NAMES[log.outcome]}{log.linked?' · 연계 성공':''}{log.combo>1?' · '+log.combo+'콤보':''}</span><strong>{log.points}점</strong></li>)}</ol></details>
+    </details>
     <div className="game-actions"><button className="game-quiet" onClick={()=>play('pick')}>다시 관람</button><button disabled={saving} onClick={onNext}>{index+1<record.results.length?'다음 종목':'육성 계속'} <ArrowRight size={15}/></button></div>
   </>;
   else if(mode==='pick') panel=<><div className="game-caption">{index+1} / {record.results.length} 종목 · {DIVISION_NAMES[record.division]}</div><h2>{DISCIPLINE_NAMES[result.discipline]} 경기</h2><p>선수 입장부터 점수 발표까지 이 경기장에서 이어집니다.</p><label className="game-athlete">관람할 선수<select value={athlete} onChange={e=>setAthlete(e.target.value)}><option value="player">{r.name} (나)</option>{result.standings.filter(row=>row.id!=='player'&&result.opponents?.[row.id]).map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label><div className="game-actions"><button onClick={()=>play('full')}><Play size={15}/> 전체 관람</button><button className="game-quiet" onClick={()=>play('highlights')}><FastForward size={15}/> 하이라이트</button><button className="game-quiet" onClick={()=>play('result')}><ListChecks size={15}/> 결과 보기</button></div></>;
