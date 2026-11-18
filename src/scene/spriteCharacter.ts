@@ -1,16 +1,18 @@
 import { EYE_COLORS, HAIR_COLORS, PANTS, SHIRTS, SHOES, SKINS } from '../game/data';
 import type { Look } from '../game/types';
 import type { Point, Pose } from './techniques';
+import { hairHem, profileHand, MATERIAL, spriteMaterial, type Material } from './spriteMaterials';
 
 type Canvas=HTMLCanvasElement;
 type Ctx=CanvasRenderingContext2D;
 type Part='head'|'torso'|'arm0'|'arm1'|'thigh0'|'thigh1'|'shin0'|'shin1'|'shoe0'|'shoe1';
 type Sleeve={upper:Canvas;lower:Canvas;shoulder:Point;elbow:Point;wrist:Point};
 type Anchors={shoulder:Point;headY:number;wrist?:Point};
-type Frame={parts:Record<Part,Canvas>;neck:number;hip:number;knee:number;ankle:number;side:boolean;model:number;armArt?:Record<Part,Canvas>;torsoUnderlay?:Canvas;motionArt?:Record<Part,Canvas>;raisedArms?:Sleeve[]};
+type Frame={parts:Record<Part,Canvas>;neck:number;hip:number;knee:number;ankle:number;side:boolean;handEnds:number[];armArt?:Record<Part,Canvas>;torsoUnderlay?:Canvas;motionArt?:Record<Part,Canvas>;raisedArms?:Sleeve[]};
+type SourceFrame={pixels:Uint8ClampedArray;slots:Uint8Array;materials:Uint8Array;model:number;side:boolean;center:number;neck:number;hip:number;knee:number;ankle:number;faceScale:number;handEnds:number[]};
 const parts:Part[]=['head','torso','arm0','arm1','thigh0','thigh1','shin0','shin1','shoe0','shoe1'];
 let factory:((width:number,height:number)=>Canvas)|undefined;
-const frames=new Map<number,Frame>();
+const frames=new Map<number,SourceFrame>();
 let sourceAtlas:CanvasImageSource|undefined;
 let ready:Promise<void>|undefined;
 const cache=new Map<string,Frame>();
@@ -51,30 +53,16 @@ const originals=[
 ];
 const rgba=(hex:string)=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));
 const luminance=(rgb:number[])=>rgb[0]*.3+rgb[1]*.59+rgb[2]*.11;
-const rgbPalettes={hair:HAIR_COLORS,shirt:SHIRTS,pants:PANTS,shoes:SHOES,skin:SKINS,eyes:EYE_COLORS};
-function recolor(data:Uint8ClampedArray,offset:number,target:string,base:string){
-  const rgb=[data[offset],data[offset+1],data[offset+2]],max=Math.max(...rgb),min=Math.min(...rgb);
-  if(max<55||min>232)return; // Preserve original ink and specular highlights.
-  const a=rgba(target),b=rgba(base),ratio=Math.max(.35,Math.min(1.65,luminance(rgb)/Math.max(1,luminance(b))));
-  for(let i=0;i<3;i++)data[offset+i]=Math.min(255,Math.round(a[i]*ratio));
-}
-const skinPixel=(r:number,g:number,b:number)=>r>200&&g>145&&b>110&&r>g*1.035&&g>b*1.04;
-
-function isLongHair(model:number,direction:number,distance:number,below:number){
-  // Front-facing hair stops above the sleeves. A long rear silhouette must not
-  // turn the front sleeves into part of the stationary head layer.
-  if(direction===0){
-    if(model===6||model===14)return below<10&&distance>25;
-    if(model===7||model===11)return below<20&&distance>32;
-    if(model===8)return below<18&&distance>24;
-    if(model===9||model===10)return below<38&&distance>33;
-    return false;
-  }
-  if(model===6||model===14)return below<30&&(direction===2?distance<22:distance>25);
-  if(model===7||model===11)return below<35&&distance>29;
-  if(model===8)return below<46&&(direction===2?distance<35:distance>22);
-  if(model===9||model===10)return below<43&&(direction===2?distance<44:distance>26);
-  return false;
+const rgbPalettes={hair:HAIR_COLORS.map(rgba),shirt:SHIRTS.map(rgba),pants:PANTS.map(rgba),shoes:SHOES.map(rgba),skin:SKINS.map(rgba),eyes:EYE_COLORS.map(rgba)};
+const swatches=['fixed','hair','skin','eyes','shirt','pants','shoes'] as const;
+function recolor(data:Uint8ClampedArray,offset:number,target:number[],base:number[],material:Material){
+  const r=data[offset],g=data[offset+1],b=data[offset+2];
+  if(Math.max(r,g,b)<55)return;
+  // Keep detail in the source artwork without flattening bright pastels into white.
+  const sourceLight=r*.3+g*.59+b*.11,baseLight=luminance(base);
+  const contrast=material===MATERIAL.skin?.75:.62;
+  const ratio=1+contrast*(Math.max(.35,Math.min(1.65,sourceLight/Math.max(1,baseLight)))-1);
+  for(let i=0;i<3;i++)data[offset+i]=Math.min(255,Math.round(target[i]*ratio));
 }
 
 export function installCharacterSprites(atlas:CanvasImageSource,createCanvas:(width:number,height:number)=>Canvas){
@@ -89,7 +77,7 @@ function soleCenter(pixels:Uint8ClampedArray){
   // Leave nominally centered art on its original pixel grid.
   return Math.abs(middle-CENTER)<2?CENTER:Math.round(middle);
 }
-function rawFrame(model:number,direction:number):Frame{
+function sourceFrame(model:number,direction:number):SourceFrame{
   const index=model*4+direction,existing=frames.get(index);if(existing)return existing;
   const cell=factory!(SIZE,ATLAS_HEIGHT),c=cell.getContext('2d')!;
   // The ponytail drawing placed in the right-facing row actually faces left.
@@ -97,44 +85,71 @@ function rawFrame(model:number,direction:number):Frame{
   if(model===6&&direction===1){c.translate(SIZE,0);c.scale(-1,1);}
   c.drawImage(sourceAtlas!,(model%5)*SIZE,(Math.floor(model/5)*4+direction)*ATLAS_HEIGHT,SIZE,ATLAS_HEIGHT,0,0,SIZE,ATLAS_HEIGHT);
   c.restore();
-  const source=c.getImageData(0,0,SIZE,ATLAS_HEIGHT),side=direction===1||direction===3;
+  const pixels=c.getImageData(0,0,SIZE,ATLAS_HEIGHT).data,side=direction===1||direction===3;
   const landmarks=atlasLandmarks[model],neck=landmarks.neck[direction],{hip,knee,ankle}=landmarks;
-  const center=soleCenter(source.data);
-  const buffers=Object.fromEntries(parts.map(part=>[part,c.createImageData(SIZE,ATLAS_HEIGHT)])) as Record<Part,ImageData>;
+  const center=soleCenter(pixels),eye=neck-landmarks.face[direction];
+  const slots=new Uint8Array(SIZE*ATLAS_HEIGHT),materials=new Uint8Array(slots.length);
+  const handEnds=[HIP-4,HIP-4];
+  const hems=Array.from({length:SIZE},(_,x)=>hairHem(model,direction,x,neck));
   for(let y=0;y<ATLAS_HEIGHT;y++)for(let x=0;x<SIZE;x++){
-    const offset=(y*SIZE+x)*4;if(!source.data[offset+3])continue;
+    const position=y*SIZE+x,offset=position*4;if(!pixels[offset+3])continue;
     const distance=Math.abs(x-center);
-    let part:Part;
-    if(y<neck||isLongHair(model,direction,distance,y-neck))part='head';
-    else if(y<hip||y<hip+9&&distance>28){
-      part=y<neck+8?'torso':side?(distance<13?'arm1':'torso'):x<center-22?'arm0':x>center+22?'arm1':'torso';
+    const leg=x<center?0:1;
+    let slot:number,garment:typeof MATERIAL.hair|typeof MATERIAL.shirt|typeof MATERIAL.pants|typeof MATERIAL.shoes;
+    if(y<hems[x]){
+      slot=0;garment=MATERIAL.hair;
+    }else if(side&&profileHand(model,direction,x,y,2)){
+      slot=3;garment=MATERIAL.shirt;
+    }else if(y<hip||y<hip+9&&distance>28&&!side){
+      slot=y<neck+8?1:side?(distance<13?3:1):distance>22?2+leg:1;
+      garment=MATERIAL.shirt;
     }else{
-      const leg=x<center?0:1;
-      part=(y<knee?'thigh':y<ankle?'shin':'shoe')+leg as Part;
+      slot=(y<knee?4:y<ankle?6:8)+leg;
+      garment=y<ankle?MATERIAL.pants:MATERIAL.shoes;
     }
-    buffers[part].data.set(source.data.subarray(offset,offset+4),offset);
+    const material=spriteMaterial(model,direction,x,y,center,neck,eye,ankle,garment,pixels[offset],pixels[offset+1],pixels[offset+2]);
+    slots[position]=slot;
+    materials[position]=material;
+    if(direction===0&&slot>=2&&slot<=3&&material===MATERIAL.skin){
+      const end=NECK+Math.ceil((y-neck)*(HIP-NECK)/(hip-neck))+3;
+      handEnds[slot-2]=Math.max(handEnds[slot-2],Math.min(HEIGHT,end));
+    }
   }
   // Scale the face around its collar using the eye line, independent of hair
   // height. Register clothing at the joints while preserving silhouette width.
   const faceScale=(side?22:26)/landmarks.face[direction];
+  const frame={pixels,slots,materials,model,side,center,neck,hip,knee,ankle,faceScale,handEnds};
+  frames.set(index,frame);
+  if(frames.size>16)frames.delete(frames.keys().next().value!);
+  return frame;
+}
+function paintPart(cell:Canvas,frame:SourceFrame,part:Part,slot:number,look:Look){
+  const c=cell.getContext('2d')!,buffer=c.createImageData(SIZE,ATLAS_HEIGHT);
+  const base=originals[frame.model];
+  const shades={...base,skin:1,eyes:0};
+  const picks={...look,hair:look.hairColor??(look.hair<4?look.hair:base.hair)};
+  for(let position=0;position<frame.slots.length;position++){
+    const offset=position*4;
+    if(!frame.pixels[offset+3]||frame.slots[position]!==slot)continue;
+    buffer.data.set(frame.pixels.subarray(offset,offset+4),offset);
+    const material=frame.materials[position] as Material,role=swatches[material];
+    if(role==='fixed')continue;
+    const picked=picks[role];
+    if(picked!==undefined&&picked!==shades[role])recolor(buffer.data,offset,rgbPalettes[role][picked],rgbPalettes[role][shades[role]],material);
+  }
+  const {neck,hip,knee,ankle,center,faceScale}=frame;
   const upper={from:neck,to:NECK,scale:(HIP-NECK)/(hip-neck)};
   const thigh={from:hip,to:HIP,scale:(KNEE-HIP)/(knee-hip)};
   const shin={from:knee,to:KNEE,scale:(ANKLE-KNEE)/(ankle-knee)};
   const shoe={from:ankle,to:ANKLE,scale:(SOLE-ANKLE)/(ATLAS_SOLE-ankle)};
   const head={from:neck,to:NECK,scale:faceScale};
-  const images={} as Record<Part,Canvas>;
-  for(const part of parts){
-    const placement=part==='head'?head:part.startsWith('thigh')?thigh:part.startsWith('shin')?shin:part.startsWith('shoe')?shoe:upper;
-    const widthScale=part==='head'?faceScale:1;
-    const out=factory!(SIZE,HEIGHT),context=out.getContext('2d')!;
-    context.imageSmoothingEnabled=false;
-    c.putImageData(buffers[part],0,0);
-    context.drawImage(cell,CENTER-center*widthScale,placement.to-placement.from*placement.scale,SIZE*widthScale,ATLAS_HEIGHT*placement.scale);
-    images[part]=out;
-  }
-  const frame={parts:images,neck:NECK,hip:HIP,knee:KNEE,ankle:ANKLE,side,model};frames.set(index,frame);
-  if(frames.size>16)frames.delete(frames.keys().next().value!);
-  return frame;
+  const placement=part==='head'?head:part.startsWith('thigh')?thigh:part.startsWith('shin')?shin:part.startsWith('shoe')?shoe:upper;
+  const widthScale=part==='head'?faceScale:1;
+  const out=factory!(SIZE,HEIGHT),context=out.getContext('2d')!;
+  context.imageSmoothingEnabled=false;
+  c.putImageData(buffer,0,0);
+  context.drawImage(cell,CENTER-center*widthScale,placement.to-placement.from*placement.scale,SIZE*widthScale,ATLAS_HEIGHT*placement.scale);
+  return out;
 }
 export function loadCharacterSprites(){
   if(sourceAtlas)return Promise.resolve();
@@ -158,31 +173,17 @@ function sourceModels(look:Look){
 function styledFrame(look:Look,direction:number):Frame{
   const key=JSON.stringify([look.gender,look.hair,look.hairColor,look.skin,look.shirt,look.pants,look.shoes,look.eyes,look.outfit,look.bottom,look.footwear,direction]);
   const existing=cache.get(key);if(existing)return existing;
-  const models=sourceModels(look),bodyFrame=rawFrame(models.body,direction);
+  const models=sourceModels(look),body=sourceFrame(models.body,direction);
+  const sources={head:sourceFrame(models.head,direction),body,bottom:sourceFrame(models.bottom,direction),shoe:sourceFrame(models.shoe,direction)};
+  const cell=factory!(SIZE,ATLAS_HEIGHT);
   const images={} as Record<Part,Canvas>;
-  for(const part of parts){
-    const model=part==='head'?models.head:part==='torso'||part.startsWith('arm')?models.body:part.startsWith('shoe')?models.shoe:models.bottom;
-    const frame=rawFrame(model,direction),image=factory!(SIZE,HEIGHT),c=image.getContext('2d')!;
-    c.drawImage(frame.parts[part],0,0);
-    const pixels=c.getImageData(0,0,SIZE,HEIGHT),data=pixels.data,base=originals[model];
-    for(let y=0;y<HEIGHT;y++)for(let x=0;x<SIZE;x++){
-      const offset=(y*SIZE+x)*4;if(!data[offset+3])continue;
-      const r=data[offset],g=data[offset+1],b=data[offset+2];
-      const aboveCollar=frame.neck-y;
-      const isSkin=skinPixel(r,g,b)&&(part==='head'?direction!==2&&aboveCollar>0&&aboveCollar<30&&Math.abs(x-CENTER)<23:part.startsWith('arm')?y>frame.hip-13:part==='torso'?y<frame.neck+7:model===9&&y>frame.hip+8&&y<frame.knee);
-      if(isSkin){if(look.skin!==1)recolor(data,offset,SKINS[look.skin],SKINS[1]);continue;}
-      const role=part==='head'?'hair':part==='torso'||part.startsWith('arm')?'shirt':part.startsWith('shoe')?'shoes':'pants';
-      const picked=role==='hair'?look.hairColor??(look.hair<4?look.hair:base.hair):look[role];
-      // Cream trim, laces and white eye pixels remain part of the source clothing.
-      const cream=Math.min(r,g,b)>160&&Math.max(r,g,b)-Math.min(r,g,b)<65;
-      const leggings=look.bottom===3&&role==='pants'&&y>frame.hip+17;
-      if(!leggings&&picked!==undefined&&picked!==base[role]&&(!cream||role==='hair'||base[role]===4&&role==='shirt'))recolor(data,offset,rgbPalettes[role][picked],rgbPalettes[role][base[role]]);
-      if(part==='head'&&direction!==2&&look.eyes!==undefined&&look.eyes!==0&&aboveCollar<28&&aboveCollar>11&&Math.abs(x-CENTER)>6&&Math.abs(x-CENTER)<23&&r<160&&g<135&&b<145&&Math.max(r,g,b)>60)recolor(data,offset,EYE_COLORS[look.eyes],EYE_COLORS[0]);
-    }
-    c.putImageData(pixels,0,0);images[part]=image;
+  for(const [slot,part] of parts.entries()){
+    const frame=slot===0?sources.head:slot<4?sources.body:slot<8?sources.bottom:sources.shoe;
+    images[part]=paintPart(cell,frame,part,slot,look);
   }
   const front=direction!==0?styledFrame(look,0):undefined;
-  const result={...bodyFrame,parts:images,armArt:front?.parts??images,torsoUnderlay:bodyFrame.side?front!.parts.torso:undefined};cache.set(key,result);
+  const result={neck:NECK,hip:HIP,knee:KNEE,ankle:ANKLE,side:body.side,parts:images,handEnds:front?.handEnds??body.handEnds,armArt:front?.parts??images,torsoUnderlay:body.side?front!.parts.torso:undefined};
+  cache.set(key,result);
   if(cache.size>16)cache.delete(cache.keys().next().value!);
   return result;
 }
@@ -225,14 +226,7 @@ function sleeveParts(frame:Frame){
   return frame.raisedArms??=([0,1].map(i=>{
     const sign=i===0?-1:1,center=CENTER+sign*FOREARM_X,split=ELBOW_Y;
     const upper=factory!(SIZE,HEIGHT),lower=factory!(SIZE,HEIGHT),image=movingParts(frame)[`arm${i}` as Part];
-    // Locate the hand on the unmodified artwork so darker custom skin colors
-    // cannot accidentally shorten a sleeve or remove its hand.
-    const pixels=rawFrame(frame.model,0).parts[`arm${i}` as Part].getContext('2d')!.getImageData(0,0,SIZE,HEIGHT).data;
-    let end=frame.hip-4;
-    for(let y=frame.hip-16;y<frame.hip+12;y++)for(let x=0;x<SIZE;x++){
-      const offset=(y*SIZE+x)*4;
-      if((x-CENTER)*sign>28&&pixels[offset+3]&&skinPixel(pixels[offset],pixels[offset+1],pixels[offset+2]))end=Math.max(end,y+3);
-    }
+    const end=frame.handEnds[i];
     const overlap=5;
     upper.getContext('2d')!.drawImage(image,0,0,SIZE,split+overlap,0,0,SIZE,split+overlap);
     lower.getContext('2d')!.drawImage(image,0,split-overlap,SIZE,end-split+overlap,0,split-overlap,SIZE,end-split+overlap);
@@ -270,7 +264,6 @@ export function paintSpriteCharacter(c:Ctx,look:Look,pose:Pose,still:boolean,tim
   if(still&&!falling){
     const base={x:pose.hip.x+pose.lean*.3,y:Math.max(...pose.feet.map(foot=>foot.y))};
     const origin={x:CENTER,y:SOLE};
-    if(frame.torsoUnderlay)piece(c,frame.torsoUnderlay,origin,base,0,SCALE*.55);
     for(const part of ['thigh0','thigh1','shin0','shin1','shoe0','shoe1','arm0','torso','arm1','head'] as Part[])piece(c,frame.parts[part],origin,base);
     for(const dx of [-7,7])legAccessories(c,look,{x:base.x+dx,y:base.y-19},{x:base.x+dx,y:base.y});
     const neck={x:base.x,y:base.y-(SOLE-frame.neck)*SCALE};headwear(c,look,neck);

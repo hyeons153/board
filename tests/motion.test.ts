@@ -75,6 +75,51 @@ test('changing skin color preserves the entire raised sleeve and hand silhouette
   }
 });
 
+test('skin, hair, jacket, waistband and shoes use separate dyes on the original artwork',()=>{
+  const canvas=createCanvas(ACTOR_WIDTH*2,ACTOR_HEIGHT*2),c=canvas.getContext('2d');
+  const look=LOOK_PRESETS.male[1];
+  const changes={
+    skin:{skin:5},hairColor:{hairColor:2},shirt:{shirt:3},pants:{pants:6},shoes:{shoes:6},
+  };
+  const pixels=(overrides:Partial<Look>)=>{
+    paintRider(c as unknown as CanvasRenderingContext2D,{...look,...overrides},'rest',0,
+      {id:'peter-pan',progress:0,bodyHeading:0,boardHeading:0});
+    return c.getImageData(0,0,canvas.width,canvas.height).data;
+  };
+  const original=pixels({});
+  const variants=Object.entries(changes).map(([name,overrides])=>[name,pixels(overrides)] as const);
+  const samples=[
+    ['forehead','skin',236,155],['ear','skin',196,173],['hand','skin',197,242],
+    ['hair','hairColor',229,122],['jacket','shirt',206,208],
+    ['waistband','pants',224,239],['shoe','shoes',213,302],
+  ] as const;
+  for(const [label,dye,x,y] of samples){
+    const offset=(y*canvas.width+x)*4,source=original.slice(offset,offset+4);
+    for(const [name,variant] of variants){
+      const result=variant.slice(offset,offset+4);
+      assert.equal(result[3],255,label+' must retain its silhouette');
+      if(name===dye)assert.notDeepEqual(result,source,label+' must receive its own dye');
+      else assert.deepEqual(result,source,label+' must ignore the '+name+' dye');
+    }
+  }
+});
+
+test('darkening skin preserves the back of long wave hair and recolors bare knees',()=>{
+  const canvas=createCanvas(ACTOR_WIDTH*2,ACTOR_HEIGHT*2),c=canvas.getContext('2d'),look=LOOK_PRESETS.female[4];
+  function render(skin:number,heading:number){
+    paintRider(c as unknown as CanvasRenderingContext2D,{...look,skin},'rest',0,
+      {id:'peter-pan',progress:0,bodyHeading:heading,boardHeading:heading});
+    return c.getImageData(0,0,canvas.width,canvas.height).data;
+  }
+  const back=render(1,Math.PI),darkBack=render(5,Math.PI);
+  for(let y=122;y<180;y++){
+    const start=(y*canvas.width+173)*4,end=(y*canvas.width+275)*4;
+    assert.deepEqual(darkBack.slice(start,end),back.slice(start,end),'Back hair must not be dyed as skin');
+  }
+  const front=render(1,0),darkFront=render(5,0),knee=(277*canvas.width+210)*4;
+  assert.notDeepEqual(darkFront.slice(knee,knee+3),front.slice(knee,knee+3),'The exposed knee must be dyed as skin');
+});
+
 test('Peter Pan and cross-step gather one foot while the other remains planted',()=>{
   for(const id of ['peter-pan','cross']){
     const start=techniquePose(id,.18),gather=techniquePose(id,.30);
