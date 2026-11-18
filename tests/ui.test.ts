@@ -57,6 +57,11 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await act(async()=>{root.render(createElement(App));});await settle(80);
     const frame=win.document.querySelector('.game-console');assert.ok(frame);
     await click('새 라이더 등록');
+    await click('여성');await click('데크 색상 검정');
+    assert.equal(win.document.querySelector('[aria-label="데크 색상 검정"]')!.getAttribute('aria-pressed'),'true');
+    await click('데크 색상 흰색');
+    assert.equal(win.document.querySelector('[aria-label="데크 색상 흰색"]')!.getAttribute('aria-pressed'),'true');
+    assert.equal(win.document.querySelector('.gender-options button[aria-pressed="true"]')!.textContent,'여성');
     const name=win.document.querySelector<HTMLInputElement>('input[aria-label="라이더 이름"]')!;
     await act(async()=>{Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype,'value')!.set!.call(name,'UI test rider');name.dispatchEvent(new win.Event('input',{bubbles:true}));});
     await click('등록하고 시작');

@@ -1,13 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCanvas } from '@napi-rs/canvas';
-import { DEFAULT_LOOK, SKILLS } from '../src/game/data';
+import { BOARDS, DEFAULT_LOOK, SKILLS } from '../src/game/data';
 import { lineTerms } from '../src/game/content';
 import { paintRider } from '../src/scene/rider';
 import { ACTOR_HEIGHT, ACTOR_WIDTH, TECHNIQUES, boardPoint, headingsBefore, techniquePose, trainingTechnique } from '../src/scene/techniques';
-import type { MoveLog } from '../src/game/types';
+import type { Look, MoveLog } from '../src/game/types';
 
 const near=(actual:number,expected:number)=>assert.ok(Math.abs(actual-expected)<.00001,`${actual} != ${expected}`);
+
+test('rounded male and female riders retain every hairstyle, black/white decks and safe motion bounds',()=>{
+  const canvas=createCanvas(ACTOR_WIDTH,ACTOR_HEIGHT),c=canvas.getContext('2d');
+  const portrait=(look:Look)=>{paintRider(c as unknown as CanvasRenderingContext2D,look,'rest',0);return canvas.toBuffer('image/png');};
+  const legacy={hair:0,skin:0,shirt:0,board:0};
+  assert.deepEqual(portrait(legacy),portrait({...legacy,gender:'male'}));
+  assert.notDeepEqual(portrait({...legacy,gender:'male'}),portrait({...legacy,gender:'female'}));
+  for(const gender of ['male','female'] as const)for(const hair of [0,1,2,3])for(const board of [4,5]){
+    const look:Look={...DEFAULT_LOOK,gender,hair,board,hairColor:7,skin:5,shirt:7,pants:7,shoes:7};
+    portrait(look);
+    const color=BOARDS[board];
+    const rgb=[1,3,5].map(start=>parseInt(color.slice(start,start+2),16));
+    let hasDeck=false;
+    const pixels=c.getImageData(0,0,ACTOR_WIDTH,ACTOR_HEIGHT).data;
+    for(let i=0;i<pixels.length;i+=4)if(rgb.every((value,n)=>pixels[i+n]===value)&&pixels[i+3])hasDeck=true;
+    assert.ok(hasDeck,'Selected deck paint must be visible');
+    for(const technique of [{id:'kickflip',progress:.4},{id:'pirouette',progress:.6},{id:'ghost',progress:.5},{id:'wood',progress:.5},{id:'treflip',progress:.9,outcome:'miss' as const}]){
+      paintRider(c as unknown as CanvasRenderingContext2D,look,'ride',0,technique);
+      const rgba=c.getImageData(0,0,ACTOR_WIDTH,ACTOR_HEIGHT).data;
+      for(let y=0;y<ACTOR_HEIGHT;y++)for(let x=0;x<ACTOR_WIDTH;x++)if(rgba[(y*ACTOR_WIDTH+x)*4+3])assert.ok(x>0&&x<ACTOR_WIDTH-1&&y>0&&y<ACTOR_HEIGHT-1,'Appearance must fit the texture during movement');
+    }
+  }
+});
 test('step turns, shuvits, flips and compound spins keep their prescribed independent rotations',()=>{
   const rotations:Record<string,[number,number,number]>={
     'step-180':[180,0,0],'step-360':[360,0,0],pirouette:[360,0,0],'pirouette-540':[540,0,0],'pirouette-720':[720,0,0],

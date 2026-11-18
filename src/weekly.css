@@ -52,16 +52,24 @@
 
 .weekly-choices.is-auto .weekly-action-grid button:disabled { opacity:.8; cursor:default; }.weekly-choices.is-auto .weekly-action-grid button[aria-pressed=true] { opacity:1; outline:2px solid #b6d971; outline-offset:-2px; }.weekly-auto { justify-content:space-between; margin-top:12px; }.weekly-auto strong { font-size:.9rem; color:#365e45; }.weekly-auto p { margin:5px 0 0; font-size:.7rem; color:#60745b; }
 
-/* Reserve the same space before and after a choice; only the grid scrolls on short screens. */
+/* Fixed row counts keep every action visible without scrolling or moving the panel on selection. */
 .weekly-choices { height:350px; display:flex; flex-direction:column; overflow:hidden; }
 .weekly-choices > header { flex:none; }
-.weekly-action-grid { flex:1; min-height:0; overflow:auto; grid-auto-rows:67px; align-content:start; }
-.weekly-selection-slot { height:122px; flex:none; display:flex; flex-direction:column; justify-content:flex-end; overflow:auto; }
+.weekly-action-grid { flex:1; min-height:0; overflow:visible; grid-template-rows:repeat(2,minmax(0,1fr)); grid-auto-rows:auto; align-content:stretch; }
+.weekly-action-grid > button { min-height:0; min-width:0; }
+.weekly-selection-slot { height:122px; flex:none; display:flex; flex-direction:column; justify-content:flex-end; overflow:visible; }
 .weekly-selection-slot .weekly-confirm { flex:none; margin-top:auto; position:static; }
 .weekly-selection-slot .weekly-hint { margin-top:12px; margin-bottom:12px; }
 .weekly-inline-controls { flex:none; min-height:0; }
+.swatch-grid fieldset > div { flex-wrap:wrap; }
+.swatch-grid .gender-options button { min-height:32px; padding:5px 15px; border:1px solid #a6b89a; border-radius:6px; background:#f8f4e8; color:#344d46; font-size:.78rem; }
+.swatch-grid .gender-options button[aria-pressed=true] { background:#deedc8; border-color:#678a60; font-weight:750; }
+.swatch-grid .swatch { flex:none; border-color:#8c9b8d; }
 .console-world:has(.weekly-choices) .spot-title { display:none; }
-.console-world .spot-map-trigger { cursor:pointer; display:flex; align-items:center; gap:6px; color:#f9f3dd; }
+.game-console .game-hud .spot-map-trigger { position:absolute; top:0; right:0; display:flex; align-items:center; gap:7px; min-height:36px; padding:8px 12px; border:1px solid #c4d69c; border-radius:7px; background:#1d2d43; color:#eff9cf; font:750 .75rem/1.3 var(--mono); box-shadow:0 2px 9px #101b3155; cursor:pointer; }
+.game-console .game-hud .spot-map-trigger:hover:not(:disabled) { background:#344b50; border-color:#e0f5ab; }
+.game-console .game-hud .spot-map-trigger:disabled { opacity:1; color:#c6d1c3; border-color:#728478; cursor:default; }
+.game-console .game-hud:has(.spot-map-trigger) .scene-counter { margin-left:auto; margin-top:44px; }
 .spot-map { position:absolute; z-index:6; top:12px; right:16px; width:min(620px,calc(100% - 32px)); max-height:calc(100% - 24px); overflow:auto; padding:18px; border:1px solid #bacbb6; border-radius:12px; color:#253b4b; background:#fffcef; box-shadow:0 10px 48px #0b182ca8; scrollbar-color:#7d9a83 #eee9dc; }
 .spot-map > header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .spot-map > header span { font:700 .65rem var(--mono); letter-spacing:.12em; color:#527865; }
@@ -85,6 +93,5 @@
 .spot-map-studio .spot-map-scene { background:linear-gradient(#808eae 0 55%,#45516d 55% 78%,#9b8264 78%); }
 .spot-map-night .spot-map-scene { background:linear-gradient(#3f416c 0 55%,#43394e 55% 78%,#30283f 78%); }
 .spot-map-arena .spot-map-scene { background:linear-gradient(#95c6d8 0 55%,#526b71 55% 78%,#a58e6c 78%); }
-@media(max-width:1050px){ .weekly-choices { height:395px; }.weekly-action-grid { grid-auto-rows:57px; } }
-@media(max-width:700px){ .weekly-choices { height:390px; }.weekly-selection-slot { height:142px; }.weekly-action-grid { grid-auto-rows:56px; }.spot-map { top:8px; right:8px; width:calc(100% - 16px); max-height:calc(100% - 16px); padding:12px; }.spot-map-grid { gap:7px; }.spot-map-bonus { font-size:.65rem; } }
-@media(max-height:620px) and (min-width:701px){ .weekly-action-grid { grid-auto-rows:48px; } }
+@media(max-width:1050px){ .weekly-choices { height:395px; }.weekly-action-grid { grid-template-rows:repeat(3,minmax(0,1fr)); } }
+@media(max-width:700px){ .weekly-choices { height:390px; }.weekly-selection-slot { height:142px; }.spot-map { top:8px; right:8px; width:calc(100% - 16px); max-height:calc(100% - 16px); padding:12px; }.spot-map-grid { gap:7px; }.spot-map-bonus { font-size:.65rem; }.game-console .game-hud .spot-map-trigger { min-height:32px; padding:7px 9px; font-size:.67rem; }.game-console .game-hud:has(.spot-map-trigger) .scene-counter { margin-top:39px; } }

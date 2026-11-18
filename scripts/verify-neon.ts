@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { GameAction, View } from '../src/game/types';
 import type { Directory, Publication, PublicCard } from '../src/game/public';
+import { BOARDS, HAIR_COLORS, PANTS, SHIRTS, SHOES, SKINS } from '../src/game/data';
 
 const base=new URL(process.argv[2]??'http://127.0.0.1:5185');
 const deployed=process.argv.includes('--deployed');
@@ -60,7 +61,12 @@ async function run(){
   if(deployed) assert.equal(view!.weekMs,2000);
   assert.equal('speed' in view!,false);
   console.log('PASS /api/game -> Neon guest session');
-  await game({type:'create',name:'Neon 연결 검증 라이더',look:{hair:1,skin:2,shirt:3,board:1,pants:1,shoes:2}});
+  const appearance={gender:'female' as const,hair:2,skin:SKINS.length-1,shirt:SHIRTS.length-1,board:5,pants:PANTS.length-1,shoes:SHOES.length-1,hairColor:HAIR_COLORS.length-1};
+  assert.equal(BOARDS.length,8);
+  await game({type:'create',name:'Neon 연결 검증 라이더',look:appearance});await load();
+  assert.deepEqual(view!.career.rider!.look,appearance);
+  await game({type:'makeover',look:{...appearance,board:4}});await load();assert.equal(view!.career.rider!.look.board,4);
+  console.log('PASS gender and expanded colors -> white deck creation -> black deck makeover -> durable reload');
   await game({type:'routine',discipline:'dance',skills:['peter-pan']});
   await load();assert.deepEqual(view!.career.rider!.routines.dance,['peter-pan']);
   console.log('PASS saved line -> durable reload');

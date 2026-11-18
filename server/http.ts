@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ACTIONS, DISCIPLINES, SPOTS, STRATEGIES, type View } from '../src/game/types.js';
-import { RULES } from '../src/game/data.js';
+import { BOARDS, HAIR_COLORS, PANTS, RULES, SHIRTS, SHOES, SKINS } from '../src/game/data.js';
 import { GEAR_SLOTS } from '../src/game/economy.js';
 import { divisionFor, GameError } from '../src/game/career.js';
 import { advance, remaining } from './clock.js';
@@ -9,8 +9,9 @@ import { GUEST_SECONDS, type Row, type Store } from './store.js';
 import { AccessError, type OnlineStore } from './databaseStore.js';
 import { onlineRequest, rawSession, sessionCookie, sessionScope } from './online.js';
 
-const color=z.number().int().min(0).max(3);
-const look=z.strictObject({hair:color,skin:color,shirt:color,board:color,hairColor:color.optional(),pants:color.optional(),shoes:color.optional(),deckDesign:color.optional()});
+const style=z.number().int().min(0).max(3);
+const color=(palette:readonly string[])=>z.number().int().min(0).max(palette.length-1);
+const look=z.strictObject({hair:style,skin:color(SKINS),shirt:color(SHIRTS),board:color(BOARDS),gender:z.enum(['male','female']).optional(),hairColor:color(HAIR_COLORS).optional(),pants:color(PANTS).optional(),shoes:color(SHOES).optional(),deckDesign:style.optional()});
 const skill=z.string().max(40).regex(/^[a-z0-9-]+$/);
 const disciplines=z.array(z.enum(DISCIPLINES)).max(3).refine(ds=>new Set(ds).size===ds.length);
 // Older open clients can still submit this retired field; it is discarded.

@@ -36,13 +36,14 @@ export const ACTION_NAMES: Record<Action,string> = { speed:'속도 훈련', carv
 export const OUTCOME_NAMES = { miss:'실패', rough:'어설픈 성공', clean:'성공', great:'대성공' };
 export const KIND_NAMES = { step:'스텝', technique:'테크닉', spin:'회전', pop:'팝', flip:'플립' };
 export const DIFFICULTY_NAMES = ['','초급','중급','고급','최고급'];
-export const SKINS = ['#e8a877','#f2c59e','#bc825b','#85543d'];
-export const SHIRTS = ['#cafd67','#f88966','#9f9cf5','#54d3cb'];
-export const BOARDS = ['#fab66c','#d5faf1','#bc91ec','#f47a87'];
-export const HAIR_COLORS = ['#252437','#99513d','#b187c8','#a9c662'];
-export const PANTS = ['#574b74','#2b5478','#2f7064','#8d5a55'];
-export const SHOES = ['#fff2db','#9aeddc','#fcb58d','#d2c9ff'];
-export const DEFAULT_LOOK:Look = {hair:0,skin:0,shirt:0,board:0};
+export const SKINS = ['#e8a877','#f2c59e','#bc825b','#85543d','#f7dcc4','#603f34'];
+export const SHIRTS = ['#cafd67','#f88966','#9f9cf5','#54d3cb','#faf4df','#303749','#ed9bc0','#83b8ed'];
+export const BOARDS = ['#fab66c','#d5faf1','#bc91ec','#f47a87','#232833','#f6f4e9','#82b9ed','#94d79e'];
+export const BOARD_COLOR_NAMES = ['살구','민트','라벤더','코랄','검정','흰색','하늘','연두'];
+export const HAIR_COLORS = ['#252437','#99513d','#b187c8','#a9c662','#60452f','#e6c983','#eee9dc','#df97ae'];
+export const PANTS = ['#574b74','#2b5478','#2f7064','#8d5a55','#262d3c','#e7dfcd','#86a8cf','#cc9caf'];
+export const SHOES = ['#fff2db','#9aeddc','#fcb58d','#d2c9ff','#2c3342','#f4f4ee','#ed91ae','#8fbced'];
+export const DEFAULT_LOOK:Look = {hair:0,skin:0,shirt:0,board:0,gender:'male'};
 
 export const LOCATIONS = {
   river:{ name:'강변 스팟', en:'RIVERSIDE BANK', detail:'탁 트인 바람과 길게 뻗은 산책로.', boosted:['dance','speed'], boost:1.24, risk:.93, npc:'yu' },

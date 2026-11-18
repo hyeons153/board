@@ -6,7 +6,7 @@ export type Rival = {
 };
 export const RIVALS: Rival[] = [
   {id:'yu',name:'한유리',style:'댄싱',personality:'스텝을 소리로 기억하는 낙천적인 안무가',line:'“보드는 타는 게 아니라 춤추는 거야.”',
-    stats:{speed:21,carve:27,link:23,balance:23},favorite:'dance',color:'#9765bd',look:{hair:2,hairColor:2,skin:1,shirt:2,pants:0,shoes:1,board:2,deckDesign:1},spots:['river','arena'],signature:'pirouette',tactic:'flow',growth:{speed:7,carve:8.5,link:9,balance:6},mastery:8.2},
+    stats:{speed:21,carve:27,link:23,balance:23},favorite:'dance',color:'#9765bd',look:{gender:'female',hair:2,hairColor:2,skin:1,shirt:2,pants:0,shoes:1,board:2,deckDesign:1},spots:['river','arena'],signature:'pirouette',tactic:'flow',growth:{speed:7,carve:8.5,link:9,balance:6},mastery:8.2},
   {id:'jun',name:'강준',style:'트릭',personality:'넘어진 장면까지 영상으로 남기는 승부사',line:'“착지만 하면 다 계획대로였어.”',
     stats:{speed:19,carve:15,link:22,balance:28},favorite:'trick',color:'#bf6549',look:{hair:3,hairColor:1,skin:2,shirt:1,pants:1,shoes:2,board:0,deckDesign:2},spots:['plaza','night'],signature:'hardflip',tactic:'score',growth:{speed:6,carve:5,link:7,balance:9},mastery:8.8},
   {id:'sol',name:'윤솔',style:'올라운더',personality:'툭 던지는 조언이 정확한 스팟 선배',line:'“연습보다 커피가 먼저야. 진지하게.”',
@@ -14,7 +14,7 @@ export const RIVALS: Rival[] = [
   {id:'min',name:'이민재',style:'안정형',personality:'보드 나사까지 체크리스트에 넣는 완벽주의자',line:'“실전일수록 아는 걸 제대로.”',
     stats:{speed:19,carve:15,link:15,balance:16},favorite:'freestyle',color:'#5669b5',look:{hair:0,hairColor:1,skin:0,shirt:2,pants:3,shoes:0,board:1,deckDesign:0},spots:['park','arena'],signature:'cross',tactic:'stable',growth:{speed:8,carve:7,link:7,balance:9},mastery:9.2},
   {id:'ha',name:'최하린',style:'스텝·카빙',personality:'템포를 재는 데 진심인 러닝 크루 출신',line:'“말하려면 일단 한 바퀴 더!”',
-    stats:{speed:17,carve:19,link:17,balance:18},favorite:'dance',color:'#b55c71',look:{hair:2,hairColor:3,skin:1,shirt:1,pants:2,shoes:2,board:3,deckDesign:3},spots:['river','park'],signature:'back-cross',tactic:'flow',growth:{speed:8.9,carve:9.2,link:7.4,balance:6.4},mastery:8.6},
+    stats:{speed:17,carve:19,link:17,balance:18},favorite:'dance',color:'#b55c71',look:{gender:'female',hair:2,hairColor:3,skin:1,shirt:1,pants:2,shoes:2,board:3,deckDesign:3},spots:['river','park'],signature:'back-cross',tactic:'flow',growth:{speed:8.9,carve:9.2,link:7.4,balance:6.4},mastery:8.6},
   {id:'noa',name:'정노아',style:'하이 리스크 트릭',personality:'새로운 플립에만 눈빛이 바뀌는 야행성 라이더',line:'“실패 영상도 모으면 도감이 되겠지.”',
     stats:{speed:15,carve:14,link:16,balance:15},favorite:'trick',color:'#7254a7',look:{hair:3,hairColor:2,skin:2,shirt:3,pants:0,shoes:3,board:2,deckDesign:2},spots:['plaza','night','studio'],signature:'treflip',tactic:'score',growth:{speed:7,carve:6,link:8,balance:10},mastery:9.4},
 ];

@@ -5,7 +5,7 @@ import { mkdtemp, readdir, rmdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHandler } from '../server/http';
 import { localStore } from '../server/store';
-import { DEFAULT_LOOK } from '../src/game/data';
+import { BOARDS, DEFAULT_LOOK, HAIR_COLORS, PANTS, SHIRTS, SHOES, SKINS } from '../src/game/data';
 import { ECONOMY, playerPlace } from '../src/game/economy';
 import type { View } from '../src/game/types';
 
@@ -26,7 +26,11 @@ test('guest snapshots survive reopening storage; concurrent tournament submissio
     }));
     assert.equal((await post({type:'create',name:'Tester',look:DEFAULT_LOOK,money:99_000_000},0)).status,400);
     assert.equal((await post({type:'create',name:'Tester',look:DEFAULT_LOOK},0,'https://other.example')).status,403);
-    const create=await post({type:'create',name:'Tester',look:DEFAULT_LOOK},0);
+    assert.equal((await post({type:'create',name:'Tester',look:{...DEFAULT_LOOK,board:BOARDS.length}},0)).status,400);
+    assert.equal((await post({type:'create',name:'Tester',look:{...DEFAULT_LOOK,skin:SKINS.length}},0)).status,400);
+    assert.equal((await post({type:'create',name:'Tester',look:{...DEFAULT_LOOK,gender:'invalid'}},0)).status,400);
+    const appearance={...DEFAULT_LOOK,gender:'female' as const,board:5,shirt:SHIRTS.length-1,hairColor:HAIR_COLORS.length-1,pants:PANTS.length-1,shoes:SHOES.length-1,skin:SKINS.length-1};
+    const create=await post({type:'create',name:'Tester',look:appearance},0);
     assert.equal(create.status,200);
     let save:View=await create.json();
     assert.equal('speed' in save,false);
@@ -36,8 +40,13 @@ test('guest snapshots survive reopening storage; concurrent tournament submissio
     assert.equal(enabled.status,200);
     save=await enabled.json();
     const restored:View=await (await handler(new Request(base,{headers:{cookie}}))).json();
+    assert.deepEqual(restored.career.rider!.look,appearance,'New colors and gender must persist across reload');
     assert.equal(restored.fastForward,false);
     assert.equal(restored.weekMs,1000);
+    const restyled={...appearance,gender:'male' as const,board:4};
+    const makeover=await post({type:'makeover',look:restyled},save.version);
+    assert.equal(makeover.status,200);save=await makeover.json();
+    assert.deepEqual(save.career.rider!.look,restyled);
     const heartbeat=await post({type:'pulse'},save.version);
     const heartbeatView:View=await heartbeat.json();
     assert.ok(heartbeatView.version>=save.version);

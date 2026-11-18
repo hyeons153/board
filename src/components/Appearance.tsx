@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { BOARDS, HAIR_COLORS, PANTS, SHIRTS, SHOES, SKINS } from '../game/data';
+import { BOARD_COLOR_NAMES, BOARDS, HAIR_COLORS, PANTS, SHIRTS, SHOES, SKINS } from '../game/data';
 import type { Look } from '../game/types';
 import { paintRider } from '../scene/landscape';
 import { ACTOR_HEIGHT } from '../scene/techniques';
@@ -17,6 +17,9 @@ const fields=[
 
 export function LookFields({look,onChange}:{look:Look;onChange:(look:Look)=>void}){
   return <div className="swatch-grid">
+    <fieldset><legend>성별</legend><div className="gender-options" aria-label="성별">
+      {(['male','female'] as const).map(gender=><button key={gender} type="button" aria-pressed={(look.gender??'male')===gender} onClick={()=>onChange({...look,gender})}>{gender==='male'?'남성':'여성'}</button>)}
+    </div></fieldset>
     {fields.map(([field,label,values])=>
       <fieldset key={field}>
         <legend>{label}</legend>
@@ -26,8 +29,9 @@ export function LookFields({look,onChange}:{look:Look;onChange:(look:Look)=>void
             </select>
           : <div>{values.map((color,index)=>{
               const picked=(look[field]??(field==='hairColor'?look.hair:0))===index;
-              return <button key={color} type="button" className={'swatch'+(picked?' picked':'')} style={{backgroundColor:color}}
-                aria-pressed={picked} aria-label={label+' '+(index+1)} onClick={()=>onChange({...look,[field]:index})}/>;
+              const name=label+' '+(field==='board'?BOARD_COLOR_NAMES[index]:index+1);
+              return <button key={color} type="button" className={'swatch'+(picked?' picked':'')} style={{backgroundColor:color}} title={name}
+                aria-pressed={picked} aria-label={name} onClick={()=>onChange({...look,[field]:index})}/>;
             })}</div>
         }
       </fieldset>
