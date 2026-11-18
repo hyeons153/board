@@ -7,7 +7,7 @@ import { ECONOMY, equippedLook, extras, playerPlace, SPONSOR } from '../src/game
 import { pickEvent } from '../src/game/events';
 import { seeded } from '../src/game/random';
 import { advance, blankSave, remaining } from '../server/clock';
-import { DISCIPLINES, STATS, type Career, type Plan } from '../src/game/types';
+import { DISCIPLINES, GAME_SPEEDS, STATS, type Career, type Plan } from '../src/game/types';
 
 const identity=()=>({id:'rider-1',seed:5411});
 const career=():Career=>({rider:newRider(identity().id,identity().seed,'리버',{...DEFAULT_LOOK}),hall:[]});
@@ -118,6 +118,83 @@ test('open pages share one clock; a new page cannot claim elapsed time while all
   assert.equal(remaining(save,week),500);
 });
 
+
+test('all game speeds complete one training at the scaled deadline and preserve event pauses',()=>{
+  const week=180000;
+  for(const speed of GAME_SPEEDS){
+    let save=advance(blankSave(),{type:'create',name:'Speed',look:DEFAULT_LOOK},'first',0,week,identity,true);
+    save=advance(save,{type:'speed',speed},'first',0,week,identity,true);
+    save=advance(save,{type:'plan',plan:plan('speed')},'first',0,week,identity,true);
+    assert.equal(remaining(save,week),week/speed);
+    save=advance(save,{type:'pulse'},'first',week/speed-1,week,identity,true);
+    assert.equal(save.career.rider!.phase,'plan');
+    save=advance(save,{type:'pulse'},'first',week/speed,week,identity,true);
+    assert.equal(save.career.rider!.phase,'event');
+    assert.equal(save.career.rider!.rankedStart,1);
+    const paused=structuredClone(save.career);
+    save=advance(save,{type:'pulse'},'first',week*2,week,identity,true);
+    assert.deepEqual(save.career,paused);
+    save=advance(save,{type:'event',index:0},'first',week*2,week,identity,true);
+    assert.equal(save.career.rider!.week,2);
+    assert.equal(remaining(save,week),week/speed);
+  }
+});
+
+test('changing speed uses the previous rate for elapsed time and preserves earned progress',()=>{
+  const week=180000;
+  let save=advance(blankSave(),{type:'create',name:'Speed',look:DEFAULT_LOOK},'first',0,week,identity);
+  save=advance(save,{type:'plan',plan:plan('speed')},'first',0,week,identity);
+  save=advance(save,{type:'speed',speed:8},'first',90000,week,identity);
+  assert.equal(remaining(save,week),11250);
+  assert.equal(save.career.rider!.phase,'plan');
+  save=advance(save,{type:'speed',speed:1},'first',95000,week,identity);
+  assert.equal(remaining(save,week),50000);
+  save=advance(save,{type:'pulse'},'first',144999,week,identity);
+  assert.equal(save.career.rider!.phase,'plan');
+  save=advance(save,{type:'pulse'},'first',145000,week,identity);
+  assert.equal(save.career.rider!.phase,'event');
+});
+
+test('auto mode advances at each selected speed and keeps pre-meet choices paused',()=>{
+  const week=180000;
+  for(const speed of GAME_SPEEDS){
+    let save=advance(blankSave(),{type:'create',name:'Auto speed',look:DEFAULT_LOOK},'first',0,week,identity);
+    save=advance(save,{type:'speed',speed},'first',0,week,identity);
+    save=advance(save,{type:'settings',settings:{mode:'auto',strategy:'balanced',intensity:'safe',entries:[],pauseMeet:true}},'first',0,week,identity);
+    save=advance(save,{type:'pulse'},'first',week/speed-1,week,identity);
+    assert.equal(save.career.rider!.week,1);
+    save=advance(save,{type:'pulse'},'first',week/speed,week,identity);
+    assert.equal(save.career.rider!.week,2);
+    save.career.rider!.phase='meet';
+    save.career.rider!.week=7;
+    const paused=structuredClone(save.career);
+    save=advance(save,{type:'pulse'},'first',week*5,week,identity);
+    assert.deepEqual(save.career,paused);
+    save=advance(save,{type:'entry',disciplines:[]},'first',week*5,week,identity);
+    assert.equal(save.career.rider!.records.length,1);
+    assert.equal(save.career.rider!.week,8);
+    save=advance(save,{type:'pulse'},'first',week*5,week,identity);
+    assert.equal(save.career.rider!.records.length,1);
+    assert.equal(save.career.rider!.week,8);
+  }
+});
+
+test('accelerated clocks share time across tabs and cannot claim time before a new page joins',()=>{
+  const week=180000;
+  let save=advance(blankSave(),{type:'create',name:'Speed',look:DEFAULT_LOOK},'first',0,week,identity);
+  save=advance(save,{type:'speed',speed:8},'first',0,week,identity);
+  save=advance(save,{type:'plan',plan:plan('speed')},'first',0,week,identity);
+  save=advance(save,{type:'pulse'},'second',10000,week,identity);
+  assert.equal(remaining(save,week),22500);
+  save=advance(save,{type:'pulse'},'first',10000,week,identity);
+  assert.equal(remaining(save,week),12500);
+  save=advance(save,{type:'pulse'},'second',10000,week,identity);
+  assert.equal(remaining(save,week),12500);
+  save=advance(save,{type:'pulse'},'fresh',900000,week,identity);
+  assert.equal(remaining(save,week),12500);
+  save=advance(save,{type:'pulse'},'fresh',912500,week,identity);
+  assert.equal(save.career.rider!.phase,'event');
+});
 
 test('equipment, lesson fees, and locked spots are enforced by the career command',()=>{
   const c=career(),r=c.rider!;

@@ -78,6 +78,7 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
     const owner=browser(handle), viewer=browser(handle);
     await owner.read();
     await status(owner.game({type:'create',name:'리버 공식 선수',look:{...DEFAULT_LOOK,shirt:2}}),200);
+    await status(owner.game({type:'speed',speed:8}),200);
     const ownerRider=owner.snapshot().career.rider!;
     const oldToken=owner.token();
     const register=await status(owner.call('?area=account',{type:'register',username:'river_archive',password:pw}),200);
@@ -86,6 +87,7 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
     assert.equal(await store.authenticate(sessionHash(oldToken)),undefined);
     const privateView=await owner.read();
     assert.equal(privateView.username,'river_archive');
+    assert.equal(privateView.speed,8);
     assert.equal(privateView.career.rider?.id,ownerRider.id);
     assert.equal(privateView.career.rider?.seed,0);
     const ownerId=(await store.actor(sessionHash(owner.token())))!.id;
@@ -148,10 +150,12 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
     await status(owner.call('?area=account',{type:'logout'}),200);
     await owner.read();
     await status(owner.game({type:'create',name:'게스트 선수',look:DEFAULT_LOOK}),200);
+    await status(owner.game({type:'speed',speed:2}),200);
     await status(owner.call('?area=account',{type:'login',username:'river_archive',password:'incorrect-long-passphrase'}),401);
     await status(owner.call('?area=account',{type:'login',username:'river_archive',password:pw}),200);
     const merged=await owner.read();
     assert.equal(merged.career.rider?.name,'다음 회차');
+    assert.equal(merged.speed,8);
     assert.equal(merged.career.parked?.[0].name,'게스트 선수');
     await status(owner.game({type:'switch-rider',id:merged.career.parked![0].id}),200);
     assert.equal(owner.snapshot().career.rider?.name,'게스트 선수');

@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { GameAction, View } from '../src/game/types';
+import { GAME_SPEEDS, type GameSpeed } from '../src/game/types';
 import type { Directory, Publication, PublicCard } from '../src/game/public';
 
 const base=new URL(process.argv[2]??'http://127.0.0.1:5185');
 const deployed=process.argv.includes('--deployed');
+const speed=Number(process.argv.find(arg=>arg.startsWith('--speed='))?.split('=')[1]??1) as GameSpeed;
+assert.ok(GAME_SPEEDS.includes(speed),'Choose --speed=1, 2, 3, 4 or 8');
 const local=['127.0.0.1','localhost','[::1]'].includes(base.hostname);
 if(!local&&!(deployed&&base.protocol==='https:'&&base.hostname.endsWith('.vercel.app')))
   throw new Error('Use a local Neon-wired server, or explicitly select a Vercel deployment with --deployed.');
@@ -58,6 +61,12 @@ async function run(){
   assert.equal(view?.storage,'neon');
   console.log('PASS /api/game -> Neon guest session');
   await game({type:'create',name:'Neon 연결 검증 라이더',look:{hair:1,skin:2,shirt:3,board:1,pants:1,shoes:2}});
+  const baseWeekMs=view!.weekMs;
+  await game({type:'speed',speed});
+  await load();
+  assert.equal(view!.speed,speed);
+  assert.equal(view!.weekMs,baseWeekMs/speed);
+  console.log('PASS x'+speed+' speed -> scaled deadline -> durable reload');
   const riderId=view!.career.rider!.id;
   await game({type:'plan',plan:{action:'speed',spot:'river',intensity:'safe'}});
   await waitForWeek();

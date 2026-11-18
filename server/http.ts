@@ -1,10 +1,10 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { ACTIONS, DISCIPLINES, INTENSITIES, SPOTS, STRATEGIES, type View } from '../src/game/types.js';
+import { ACTIONS, DISCIPLINES, GAME_SPEEDS, INTENSITIES, SPOTS, STRATEGIES, type View } from '../src/game/types.js';
 import { RULES } from '../src/game/data.js';
 import { GEAR_SLOTS } from '../src/game/economy.js';
 import { GameError } from '../src/game/career.js';
-import { advance, remaining } from './clock.js';
+import { advance, gameSpeed, remaining } from './clock.js';
 import { GUEST_SECONDS, type Row, type Store } from './store.js';
 import { AccessError, type OnlineStore } from './databaseStore.js';
 import { onlineRequest, rawSession, sessionCookie, sessionScope } from './online.js';
@@ -15,6 +15,7 @@ const skill=z.string().max(40).regex(/^[a-z0-9-]+$/);
 const disciplines=z.array(z.enum(DISCIPLINES)).max(3).refine(ds=>new Set(ds).size===ds.length);
 const actionSchema=z.discriminatedUnion('type',[
   z.strictObject({type:z.literal('pulse')}),
+  z.strictObject({type:z.literal('speed'),speed:z.union(GAME_SPEEDS.map(speed=>z.literal(speed)))}),
   z.strictObject({type:z.literal('create'),name:z.string().trim().min(1).max(16).regex(/^[\p{L}\p{N} _.-]+$/u),look}),
   z.strictObject({type:z.literal('plan'),plan:z.strictObject({action:z.enum(ACTIONS),spot:z.enum(SPOTS),intensity:z.enum(INTENSITIES),skill:skill.optional(),lesson:z.boolean().optional(),discipline:z.enum(DISCIPLINES).optional()})}),
   z.strictObject({type:z.literal('settings'),settings:z.strictObject({mode:z.enum(['manual','auto']),strategy:z.enum(STRATEGIES),intensity:z.enum(INTENSITIES),entries:disciplines,pauseStory:z.boolean().optional(),pauseMeet:z.boolean().optional(),pauseInjury:z.boolean().optional()})}),
@@ -64,7 +65,8 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
     const hall=career.hall.map(archive=>({...archive,records:records(archive.records,false)}));
     const rider=career.rider?{...career.rider,seed:0,records:records(career.rider.records,true)}:null;
     const parked=career.parked?.map(item=>({...item,seed:0,records:records(item.records,false)}));
-    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,remainingMs:remaining(row.snapshot,weekMs),weekMs,storage:store.kind,username,scope};
+    const speed=gameSpeed(row.snapshot);
+    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,remainingMs:remaining(row.snapshot,weekMs),weekMs:weekMs/speed,speed,storage:store.kind,username,scope};
   };
   return async (request:Request):Promise<Response>=>{
     try{

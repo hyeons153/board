@@ -6,6 +6,8 @@ export const STRATEGIES = ['balanced','dance','trick','freestyle'] as const;
 export const INTENSITIES = ['safe','normal','focus'] as const;
 export const STYLES = ['stable','flow','score'] as const;
 export const ACTIONS = [...STATS,'dance','trick','rest','hospital','rehearsal'] as const;
+export const GAME_SPEEDS = [1,2,3,4,8] as const;
+export type GameSpeed = typeof GAME_SPEEDS[number];
 export type Stat = typeof STATS[number];
 export type Stats = Record<Stat,number>;
 export type Division = typeof DIVISIONS[number];
@@ -43,9 +45,10 @@ export type Ending = { kind:'legend'|'champion'|'technician'|'veteran'|'early'; 
 export type Mentor = { id:string; name:string; look:Look; skill?:string; title:string; wins:number };
 export type Archive = { id:string; name:string; look:Look; year:number; week:number; reason:'early'|'complete'; stats:Stats; skills:Record<string,Progress>; records:MeetRecord[]; seasons:Season[]; relations:Record<string,number>; fame:number; extras?:CareerExtras; events?:Rider['events']; ending?:Ending; honors?:string[]; rankedStart?:number };
 export type Career = { rider:Rider|null; hall:Archive[]; parked?:Rider[] };
-export type View = { career:Career; version:number; remainingMs:number; weekMs:number; storage:'local'|'neon'; username?:string; scope?:string };
+export type View = { career:Career; version:number; remainingMs:number; weekMs:number; speed:GameSpeed; storage:'local'|'neon'; username?:string; scope?:string };
 export type GameAction =
   | { type:'pulse' }
+  | { type:'speed'; speed:GameSpeed }
   | { type:'create'; name:string; look:Look }
   | { type:'plan'; plan:Plan }
   | { type:'settings'; settings:Settings }

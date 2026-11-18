@@ -49,6 +49,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .page-header { min-height: 112px; border-bottom: 1px solid #d9d2bd; padding: 5px 0 14px; margin-bottom: 17px; }
 .page-header h1 { color: #283855; }
 .week-chip { background: #e3ebf5; border-color: #cbd9e8; color: #324971; box-shadow: 2px 3px 0 #d6d5cf; }
+.speed-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; margin: 0 0 17px; padding: .65rem .85rem; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.speed-controls > span { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; font-weight: 750; }
+.speed-options { display: flex; flex-wrap: wrap; gap: .3rem; }
+.speed-options .pill { min-width: 40px; min-height: 36px; font-variant-numeric: tabular-nums; }
+.speed-controls small { margin-left: auto; color: var(--muted); font-size: .75rem; }
 .panel, .stat-card { border-radius: 12px; box-shadow: 2px 3px 0 #4d4c3810; }
 .section-title > svg, .section-title .eyebrow { color: #496f60; }
 .spot-stage { border: 2px solid #43536f; }

@@ -28,7 +28,15 @@ test('guest snapshots survive reopening storage; concurrent tournament submissio
     assert.equal((await post({type:'create',name:'Tester',look:DEFAULT_LOOK},0,'https://other.example')).status,403);
     const create=await post({type:'create',name:'Tester',look:DEFAULT_LOOK},0);
     assert.equal(create.status,200);
-    const save:View=await create.json();
+    let save:View=await create.json();
+    assert.equal(save.speed,1);
+    for(const speed of [0,5,16,'8']) assert.equal((await post({type:'speed',speed},save.version)).status,400);
+    const accelerated=await post({type:'speed',speed:8},save.version);
+    assert.equal(accelerated.status,200);
+    save=await accelerated.json();
+    const restored:View=await (await handler(new Request(base,{headers:{cookie}}))).json();
+    assert.equal(restored.speed,8);
+    assert.equal(restored.weekMs,125);
     const owner=await store.authenticate(createHash('sha256').update(cookie.split('=')[1]).digest('hex'));
     assert.ok(owner);
     const row=await store.get(owner);
