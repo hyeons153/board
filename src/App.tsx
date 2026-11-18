@@ -102,7 +102,7 @@ export default function App(){
           <div className="stack">
             {r.phase==='retired'&&<div className="meet-notice panel"><Trophy size={22}/><div><b>커리어 종료</b><span>명예의 전당에 {r.name} 선수의 기록이 남았습니다.</span></div><button className="button secondary small" onClick={()=>setEndingId(r.id)}>엔딩 보기</button><button className="button primary small" onClick={()=>setTitle('new')}>새 선수</button></div>}
             <MeetNotice r={r} onClick={()=>go('meets')}/>
-            <Training key={r.id+'-'+(target??'weekly')} r={r} send={game.send} saving={game.saving} remaining={game.remaining} weekMs={view.weekMs} target={target}/>
+            <Training key={r.id+'-'+(target??'weekly')} r={r} send={game.send} saving={game.saving} remaining={game.remaining} weekMs={view.weekMs} fastForward={view.fastForward} target={target}/>
           </div>
           <aside className="stack overview-aside"><RiderCard r={r}/><Upcoming r={r} onClick={()=>go('meets')}/><SeasonStrip r={r}/>
             {last&&<div className="panel quick-replay"><CirclePlay size={20}/><div><span>최근 경기</span><b>{latestMeetLabel}</b></div><button className="icon-button" aria-label="최근 경기 재생" onClick={()=>{go('meets');setShowReplay(true);}}><ArrowRight size={17}/></button></div>}

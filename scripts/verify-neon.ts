@@ -5,6 +5,7 @@ import type { Directory, Publication, PublicCard } from '../src/game/public';
 
 const base=new URL(process.argv[2]??'http://127.0.0.1:5185');
 const deployed=process.argv.includes('--deployed');
+const fastForward=process.argv.includes('--fast-forward');
 const local=['127.0.0.1','localhost','[::1]'].includes(base.hostname);
 if(!local&&!(deployed&&base.protocol==='https:'&&base.hostname.endsWith('.vercel.app')))
   throw new Error('Use a local Neon-wired server, or explicitly select a Vercel deployment with --deployed.');
@@ -60,6 +61,14 @@ async function run(){
   assert.equal('speed' in view!,false);
   console.log('PASS /api/game -> Neon guest session');
   await game({type:'create',name:'Neon 연결 검증 라이더',look:{hair:1,skin:2,shirt:3,board:1,pants:1,shoes:2}});
+  if(fastForward){
+    const baseWeekMs=view!.weekMs;
+    await game({type:'fast-forward',enabled:true});
+    await load();
+    assert.equal(view!.fastForward,true);
+    assert.equal(view!.weekMs,baseWeekMs/2);
+    console.log('PASS x2 toggle -> half-length week -> durable reload');
+  }
   const riderId=view!.career.rider!.id;
   await game({type:'plan',plan:{action:'speed',spot:'river',intensity:'safe'}});
   await waitForWeek();
@@ -83,6 +92,7 @@ async function run(){
   console.log('PASS equipment transaction persisted');
   await game({type:'retire'});
   assert.equal(view!.career.hall[0].id,riderId);
+  assert.equal(view!.fastForward,fastForward);
   assert.equal(view!.career.hall[0].ending?.kind,'early');
   const published=await request<Publication>('?area=public',{type:'publish',archiveId:riderId,active:true});
   const ownerCookie=cookie;

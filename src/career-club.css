@@ -58,6 +58,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .spot-visitor .pixel-rider { width: 23px; height: 23px; }
 .scene-progress { background: #344564; }
 .scene-progress span { background: #d8f29d; }
+.scene-counter .fast-forward { min-width: 33px; min-height: 26px; margin: -3px -3px -3px 2px; padding: 3px 6px; border: 1px solid #d2c1d178; border-radius: 4px; background: #ffffff10; color: #fff3e0; font: 750 .72rem var(--mono); }
+.scene-counter .fast-forward:hover:not(:disabled), .scene-counter .fast-forward.is-active { background: #d8f29d; border-color: #d8f29d; color: #253d34; }
 .expanded.spot-picker { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .expanded.spot-picker button { display: grid; min-height: 53px; justify-content: start; text-align: left; gap: 1px; padding: .45rem .53rem; }
 .expanded.spot-picker button:disabled { opacity: 1; color: #595968; background: #efebe1; }

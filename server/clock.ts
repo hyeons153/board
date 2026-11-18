@@ -1,9 +1,9 @@
-import { command, processWeek } from '../src/game/career.js';
+import { command, GameError, processWeek } from '../src/game/career.js';
 import type { Career, GameAction } from '../src/game/types.js';
 
-export type Save = { format:1; career:Career; clock:{credit:number; stamp:number; tabs:Record<string,number>} };
+export type Save = { format:1; career:Career; clock:{credit:number; stamp:number; tabs:Record<string,number>; fastForward?:boolean} };
 export const blankSave=():Save=>({format:1,career:{rider:null,hall:[]},clock:{credit:0,stamp:0,tabs:{}}});
-export const remaining=(save:Save,weekMs:number)=>save.career.rider?.phase==='plan'?Math.max(0,weekMs-save.clock.credit):0;
+export const remaining=(save:Save,weekMs:number)=>save.career.rider?.phase==='plan'?Math.max(0,(weekMs-save.clock.credit)/(save.clock.fastForward?2:1)):0;
 
 export function advance(prev:Save,a:GameAction,tab:string,now:number,weekMs:number,identity:()=>{id:string;seed:number},official=false,account=false):Save {
   const next=structuredClone(prev);
@@ -16,7 +16,7 @@ export function advance(prev:Save,a:GameAction,tab:string,now:number,weekMs:numb
   const joined=clock.tabs[tab];
   if(r?.phase==='plan'&&joined!==undefined) {
     const elapsed=Math.min(5*60_000,Math.max(0,now-Math.max(clock.stamp,joined)));
-    clock.credit=Math.min(clock.credit+elapsed,(r.settings.mode==='auto'?416:1)*weekMs);
+    clock.credit=Math.min(clock.credit+elapsed*(prev.clock.fastForward?2:1),(r.settings.mode==='auto'?416:1)*weekMs);
     clock.stamp=Math.max(now,clock.stamp);
   }
   const tabs=Object.entries(clock.tabs).filter(([key,seen])=>key!==tab&&now-seen<=7*24*60*60*1000).sort((a,b)=>b[1]-a[1]).slice(0,15);
@@ -24,7 +24,10 @@ export function advance(prev:Save,a:GameAction,tab:string,now:number,weekMs:numb
   if(a.type==='create'||a.type==='switch-rider') {
     clock.credit=0; clock.stamp=now; clock.tabs={[tab]:now};
   }
-  command(next.career,a,identity,official,account);
+  if(a.type==='fast-forward'){
+    if(!r||r.phase==='retired') throw new GameError('진행 중인 커리어에서 배속을 선택해 주세요.');
+    clock.fastForward=a.enabled;
+  }else command(next.career,a,identity,official,account);
   const rider=next.career.rider;
   for(let batch=0;batch<8&&clock.credit>=weekMs;batch++){
     if(!processWeek(next.career,official)) break;

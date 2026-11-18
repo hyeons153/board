@@ -143,6 +143,32 @@ test('weeks take 30 seconds in manual and auto mode regardless of a retired spee
   }
 });
 
+test('the x2 toggle preserves progress, pauses and normal speed when turned off',()=>{
+  for(const auto of [false,true]){
+    let save=advance(blankSave(),{type:'create',name:'Toggle',look:DEFAULT_LOOK},'first',0,RULES.weekMs,identity);
+    save=advance(save,auto
+      ?{type:'settings',settings:{mode:'auto',strategy:'balanced',intensity:'safe',entries:[]}}
+      :{type:'plan',plan:plan('speed')},'first',0,RULES.weekMs,identity);
+    save=advance(save,{type:'fast-forward',enabled:true},'first',10000,RULES.weekMs,identity);
+    assert.equal(remaining(save,RULES.weekMs),10000);
+    assert.equal(save.career.rider!.week,1);
+    save=advance(save,{type:'fast-forward',enabled:false},'first',15000,RULES.weekMs,identity);
+    assert.equal(remaining(save,RULES.weekMs),10000);
+    save=advance(save,{type:'fast-forward',enabled:true},'first',15000,RULES.weekMs,identity);
+    assert.equal(remaining(save,RULES.weekMs),5000);
+    save=advance(save,{type:'pulse'},'first',19999,RULES.weekMs,identity);
+    assert.equal(save.career.rider!.phase,'plan');
+    save=advance(save,{type:'pulse'},'first',20000,RULES.weekMs,identity);
+    assert.equal(save.career.rider!.phase,auto?'plan':'event');
+    assert.equal(save.career.rider!.week,auto?2:1);
+    if(!auto){
+      const paused=structuredClone(save.career);
+      save=advance(save,{type:'pulse'},'first',100000,RULES.weekMs,identity);
+      assert.deepEqual(save.career,paused);
+    }
+  }
+});
+
 test('equipment, lesson fees, and locked spots are enforced by the career command',()=>{
   const c=career(),r=c.rider!;
   assert.throws(()=>command(c,{type:'plan',plan:{...plan('trick'),spot:'night'}},identity),GameError);

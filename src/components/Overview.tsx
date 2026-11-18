@@ -58,7 +58,7 @@ export function EventCard({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
     </div>
   </section>;
 }
-export function Training({r,send,saving,remaining,weekMs,target}:{r:Rider;send:Submit;saving:boolean;remaining:number;weekMs:number;target?:string}){
+export function Training({r,send,saving,remaining,weekMs,fastForward,target}:{r:Rider;send:Submit;saving:boolean;remaining:number;weekMs:number;fastForward:boolean;target?:string}){
   const skill=SKILL[target??''];
   const [spot,setSpot]=useState<Spot>(r.plan?.spot??r.spot);
   const [action,setAction]=useState<Action>(skill?.family??r.plan?.action??'speed');
@@ -85,7 +85,10 @@ export function Training({r,send,saving,remaining,weekMs,target}:{r:Rider;send:S
     <div className="spot-stage"><Scene spot={viewSpot} look={equippedLook(r)} guest={visitor?.look} motion={viewMotion}/><div className="scene-shade"/>
       <div className="spot-title"><span><MapPin size={13}/> {LOCATIONS[viewSpot].en}</span><h2>{LOCATIONS[viewSpot].name}</h2><p>{LOCATIONS[viewSpot].detail}</p>
       {visitor&&<span className="spot-visitor"><PixelRider look={visitor.look}/> {visitor.name} 연습 중</span>}</div>
-      <div className="scene-counter"><Timer size={14}/><span>{when(remaining)}</span></div>
+      <div className="scene-counter"><Timer size={14}/><span>{when(remaining)}</span>
+        {r.phase!=='retired'&&<button type="button" className={`fast-forward ${fastForward?'is-active':''}`} aria-label="2배속" aria-pressed={fastForward}
+          title={fastForward?'2배속 끄기':'2배속 켜기'} disabled={saving} onClick={()=>void send({type:'fast-forward',enabled:!fastForward})}>x2</button>}
+      </div>
       <div className="scene-progress"><span style={{width:`${(1-Math.min(1,remaining/weekMs))*100}%`}}/></div>
     </div>
     <div className="spot-picker expanded" aria-label="훈련 스팟">{SPOTS.map(s=>{
