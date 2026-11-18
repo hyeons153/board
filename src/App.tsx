@@ -7,7 +7,7 @@ import { lineTerms } from './game/content';
 import { equippedLook, extras } from './game/economy';
 import { Brand } from './components/Brand';
 import { LookFields, PixelRider } from './components/Appearance';
-import { NewsCard, TrainingControls } from './components/Overview';
+import { NewsCard } from './components/Overview';
 import { Skills, Routines } from './components/Skills';
 import { Meets } from './components/Meets';
 import { Hall, Profile, Rankings } from './components/Records';
@@ -17,18 +17,18 @@ import OnlineHall from './components/OnlineHall';
 import Ceremony from './components/Ceremony';
 import GameStage from './components/GameStage';
 import Scene from './components/Scene';
-import type { Action, Look, MeetRecord } from './game/types';
+import { AutoSettings, StatusGauges, WeeklyChoices } from './components/WeeklyChoices';
+import type { Look, MeetRecord } from './game/types';
 
 type Screen='home'|'training'|'skills'|'routine'|'meets'|'rank'|'workshop'|'profile'|'hall'|'online'|'account'|'menu'|'new'|'ending'|'journal';
-const names:Record<Screen,string>={home:'스팟',training:'훈련',skills:'기술 도감',routine:'라인 편집',meets:'대회',rank:'시즌 랭킹',workshop:'장비·스폰서',profile:'선수 정보',hall:'명예의 전당',online:'온라인 명예의 전당',account:'계정',menu:'전체 메뉴',new:'라이더 등록',ending:'커리어 엔딩',journal:'라이더 일지'};
-const dock=[['home','스팟',Footprints],['training','훈련',HeartPulse],['skills','기술',BookOpen],['meets','대회',Flag],['workshop','상점',ShoppingBag],['menu','메뉴',Menu]] as const;
-const allMenus=[['training',Footprints,'훈련 계획과 자동 육성'],['skills',BookOpen,'댄싱·트릭 설명과 연마'],['routine',ListOrdered,'대회에서 펼칠 기술 순서'],['meets',CalendarDays,'일정과 경기 다시 보기'],['rank',Trophy,'이번 시즌 순위'],['workshop',ShoppingBag,'장비 구매·장착과 계약'],['profile',UserRound,'선수·라이벌·커리어 관리'],['hall',Trophy,'은퇴 선수와 공개 설정'],['online',Trophy,'다른 선수의 공개 기록'],['account',Settings,'로그인과 보유 선수'],['journal',NotebookText,'지난 훈련과 이벤트 기록']] as const;
+const names:Record<Screen,string>={home:'육성',training:'자동 육성 설정',skills:'기술 도감',routine:'라인 편집',meets:'대회',rank:'시즌 랭킹',workshop:'장비·스폰서',profile:'선수 정보',hall:'명예의 전당',online:'온라인 명예의 전당',account:'계정',menu:'전체 메뉴',new:'라이더 등록',ending:'커리어 엔딩',journal:'라이더 일지'};
+const dock=[['home','육성',Footprints],['skills','기술',BookOpen],['meets','대회',Flag],['workshop','상점',ShoppingBag],['menu','메뉴',Menu]] as const;
+const allMenus=[['training',Settings,'자동 행동·출전 전략 설정'],['skills',BookOpen,'댄싱·트릭 설명과 연마'],['routine',ListOrdered,'대회에서 펼칠 기술 순서'],['meets',CalendarDays,'일정과 경기 다시 보기'],['rank',Trophy,'이번 시즌 순위'],['workshop',ShoppingBag,'장비 구매·장착과 계약'],['profile',UserRound,'선수·라이벌·커리어 관리'],['hall',Trophy,'은퇴 선수와 공개 설정'],['online',Trophy,'다른 선수의 공개 기록'],['account',Settings,'로그인과 보유 선수'],['journal',NotebookText,'지난 훈련과 이벤트 기록']] as const;
 
 export default function App(){
   const game=useGame();
   const [screen,setScreen]=useState<Screen>(()=>new URLSearchParams(location.search).has('rider')?'online':'home');
   const [target,setTarget]=useState<string>();
-  const [initialAction,setInitialAction]=useState<Action>();
   const [publicId,setPublicId]=useState(()=>new URLSearchParams(location.search).get('rider')??undefined);
   const [endingId,setEndingId]=useState<string>();
   const [replay,setReplay]=useState<MeetRecord>();
@@ -48,7 +48,7 @@ export default function App(){
   },[r?.id,r?.phase,pending,trainingResult]);
   useEffect(()=>{if(screen!=='home'){panel.current?.focus({preventScroll:true});panel.current?.scrollTo(0,0);}},[screen]);
   useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){setScreen('home');setReplay(undefined);}};window.addEventListener('keydown',escape);return ()=>window.removeEventListener('keydown',escape);},[]);
-  const go=(next:Screen)=>{setScreen(next);setTarget(undefined);setInitialAction(undefined);setReplay(undefined);};
+  const go=(next:Screen)=>{setScreen(next);setTarget(undefined);setReplay(undefined);};
   const selectPublic=(id?:string)=>{
     setPublicId(id);const url=new URL(location.href);
     if(id)url.searchParams.set('rider',id);else url.searchParams.delete('rider');
@@ -74,8 +74,8 @@ export default function App(){
   else if(screen==='ending'&&archive)content=<Ceremony key={archive.id} archive={archive} onHall={()=>go('hall')} onNew={()=>go('new')}/>;
   else if(screen==='menu')content=<div className="console-menu-grid">{allMenus.filter(([id])=>r||['hall','online','account'].includes(id)).map(([id,Icon,detail])=><button key={id} onClick={()=>go(id)}><Icon size={24}/><span><strong>{names[id]}</strong><small>{detail}</small></span><ArrowRight size={16}/></button>)}</div>;
   else if(r){
-    if(screen==='training')content=busyFlow?<FlowNotice onReturn={playHome}/>:<TrainingControls key={r.id+':'+(target??'weekly')} r={r} send={game.send} saving={game.saving} target={target} initialAction={initialAction} onScheduled={playHome}/>;
-    else if(screen==='skills')content=<Skills r={r} onTrain={id=>{go('training');setTarget(id);}}/>;
+    if(screen==='training')content=busyFlow?<FlowNotice onReturn={playHome}/>:<AutoSettings r={r} send={game.send} saving={game.saving}/>;
+    else if(screen==='skills')content=<Skills r={r} onTrain={id=>{go('home');setTarget(id);}}/>;
     else if(screen==='routine')content=<Routines r={r} send={game.send} saving={game.saving||busyFlow}/>;
     else if(screen==='meets')content=<Meets r={r} onPlay={openReplay} onEntry={playHome}/>;
     else if(screen==='rank')content=<Rankings r={r}/>;
@@ -91,11 +91,13 @@ export default function App(){
     <div className="console-world">
       <div className="console-stage" inert={screen!=='home'}>{r?<GameStage r={r} send={game.send} saving={game.saving} remaining={game.remaining} weekMs={view.weekMs} fastForward={view.fastForward} spot={r.plan?.spot??r.spot} motion={r.plan?.action==='rest'||r.plan?.action==='hospital'?'rest':'ride'} record={stageRecord} pendingTraining={trainingResult} onDone={()=>void finishMeet()}/>:<><Scene spot="river" look={DEFAULT_LOOK} variant="title"/><div className="console-title-shade"/></>}</div>
       {r&&<div className="console-vitals" aria-label="선수 상태"><span>체력 <b>{Math.round(r.energy)}</b><i><em style={{width:r.energy+'%'}}/></i></span><span>₩{r.money.toLocaleString('ko-KR')}</span><span>명성 {r.fame}</span>{r.injury&&<span className="console-injury">{r.injury.severity==='major'?'중상':'경상'} · {r.injury.weeks}주</span>}</div>}
-      {screen==='home'&&!busyFlow&&!replay&&(r?<div className="console-home-actions">
-        {r.phase==='retired'?<><button className="console-primary" onClick={()=>{setEndingId(r.id);go('ending');}}>은퇴식 보기 <Trophy size={18}/></button><button onClick={()=>go('new')}>새 선수 육성</button></>:<><button className="console-primary" onClick={()=>go('training')}><Footprints size={22}/><span><strong>{r.settings.mode==='auto'?'자동 육성 설정':r.plan?'이번 주 수행 중':'이번 주 행동 선택'}</strong><small>{r.settings.mode==='auto'?'설정한 전략으로 진행 중':r.plan?ACTION_NAMES[r.plan.action]+' 수행 중':'훈련·휴식·치료 선택 후 주차 시작'}</small></span><ArrowRight size={18}/></button>{r.settings.mode==='manual'&&!r.plan&&<><button onClick={()=>{go('training');setInitialAction('rest');}}>휴식</button><button disabled={!r.injury} onClick={()=>{go('training');setInitialAction('hospital');}}>치료</button></>}<button onClick={()=>go('routine')}><ListOrdered size={18}/> 라인</button><button onClick={()=>go('profile')}><UserRound size={18}/> 선수</button></>}
-        {last&&<button onClick={()=>openReplay(last)}>최근 경기 <PlayIcon/></button>}
-        {extras(r).lastTraining&&<p className="console-last-training">{lineTerms(extras(r).lastTraining!.text)}</p>}
-      </div>:<div className="console-welcome"><span>THE LONGBOARD CAREER SIM</span><h1>LONGBOARD<br/><em>LIFE.</em></h1><p>강변의 첫 푸시부터 마지막 페스티벌까지.<br/>나만의 8년 커리어를 시작하세요.</p><button className="console-primary" onClick={()=>go('new')}>새 라이더 등록 <ArrowRight size={20}/></button><small>게임 내 1주 = 30초 · x2로 15초</small></div>)}
+      {r&&<StatusGauges r={r}/>}
+      {screen==='home'&&!busyFlow&&!replay&&(r?<>
+        {r.phase==='retired'?<div className="console-home-actions"><button className="console-primary" onClick={()=>{setEndingId(r.id);go('ending');}}>은퇴식 보기 <Trophy size={18}/></button><button onClick={()=>go('new')}>새 선수 육성</button></div>:<>
+          {!r.plan&&<WeeklyChoices key={r.id+':'+r.year+':'+r.week+':'+(target??'weekly')} r={r} send={game.send} saving={game.saving} target={target} onSettings={()=>go('training')}/>}
+          <div className="console-home-shortcuts"><button onClick={()=>go('routine')}><ListOrdered size={17}/> 라인</button><button onClick={()=>go('profile')}><UserRound size={17}/> 선수</button>{last&&<button onClick={()=>openReplay(last)}>최근 경기 <PlayIcon/></button>}</div>
+        </>}
+      </>:<div className="console-welcome"><span>THE LONGBOARD CAREER SIM</span><h1>LONGBOARD<br/><em>LIFE.</em></h1><p>강변의 첫 푸시부터 마지막 페스티벌까지.<br/>나만의 8년 커리어를 시작하세요.</p><button className="console-primary" onClick={()=>go('new')}>새 라이더 등록 <ArrowRight size={20}/></button><small>행동 선택 → 예상 변화 확인 → 약 4초 수행</small></div>)}
       {content&&screen!=='home'&&<section className={'console-panel '+(screen==='journal'?'console-panel-journal':'')} aria-label={names[screen]}>
         <header><button onClick={playHome} aria-label="게임 화면으로 돌아가기"><ArrowLeft size={18}/></button><h1>{names[screen]}</h1><button onClick={playHome} aria-label="메뉴 닫기"><X size={18}/></button></header>
         <div className="console-panel-body" ref={panel} tabIndex={-1} key={screen}>{content}</div>

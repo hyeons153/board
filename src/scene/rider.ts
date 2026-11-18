@@ -44,7 +44,7 @@ function deck(c:Ctx,look:Look,b:Pose['board']){
   poly(c,'#f5eed3',[edge(27,-3),edge(30,-2),edge(30,2),edge(27,3)]);
 }
 function leg(c:Ctx,look:Look,hip:Point,foot:Point,index:number){
-  const knee=joint(hip,{x:foot.x,y:foot.y-4},15,index===0?.7:-.5);
+  const knee=joint(hip,{x:foot.x,y:foot.y-4},15,index===0?.1:-.08);
   const jeans=PANTS[look.pants??0],shoe=SHOES[look.shoes??0];
   for(const [a,b] of [[hip,knee],[knee,{x:foot.x,y:foot.y-4}]]){limb(c,INK,a,b,10);limb(c,jeans,a,b,7);}
   box(c,'#ffffff20',knee.x-1,knee.y-2,2,5);
@@ -92,18 +92,19 @@ export function paintRider(c:Ctx,look:Look,motion:Motion,time:number,technique?:
   }
   const bodyWidth=16+Math.abs(Math.cos(pose.bodyYaw))*7;
   const shoulder={x:pose.hip.x+pose.lean,y:pose.hip.y-25},headY=shoulder.y-16;
-  const hips=[{x:pose.hip.x-6*Math.cos(pose.bodyYaw),y:pose.hip.y},{x:pose.hip.x+6*Math.cos(pose.bodyYaw),y:pose.hip.y}];
+  const hips=[{x:pose.hip.x-8*Math.cos(pose.bodyYaw),y:pose.hip.y},{x:pose.hip.x+8*Math.cos(pose.bodyYaw),y:pose.hip.y}];
   // Draw the farther leg first so crossed steps retain readable foot order.
   const order=pose.feet[0].y<pose.feet[1].y?[0,1]:[1,0];
   for(const i of order)leg(c,look,hips[i],pose.feet[i],i);
-  const armY=pose.cheer?shoulder.y-16:shoulder.y+10-pose.arms;
-  arm(c,skin,shirt,{x:shoulder.x-bodyWidth/2,y:shoulder.y+1},{x:shoulder.x-27,y:armY},-.6);
+  const spread=pose.cheer?27:15+Math.max(0,pose.arms)*.9;
+  const armY=pose.cheer?shoulder.y-16:shoulder.y+23-Math.max(0,pose.arms)*1.5;
+  arm(c,skin,shirt,{x:shoulder.x-bodyWidth/2,y:shoulder.y+1},{x:shoulder.x-spread,y:armY},-.45);
   const torso=[{x:shoulder.x-bodyWidth/2,y:shoulder.y-3},{x:shoulder.x+bodyWidth/2,y:shoulder.y-3},{x:pose.hip.x+11,y:pose.hip.y+1},{x:pose.hip.x-11,y:pose.hip.y+1}];
   poly(c,INK,torso);poly(c,shirt,torso.map((p,i)=>({x:p.x+(i===0||i===3?2:-2),y:p.y+(i<2?1:-2)})));
   box(c,'#ffffff30',shoulder.x-bodyWidth/2+3,shoulder.y,6,2);box(c,'#0000001c',pose.hip.x+6,pose.hip.y-13,3,12);
   if(Math.cos(pose.bodyYaw)>.25)box(c,'#f4e8be',shoulder.x-2,shoulder.y+5,6,3);
   else if(Math.cos(pose.bodyYaw)<-.25)box(c,'#ffffff22',shoulder.x-6,shoulder.y+6,12,2);
-  arm(c,skin,shirt,{x:shoulder.x+bodyWidth/2,y:shoulder.y+1},{x:shoulder.x+27,y:armY+2},.6);
+  arm(c,skin,shirt,{x:shoulder.x+bodyWidth/2,y:shoulder.y+1},{x:shoulder.x+spread,y:armY+2},.45);
   head(c,look,shoulder.x,headY,pose.bodyYaw);
   if(pose.cheer)for(let i=0;i<8;i++){
     const angle=i/8*Math.PI*2+time/1400;box(c,['#ffe795','#c3ffc5','#ffad91'][i%3],shoulder.x+Math.cos(angle)*31,headY+Math.sin(angle)*21,2,2);

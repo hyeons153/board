@@ -164,12 +164,14 @@ export function techniquePose(id:string,progress:number,outcome:Outcome='clean',
 
 export function basicPose(motion:Motion,time:number):Pose {
   const pose=base(),t=time/1000,cycle=Math.sin(t*5);
+  pose.feet=[{x:53,y:100},{x:76,y:100}];pose.hip.y=73;pose.bodyYaw=.25;pose.lean=1;
   if(motion==='rest'||motion==='lose'){pose.hip.y+=Math.sin(t*2)*.6+(motion==='lose'?5:0);return pose;}
   if(motion==='fall'){pose.fall=1;return pose;}
   if(['win','great','success'].includes(motion)){pose.cheer=true;pose.arms=motion==='success'?9:23;pose.hip.y-=Math.abs(cycle)*2;return pose;}
   if(motion==='carve'){pose.board.yaw=cycle*.22;pose.hip.x+=cycle*7;pose.lean=-cycle*7;}
-  if(motion==='ride'||motion==='accelerate'||motion==='mount'){
-    const push=Math.max(0,cycle);pose.feet[0]={x:48-push*17,y:100+push*9};pose.lean=push*4;pose.hip.y+=push*2;
+  if(motion==='ride'){pose.hip.y+=Math.sin(t*2)*.7;pose.lean=1+Math.sin(t*2)*.6;}
+  if(motion==='accelerate'||motion==='mount'){
+    const push=Math.max(0,cycle);pose.feet[0]={x:53-push*19,y:100+push*9};pose.lean=push*4;pose.hip.y+=push*2;pose.arms=push*4;
   }
   if(motion==='brake'){pose.feet[0]={x:39,y:109};pose.lean=-4;pose.arms=5;}
   if(motion==='land'){pose.crouch=(cycle+1)*3;pose.hip.y+=pose.crouch;}

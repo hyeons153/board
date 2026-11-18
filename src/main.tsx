@@ -5,5 +5,6 @@ import './career-club.css';
 import './online.css';
 import './in-game.css';
 import './console.css';
+import './weekly.css';
 
 createRoot(document.getElementById('root')!).render(<App />);

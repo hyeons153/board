@@ -12,12 +12,14 @@ export function validRoutine(rider:Pick<Rider,'skills'>,discipline:Discipline,id
   return routineTime(ids)<=RULES.runSeconds && ids.every(id=>{const s=SKILL[id];return !!s&&allowed(s,discipline)&&learned(rider.skills,id);});
 }
 type Profile = Pick<Rider,'stats'|'energy'|'skills'|'injury'|'extras'>;
-export function chance(profile:Profile,s:Skill,energy=profile.energy) {
+function legacyChance(profile:Profile,s:Skill,energy:number) {
   const c=RULES.success;
   const equipment = s.family==='trick' ? gearBonuses(profile).trickLand : 0;
   const injury = profile.injury?.severity==='major' ? .18 : profile.injury ? .08 : 0;
   return clamp(c.base+(profile.skills[s.id]?.mastery??0)*c.mastery+profile.stats.balance*c.balance+energy*c.energy-(s.difficulty-1)*c.difficulty-s.risk-injury+equipment,c.min,c.max);
 }
+// Competition execution depends on skill and equipment, regardless of current stamina.
+export const chance=(profile:Profile,s:Skill)=>legacyChance(profile,s,100);
 const affinity = (a:Skill,b:Skill) => a.id===b.id ? -.17 : (a.tags.some(t=>b.tags.includes(t)) ? RULES.run.danceAffinity : 0)+(a.family!==b.family ? RULES.run.mixedAffinity : 0);
 export function generateRoutine(p:Profile,d:Discipline,style:RoutineStyle,signature?:string):string[] {
   const pool=SKILLS.filter(s=>allowed(s,d)&&learned(p.skills,s.id));
@@ -42,7 +44,7 @@ export function generateRoutine(p:Profile,d:Discipline,style:RoutineStyle,signat
   return ids;
 }
 
-export function simulateRun(p:Profile, discipline:Discipline, ids:string[], rng:()=>number):Run {
+export function simulateRun(p:Profile, discipline:Discipline, ids:string[], rng:()=>number,rules:1|2=2):Run {
   if(!validRoutine(p,discipline,ids)) throw new Error('유효하지 않은 라인입니다.');
   let at=0, execution=0, combo=0, comboRaw=0, totalLinks=0, linkedCount=0, previous:Skill|undefined, successes=0;
   const seen=new Map<string,number>(), variety=new Set<string>(), usedFamilies=new Set<string>();
@@ -53,9 +55,9 @@ export function simulateRun(p:Profile, discipline:Discipline, ids:string[], rng:
     const start=at+(log.length?RULES.transition:0);
     const end=start+move.seconds;
     if (end>RULES.runSeconds) break;
-    const remainingEnergy=Math.max(0,p.energy-start/RULES.runSeconds*RULES.entryCost[discipline]*.75);
+    const remainingEnergy=rules===1?Math.max(0,p.energy-start/RULES.runSeconds*RULES.entryCost[discipline]*.75):100;
     const trickChain=previous?.family==='trick' && move.family==='trick';
-    const probability=chance(p,move,remainingEnergy)-(trickChain ? RULES.run.trickChainSuccess : 0);
+    const probability=(rules===1?legacyChance(p,move,remainingEnergy):chance(p,move))-(trickChain ? RULES.run.trickChainSuccess : 0);
     const value=rng();
     const outcome:Outcome=value>=probability?'miss':value<probability*.19?'great':value<probability*.75?'clean':'rough';
     let linked:boolean|null=null;
@@ -92,7 +94,7 @@ export function simulateRun(p:Profile, discipline:Discipline, ids:string[], rng:
     link:round(linkScore),
     combo:round(discipline==='freestyle'?(linkScore*.47+comboScore*.53)*mixed:comboScore),
     carve:round(clamp((30+p.stats.carve*.7+bonus.carve)*coverage*(.35+.65*finish))),
-    speed:round(clamp((30+p.stats.speed*.7+bonus.speed)*coverage*(.35+.65*finish)*(.65+.0035*p.energy))),
+    speed:round(clamp((30+p.stats.speed*.7+bonus.speed)*coverage*(.35+.65*finish)*(rules===1?.65+.0035*p.energy:1))),
   };
   const weights=Object.entries(RULES.scoreWeights[discipline]) as [keyof typeof partsAll,number][];
   return { score:round(weights.reduce((s,[part,weight])=>s+partsAll[part]*weight/100,0)),parts:Object.fromEntries(weights.map(([part])=>[part,partsAll[part]])),log };
@@ -143,7 +145,7 @@ export function simulateMeet(rider:Rider,meet:Meet,entries:Discipline[],official
     const place=standings.find(x=>x.id==='player')!.place;
     energy=Math.max(0,energy-RULES.entryCost[d]+fatigue);
     const prize=Math.round(RULES.prizes[Math.min(place-1,5)]*(meet.major?RULES.majorMultiplier:1));
-    const proof=official&&routine?structuredClone({version:RANKING_VERSION,seed:rider.seed,routine,stats:p.stats,energy:p.energy,
+    const proof=official&&routine?structuredClone({version:RANKING_VERSION,rules:2 as const,seed:rider.seed,routine,stats:p.stats,energy:p.energy,
       injury:p.injury,skills:p.skills,gear:p.extras?{inventory:p.extras.inventory,equipped:p.extras.equipped}:undefined}):undefined;
     results.push({
       discipline:d,run,standings,points:Math.round(RULES.places[Math.min(place-1,5)]*(meet.major?RULES.majorMultiplier:1)),

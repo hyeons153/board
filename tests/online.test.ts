@@ -10,6 +10,9 @@ import { blankSave } from '../server/clock';
 import { sessionHash } from '../server/online';
 import { publicationFor, verifiedResult } from '../server/ranking';
 import { command, newRider, processWeek } from '../src/game/career';
+import { simulateRun } from '../src/game/competition';
+import { seeded } from '../src/game/random';
+import { RULES } from '../src/game/data';
 import { CALENDAR, DEFAULT_LOOK, SKILLS } from '../src/game/data';
 import { chooseEnding } from '../src/game/legacy';
 import { DISCIPLINES, type Career, type GameAction, type View } from '../src/game/types';
@@ -211,4 +214,21 @@ test('ending precedence and auto pre-meet pause keep retirement and rewards sepa
   assert.equal(chooseEnding(archive).kind,'veteran');
   for(const skill of SKILLS) archive.skills[skill.id]={study:100,mastery:95};
   assert.equal(chooseEnding(archive).kind,'technician');
+});
+
+test('previous competition proofs replay under their original stamina rules',()=>{
+  const rider=newRider(randomUUID(),517,'Legacy',DEFAULT_LOOK),career:Career={rider,hall:[]};
+  rider.week=7;rider.phase='meet';rider.energy=0;
+  command(career,{type:'entry',disciplines:['dance']},()=>({id:randomUUID(),seed:517}),true);
+  command(career,{type:'retire'},()=>({id:randomUUID(),seed:517}),true);
+  const archive=career.hall[0],meet=archive.records[0],result=meet.results[0],proof=result.proof!;
+  assert.equal(proof.rules,2);assert.ok(verifiedResult(archive,meet,result));
+  delete proof.rules;
+  result.run=simulateRun({stats:proof.stats,energy:proof.energy,injury:proof.injury,skills:proof.skills},'dance',proof.routine,seeded(proof.seed,meet.year,meet.id,'dance','player'),1);
+  result.standings.find(row=>row.id==='player')!.score=result.run.score;
+  result.standings.sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id)).forEach((row,i)=>{row.place=i+1;});
+  const place=result.standings.find(row=>row.id==='player')!.place;
+  result.points=RULES.places[Math.min(place-1,5)];
+  assert.ok(verifiedResult(archive,meet,result),'Old records must remain verifiable');
+  proof.rules=2;assert.equal(verifiedResult(archive,meet,result),false);
 });

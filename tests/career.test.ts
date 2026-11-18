@@ -4,6 +4,7 @@ import { CALENDAR, DEFAULT_LOOK, RULES, SKILL, SKILLS } from '../src/game/data';
 import { command, GameError, newRider, processWeek } from '../src/game/career';
 import { chance, generateRoutine, learned, routineTime, simulateMeet, simulateRun, validRoutine } from '../src/game/competition';
 import { ECONOMY, equippedLook, extras, playerPlace, SPONSOR } from '../src/game/economy';
+import { previewTraining, trainingSuccess } from '../src/game/training';
 import { pickEvent } from '../src/game/events';
 import { seeded } from '../src/game/random';
 import { advance, blankSave, remaining } from '../server/clock';
@@ -49,7 +50,7 @@ test('severe injury restricts training and remains treatable even with no money'
   assert.ok(r.energy>21);
 });
 
-test('three disciplines have reproducible bounded runs, and repeats, failed landings, and fatigue matter',()=>{
+test('three disciplines have reproducible bounded runs, and repeats, failed landings matter without stamina penalties',()=>{
   const r=career().rider!;
   assert.equal(SKILLS.filter(s=>s.family==='dance').length,16);
   assert.equal(SKILLS.filter(s=>s.family==='trick').length,13);
@@ -68,7 +69,7 @@ test('three disciplines have reproducible bounded runs, and repeats, failed land
   assert.equal(simulateRun(r,'freestyle',mixed,()=>.99).score<15,true);
   assert.throws(()=>simulateRun(r,'dance',['shuvit'],()=>0));
   assert.throws(()=>simulateRun(r,'dance',Array<string>(16).fill('peter-pan'),()=>0));
-  assert.ok(simulateRun(r,'freestyle',mixed,()=>.72).score>simulateRun({...r,energy:0},'freestyle',mixed,()=>.72).score);
+  assert.deepEqual(simulateRun(r,'freestyle',mixed,()=>.72),simulateRun({...r,energy:0},'freestyle',mixed,()=>.72));
 });
 
 test('eight consecutive seasons yield 48 distinct meets, promotion, resets, and one immutable archive',()=>{
@@ -98,153 +99,6 @@ test('eight consecutive seasons yield 48 distinct meets, promotion, resets, and 
   assert.equal(c.hall[0].name,'리버');
   command(c,{type:'retire'},identity);
   assert.equal(c.hall[1].reason,'early');
-});
-
-test('open pages share one clock; a new page cannot claim elapsed time while all pages were closed',()=>{
-  const week=1000;
-  let save=advance(blankSave(),{type:'create',name:'Clock',look:DEFAULT_LOOK},'first',5000,week,identity);
-  save=advance(save,{type:'settings',settings:{mode:'auto',strategy:'balanced',intensity:'normal',entries:[]}},'first',5000,week,identity);
-  save=advance(save,{type:'pulse'},'second',5500,week,identity);
-  save=advance(save,{type:'pulse'},'first',5800,week,identity);
-  assert.equal(remaining(save,week),200);
-  save=advance(save,{type:'pulse'},'second',6000,week,identity);
-  save=advance(save,{type:'pulse'},'first',6000,week,identity);
-  assert.equal(save.career.rider?.week,2);
-  assert.equal(remaining(save,week),1000);
-  save=advance(save,{type:'pulse'},'third-new-page',100_000,week,identity);
-  assert.equal(save.career.rider?.week,2);
-  save=advance(save,{type:'pulse'},'third-new-page',104_500,week,identity);
-  assert.equal(save.career.rider?.week,6);
-  assert.equal(remaining(save,week),500);
-});
-
-
-test('weeks take 30 seconds in manual and auto mode regardless of a retired speed preference',()=>{
-  assert.equal(RULES.weekMs,30000);
-  for(const auto of [false,true]){
-    let save=advance(blankSave(),{type:'create',name:'Thirty seconds',look:DEFAULT_LOOK},'first',0,RULES.weekMs,identity);
-    Object.assign(save.clock,{speed:8});
-    save=advance(save,auto
-      ?{type:'settings',settings:{mode:'auto',strategy:'balanced',intensity:'safe',entries:[]}}
-      :{type:'plan',plan:plan('speed')},'first',0,RULES.weekMs,identity);
-    assert.equal('speed' in save.clock,false);
-    save=advance(save,{type:'pulse'},'first',29999,RULES.weekMs,identity);
-    assert.equal(save.career.rider!.week,1);
-    assert.equal(save.career.rider!.phase,'plan');
-    assert.equal(remaining(save,RULES.weekMs),1);
-    save=advance(save,{type:'pulse'},'first',30000,RULES.weekMs,identity);
-    assert.equal(save.career.rider!.phase,auto?'plan':'event');
-    assert.equal(save.career.rider!.week,auto?2:1);
-    if(!auto){
-      const paused=structuredClone(save.career);
-      save=advance(save,{type:'pulse'},'first',300000,RULES.weekMs,identity);
-      assert.deepEqual(save.career,paused);
-    }
-  }
-});
-
-test('the x2 toggle preserves progress, pauses and normal speed when turned off',()=>{
-  for(const auto of [false,true]){
-    let save=advance(blankSave(),{type:'create',name:'Toggle',look:DEFAULT_LOOK},'first',0,RULES.weekMs,identity);
-    save=advance(save,auto
-      ?{type:'settings',settings:{mode:'auto',strategy:'balanced',intensity:'safe',entries:[]}}
-      :{type:'plan',plan:plan('speed')},'first',0,RULES.weekMs,identity);
-    save=advance(save,{type:'fast-forward',enabled:true},'first',10000,RULES.weekMs,identity);
-    assert.equal(remaining(save,RULES.weekMs),10000);
-    assert.equal(save.career.rider!.week,1);
-    save=advance(save,{type:'fast-forward',enabled:false},'first',15000,RULES.weekMs,identity);
-    assert.equal(remaining(save,RULES.weekMs),10000);
-    save=advance(save,{type:'fast-forward',enabled:true},'first',15000,RULES.weekMs,identity);
-    assert.equal(remaining(save,RULES.weekMs),5000);
-    save=advance(save,{type:'pulse'},'first',19999,RULES.weekMs,identity);
-    assert.equal(save.career.rider!.phase,'plan');
-    save=advance(save,{type:'pulse'},'first',20000,RULES.weekMs,identity);
-    assert.equal(save.career.rider!.phase,auto?'plan':'event');
-    assert.equal(save.career.rider!.week,auto?2:1);
-    if(!auto){
-      const paused=structuredClone(save.career);
-      save=advance(save,{type:'pulse'},'first',100000,RULES.weekMs,identity);
-      assert.deepEqual(save.career,paused);
-    }
-  }
-});
-
-test('a completed meet holds the career until its exact result is acknowledged, without duplicate rewards or catch-up',()=>{
-  let save=advance(blankSave(),{type:'create',name:'In game',look:DEFAULT_LOOK},'first',0,RULES.weekMs,identity);
-  save.career.rider!.week=7;save.career.rider!.phase='meet';
-  save=advance(save,{type:'entry',disciplines:['dance','trick']},'first',1000,RULES.weekMs,identity,true);
-  const key=save.clock.pendingMeet!;
-  assert.ok(key);
-  const completed=structuredClone(save.career);
-  assert.equal(remaining(save,RULES.weekMs),0);
-  assert.equal(advance(save,{type:'pulse'},'other-tab',600000,RULES.weekMs,identity),save);
-  assert.throws(()=>advance(save,{type:'continue-meet',record:'wrong'},'first',600000,RULES.weekMs,identity),GameError);
-  assert.throws(()=>advance(save,{type:'entry',disciplines:['dance']},'first',600000,RULES.weekMs,identity),GameError);
-  save=advance(JSON.parse(JSON.stringify(save)),{type:'continue-meet',record:key},'new-tab',600000,RULES.weekMs,identity);
-  assert.deepEqual(save.career,completed);
-  assert.equal(save.clock.pendingMeet,undefined);
-  assert.equal(remaining(save,RULES.weekMs),0,'Manual careers wait for the next weekly choice');
-  assert.throws(()=>advance(save,{type:'continue-meet',record:key},'new-tab',600001,RULES.weekMs,identity),GameError);
-});
-
-test('auto career catch-up stops at the first meet and the final festival remains viewable after retirement',()=>{
-  for(const final of [false,true]){
-    let save=advance(blankSave(),{type:'create',name:'Auto stage',look:DEFAULT_LOOK},'first',0,RULES.weekMs,identity);
-    const r=save.career.rider!;
-    r.year=final?8:1;r.week=final?52:7;
-    r.settings={mode:'auto',strategy:'balanced',intensity:'safe',entries:['dance']};
-    save=advance(save,{type:'pulse'},'first',300000,RULES.weekMs,identity,true);
-    assert.ok(save.clock.pendingMeet);
-    assert.equal(save.career.rider!.records.length,1);
-    assert.equal(save.career.rider!.phase,final?'retired':'plan');
-    const paused=structuredClone(save);
-    save=advance(save,{type:'pulse'},'first',900000,RULES.weekMs,identity);
-    assert.deepEqual(save,paused);
-    save=advance(save,{type:'continue-meet',record:save.clock.pendingMeet!},'first',900000,RULES.weekMs,identity);
-    assert.equal(save.clock.pendingMeet,undefined);
-    assert.equal(save.career.rider!.records.length,1);
-  }
-});
-
-test('manual weeks start when an action is chosen; idle time cannot complete it and results wait for acknowledgement',()=>{
-  let save=advance(blankSave(),{type:'create',name:'Weekly choice',look:DEFAULT_LOOK},'first',0,RULES.weekMs,identity);
-  save=advance(save,{type:'pulse'},'first',300000,RULES.weekMs,identity);
-  assert.equal(save.career.rider!.week,1);assert.equal(save.clock.credit,0);assert.equal(remaining(save,RULES.weekMs),0);
-  save=advance(save,{type:'plan',plan:plan('speed')},'first',360000,RULES.weekMs,identity);
-  assert.equal(remaining(save,RULES.weekMs),30000);
-  assert.throws(()=>advance(save,{type:'plan',plan:plan('rest')},'first',370000,RULES.weekMs,identity),GameError);
-  save=advance(save,{type:'pulse'},'first',389999,RULES.weekMs,identity);
-  assert.equal(save.career.rider!.phase,'plan');
-  save=advance(save,{type:'pulse'},'first',390000,RULES.weekMs,identity);
-  assert.ok(save.clock.pendingTraining);
-  const snapshot=structuredClone(save);
-  save=advance(save,{type:'pulse'},'first',690000,RULES.weekMs,identity);
-  assert.deepEqual(save,snapshot);
-  save=advance(save,{type:'continue-training',record:save.clock.pendingTraining!},'first',690000,RULES.weekMs,identity);
-  save=advance(save,{type:'event',index:0},'first',690000,RULES.weekMs,identity);
-  assert.equal(save.career.rider!.week,2);assert.equal(remaining(save,RULES.weekMs),0);
-});
-
-test('automatic play commits each weekly action up front and chooses events and competition entries without manual gates',()=>{
-  let save=advance(blankSave(),{type:'create',name:'Fully automatic',look:DEFAULT_LOOK},'first',0,RULES.weekMs,identity);
-  const settings={mode:'auto' as const,strategy:'balanced' as const,intensity:'safe' as const,entries:[...DISCIPLINES],pauseStory:true,pauseMeet:true,pauseInjury:true};
-  save=advance(save,{type:'settings',settings},'first',0,RULES.weekMs,identity);
-  const chosen=structuredClone(save.career.rider!.plan);
-  assert.ok(chosen);
-  save=advance(save,{type:'settings',settings:{...settings,strategy:'trick',intensity:'focus'}},'first',15000,RULES.weekMs,identity);
-  assert.deepEqual(save.career.rider!.plan,chosen);
-  save=advance(save,{type:'pulse'},'first',30000,RULES.weekMs,identity);
-  assert.deepEqual(save.career.rider!.lastPlan,chosen);
-  assert.equal(save.career.rider!.week,2);
-  assert.equal(save.clock.pendingTraining,undefined);
-  assert.ok(Object.keys(save.career.rider!.events).length>0);
-  save=advance(save,{type:'pulse'},'first',300000,RULES.weekMs,identity);
-  assert.ok(save.clock.pendingMeet);
-  assert.equal(save.career.rider!.records.length,1);
-  assert.equal(save.career.rider!.settings.pauseMeet,false);
-  save=advance(save,{type:'continue-meet',record:save.clock.pendingMeet!},'first',300000,RULES.weekMs,identity);
-  assert.ok(save.career.rider!.plan);
-  assert.ok(remaining(save,RULES.weekMs)>0);
 });
 
 test('equipment, lesson fees, and locked spots are enforced by the career command',()=>{
@@ -320,4 +174,83 @@ test('sponsors pay once per season, award equipment and pay a recorded podium bo
   assert.equal(r.money,after+brand.support+ECONOMY.podiumSeason[0]);
   assert.ok(extras(r).timeline.some(item=>item.title==='시즌 순위 보상'));
   assert.equal(extras(r).inventory.filter(item=>item===brand.gift).length,1);
+});
+
+test('each confirmed action takes four seconds, survives reload and awards one result before any event',()=>{
+  const week=RULES.weekMs;assert.equal(week,4000);
+  let save=advance(blankSave(),{type:'create',name:'Four seconds',look:DEFAULT_LOOK},'first',0,week,identity);
+  save=advance(save,{type:'pulse'},'first',300000,week,identity);
+  assert.equal(save.career.rider!.week,1);assert.equal(remaining(save,week,300000),0);
+  save=advance(save,{type:'plan',plan:plan('speed')},'first',300000,week,identity);
+  assert.equal(remaining(save,week,300000),4000);
+  save=advance(save,{type:'fast-forward',enabled:true},'other',301000,week,identity);
+  assert.equal(remaining(save,week,301000),3000);
+  save=advance(save,{type:'pulse'},'other',303999,week,identity);
+  assert.equal(save.career.rider!.stats.speed,18);
+  assert.throws(()=>advance(save,{type:'plan',plan:plan('rest')},'other',303999,week,identity),GameError);
+  save=advance(JSON.parse(JSON.stringify(save)),{type:'pulse'},'reopened',304000,week,identity);
+  assert.ok(save.clock.pendingTraining);assert.ok(save.career.rider!.stats.speed>18);
+  const snapshot=structuredClone(save);
+  assert.deepEqual(advance(save,{type:'pulse'},'reopened',900000,week,identity),snapshot);
+  const key=save.clock.pendingTraining!;
+  save=advance(save,{type:'continue-training',record:key},'first',900000,week,identity);
+  assert.throws(()=>advance(save,{type:'continue-training',record:key},'first',900001,week,identity),GameError);
+  save=advance(save,{type:'event',index:0},'first',900001,week,identity);
+  assert.equal(save.career.rider!.week,2);assert.equal(remaining(save,week,900001),0);
+});
+
+test('automatic play performs one action at a time and waits for its result and tournament before the next week',()=>{
+  const week=RULES.weekMs;
+  for(const final of [false,true]){
+    let save=advance(blankSave(),{type:'create',name:'Automatic',look:DEFAULT_LOOK},'first',0,week,identity);
+    save.career.rider!.week=final?52:7;save.career.rider!.year=final?8:1;
+    save=advance(save,{type:'settings',settings:{mode:'auto',strategy:'balanced',intensity:'safe',entries:['dance','trick']}},'first',0,week,identity);
+    const selected=structuredClone(save.career.rider!.plan);assert.ok(selected);
+    save=advance(save,{type:'settings',settings:{...save.career.rider!.settings,strategy:'trick'}},'first',1000,week,identity);
+    assert.deepEqual(save.career.rider!.plan,selected);
+    save=advance(save,{type:'pulse'},'first',100000,week,identity,true);
+    assert.equal(save.career.rider!.records.length,1);assert.ok(save.clock.pendingTraining);assert.ok(save.clock.pendingMeet);
+    assert.equal(save.career.rider!.phase,final?'retired':'plan');
+    const snapshot=structuredClone(save);assert.deepEqual(advance(save,{type:'pulse'},'other',1000000,week,identity),snapshot);
+    save=advance(save,{type:'continue-training',record:save.clock.pendingTraining!},'first',1000000,week,identity);
+    assert.ok(save.clock.pendingMeet);assert.equal(save.career.rider!.plan,null);
+    save=advance(save,{type:'continue-meet',record:save.clock.pendingMeet!},'first',1000000,week,identity);
+    assert.equal(save.clock.pendingMeet,undefined);
+    assert.equal(remaining(save,week,1000000),final?0:4000);
+  }
+});
+
+test('zero stamina permits all competition entries without changing execution, links, score or automatic line choice',()=>{
+  const healthy=career().rider!,exhausted={...structuredClone(healthy),energy:0};
+  const full=simulateMeet(healthy,CALENDAR[0],[...DISCIPLINES]),empty=simulateMeet(exhausted,CALENDAR[0],[...DISCIPLINES]);
+  assert.equal(empty.results.length,3);
+  for(let i=0;i<3;i++){
+    assert.deepEqual(empty.results[i].run,full.results[i].run);
+    assert.deepEqual(empty.results[i].standings,full.results[i].standings);
+    assert.equal(empty.results[i].energy,0);
+  }
+  assert.ok(full.results[2].energy<full.results[0].energy);
+  const c:Career={rider:exhausted,hall:[]};exhausted.week=7;exhausted.phase='meet';
+  command(c,{type:'entry',disciplines:[...DISCIPLINES]},identity);assert.equal(exhausted.records[0].results.length,3);
+});
+
+test('training previews match recovery and successful stat gains while low stamina meaningfully increases failure',()=>{
+  const p:Plan={action:'speed',spot:'river',intensity:'normal'};
+  const r=career().rider!;
+  assert.ok(trainingSuccess({...r,energy:0},p)<.2);assert.ok(trainingSuccess({...r,energy:100},p)>.9);
+  let misses=0,successes=0;
+  for(let seed=1;seed<=80;seed++){
+    const c:Career={rider:newRider('preview-'+seed,seed,'Preview',DEFAULT_LOOK),hall:[]};
+    const rider=c.rider!;rider.week=3;rider.energy=seed<=40?0:100;
+    const preview=previewTraining(rider,p),before=rider.stats.speed;
+    command(c,{type:'plan',plan:p},identity);processWeek(c);
+    assert.equal(rider.energy,preview.energyAfter);
+    const gain=rider.stats.speed-before,estimate=preview.gains.speed!;
+    if(gain===0)misses++;else{successes++;assert.ok(gain>=estimate.min-.00001&&gain<=estimate.max+.00001);}
+    if(seed===40)assert.ok(misses>=25,'Most zero-stamina attempts must fail');
+  }
+  assert.ok(successes>=35);
+  const rest=previewTraining({...r,energy:80},{...p,action:'rest'});assert.equal(rest.energy,20);assert.equal(rest.energyAfter,100);
+  const hospital=previewTraining({...r,money:0,energy:0,injury:{severity:'major',weeks:3,treated:false}},{...p,action:'hospital'});
+  assert.equal(hospital.energy,24);assert.equal(hospital.money,0);
 });

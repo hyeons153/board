@@ -5,7 +5,6 @@ import type { Directory, Publication, PublicCard } from '../src/game/public';
 
 const base=new URL(process.argv[2]??'http://127.0.0.1:5185');
 const deployed=process.argv.includes('--deployed');
-const fastForward=process.argv.includes('--fast-forward');
 const competition=process.argv.includes('--competition');
 const local=['127.0.0.1','localhost','[::1]'].includes(base.hostname);
 if(!local&&!(deployed&&base.protocol==='https:'&&base.hostname.endsWith('.vercel.app')))
@@ -33,11 +32,11 @@ async function game(action:GameAction){
   return view;
 }
 async function waitForWeek(){
-  const deadline=Date.now()+(view?.weekMs??30000)+30000;
+  const deadline=Date.now()+(view?.weekMs??4000)+30000;
   while(Date.now()<deadline){
     await new Promise(resolve=>setTimeout(resolve,Math.min(view?.remainingMs??1000,2000)+120));
     await game({type:'pulse'});
-    if(view?.career.rider?.phase==='event') return;
+    if(view?.pendingTraining) return;
   }
   throw new Error('The training event did not arrive in the expected window.');
 }
@@ -58,30 +57,28 @@ async function run(){
   console.log('PASS application page and assets served');
   await load();
   assert.equal(view?.storage,'neon');
-  if(deployed) assert.equal(view!.weekMs,30000);
+  if(deployed) assert.equal(view!.weekMs,4000);
   assert.equal('speed' in view!,false);
   console.log('PASS /api/game -> Neon guest session');
   await game({type:'create',name:'Neon 연결 검증 라이더',look:{hair:1,skin:2,shirt:3,board:1,pants:1,shoes:2}});
-  if(fastForward){
-    const baseWeekMs=view!.weekMs;
-    await game({type:'fast-forward',enabled:true});
-    await load();
-    assert.equal(view!.fastForward,true);
-    assert.equal(view!.weekMs,baseWeekMs/2);
-    console.log('PASS x2 toggle -> half-length week -> durable reload');
-  }
+  await game({type:'routine',discipline:'dance',skills:['peter-pan']});
+  await load();assert.deepEqual(view!.career.rider!.routines.dance,['peter-pan']);
+  console.log('PASS saved line -> durable reload');
   const riderId=view!.career.rider!.id;
   await game({type:'plan',plan:{action:'speed',spot:'river',intensity:'safe'}});
+  assert.ok(view!.remainingMs>0&&view!.remainingMs<=view!.weekMs);
   await waitForWeek();
   assert.ok(view!.pendingTraining);
+  assert.equal(view!.career.rider!.lastPlan?.action,'speed');
+  assert.ok(view!.career.rider!.energy<100);
   await game({type:'continue-training',record:view!.pendingTraining!});
   await game({type:'event',index:0});
   assert.equal(view!.career.rider!.week,2);
-  assert.ok(view!.career.rider!.stats.speed>18);
+  assert.ok(view!.career.rider!.stats.speed>=18);
   await load();
   assert.equal(view!.career.rider!.id,riderId);
   assert.equal(view!.career.rider!.week,2);
-  console.log('PASS training -> event -> week 2 -> durable reload');
+  console.log('PASS four-second action -> result -> event -> week 2 -> durable reload');
   await request('?area=account',{type:'register',username,password});
   registered=true;
   await load();
@@ -97,10 +94,13 @@ async function run(){
     await game({type:'settings',settings:{mode:'auto',strategy:'balanced',intensity:'safe',entries:['dance','trick'],pauseMeet:true,pauseStory:false,pauseInjury:false}});
     const deadline=Date.now()+view!.weekMs*8+30000;
     while(Date.now()<deadline&&!view!.pendingMeet){
-      await new Promise(resolve=>setTimeout(resolve,2000));
+      if(view!.pendingTraining)await game({type:'continue-training',record:view!.pendingTraining!});
+      if(view!.pendingMeet)break;
+      await new Promise(resolve=>setTimeout(resolve,Math.min(4100,(view!.remainingMs||1000)+120)));
       await game({type:'pulse'});
     }
     assert.ok(view!.pendingMeet);
+    if(view!.pendingTraining)await game({type:'continue-training',record:view!.pendingTraining!});
     const key=view!.pendingMeet;
     assert.ok(key);
     const saved=JSON.stringify(view!.career);
@@ -111,13 +111,13 @@ async function run(){
     assert.equal(view!.remainingMs,0);
     await game({type:'continue-meet',record:key});
     assert.equal(view!.pendingMeet,undefined);
-    assert.equal(view!.remainingMs,view!.weekMs);
+    assert.ok(view!.remainingMs>0&&view!.remainingMs<=view!.weekMs);
     assert.equal(view!.career.rider!.records[0].results.length,2);
     console.log('PASS competition -> two disciplines -> durable result hold -> one acknowledgement -> fresh week');
   }
   await game({type:'retire'});
   assert.equal(view!.career.hall[0].id,riderId);
-  assert.equal(view!.fastForward,fastForward);
+  assert.equal(view!.fastForward,false);
   assert.equal(view!.career.hall[0].ending?.kind,'early');
   const published=await request<Publication>('?area=public',{type:'publish',archiveId:riderId,active:true});
   const ownerCookie=cookie;

@@ -1,7 +1,7 @@
 import type { Family, Meet, Skill, Spot, Action, Stats, Discipline, Division, Intensity, RoutineStyle, Strategy, Look, Progress } from './types.js';
 
 export const RULES = {
-  weekMs:30_000, weeks:52, years:8, runSeconds:60, transition:1, recovery:2.5,
+  weekMs:4_000, weeks:52, years:8, runSeconds:60, transition:1, recovery:2.5,
   statCap:100, statHeadroom:68, startStats:{ speed:18, carve:16, link:14, balance:20 } satisfies Stats,
   startMoney:120_000, weeklyAllowance:3_000, hospitalFee:32_000, safetyFund:15_000,
   statGrowth:2.8, secondaryGrowth:0.7, study:37, mastery:13, restEnergy:41,

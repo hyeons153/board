@@ -36,11 +36,11 @@ test('guest snapshots survive reopening storage; concurrent tournament submissio
     assert.equal(enabled.status,200);
     save=await enabled.json();
     const restored:View=await (await handler(new Request(base,{headers:{cookie}}))).json();
-    assert.equal(restored.fastForward,true);
-    assert.equal(restored.weekMs,500);
+    assert.equal(restored.fastForward,false);
+    assert.equal(restored.weekMs,1000);
     const heartbeat=await post({type:'pulse'},save.version);
     const heartbeatView:View=await heartbeat.json();
-    assert.ok(heartbeatView.version>save.version);
+    assert.ok(heartbeatView.version>=save.version);
     assert.equal(heartbeatView.stateVersion,save.stateVersion);
     const planAfterHeartbeat=await post({type:'plan',plan:{action:'speed',intensity:'safe',spot:'river'}},save.version,'http://127.0.0.1',save.stateVersion);
     assert.equal(planAfterHeartbeat.status,200,'Clock-only saves must not reject the player choice');
@@ -53,6 +53,7 @@ test('guest snapshots survive reopening storage; concurrent tournament submissio
     const row=await store.get(owner);
     const rider=row.snapshot.career.rider!;
     delete rider.extras; // A phase-one snapshot has no career extensions.
+    rider.plan=null;delete row.snapshot.clock.readyAt;
     rider.week=7;rider.phase='meet';
     const setup=await store.replace(owner,save.version,row.snapshot);
     assert.ok(setup);

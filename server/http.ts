@@ -67,8 +67,7 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
     const hall=career.hall.map(archive=>({...archive,records:records(archive.records,false)}));
     const rider=career.rider?{...career.rider,seed:0,records:records(career.rider.records,true)}:null;
     const parked=career.parked?.map(item=>({...item,seed:0,records:records(item.records,false)}));
-    const fastForward=row.snapshot.clock.fastForward===true;
-    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,stateVersion:row.snapshot.clock.stateVersion??0,remainingMs:remaining(row.snapshot,weekMs),weekMs:weekMs/(fastForward?2:1),fastForward,pendingMeet:row.snapshot.clock.pendingMeet,pendingTraining:row.snapshot.clock.pendingTraining,storage:store.kind,username,scope};
+    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,stateVersion:row.snapshot.clock.stateVersion??0,remainingMs:remaining(row.snapshot,weekMs),weekMs,fastForward:false,pendingMeet:row.snapshot.clock.pendingMeet,pendingTraining:row.snapshot.clock.pendingTraining,storage:store.kind,username,scope};
   };
   return async (request:Request):Promise<Response>=>{
     try{

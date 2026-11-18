@@ -6,6 +6,7 @@ import { RANKING_VERSION } from './public.js';
 import { RIVALS, SPOT_GATE, spotUnlocked } from './content.js';
 import { ECONOMY, eligibleSponsor, extras, freshExtras, gearBonuses, ITEM, maintainedSponsor, milestone, playerPlace, SPONSOR, supply } from './economy.js';
 import { clamp, round, seeded } from './random.js';
+import { statAfter, trainingFactor, trainingSuccess } from './training.js';
 import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family } from './types.js';
 
 export class GameError extends Error {}
@@ -28,8 +29,7 @@ function note(r:Rider,type:News['type'],text:string) {
 }
 function stat(r:Rider,name:typeof STATS[number],gain:number) {
   const current=r.stats[name];
-  const headroom=clamp((RULES.statCap-current)/RULES.statHeadroom,0,1);
-  r.stats[name]=round(clamp(current+gain*headroom,0,RULES.statCap));
+  r.stats[name]=statAfter(current,gain);
 }
 function trainSkill(r:Rider,id:string,gain:number,mastery:number) {
   const now=r.skills[id]??{study:0,mastery:0};
@@ -93,16 +93,11 @@ function train(r:Rider,p:Plan) {
     const energyBefore=r.energy;
     const practice=RULES.practice;
     const attempted=SKILL[p.skill??''];
-    const spotBoost=spot.boosted.some(a=>a===p.action)?spot.boost:1;
-    const advancedSpot=p.spot==='night'&&attempted&&attempted.difficulty>=3 ? 1.09 : 1;
-    const health=r.injury?.severity==='major' ? .55 : r.injury ? .78 : 1;
     const form=rng();
-    const missed=energyBefore<practice.lowEnergy&&form<practice.missChance;
+    const success=trainingSuccess(r,p);
+    const missed=form<1-success;
     const great=form>1-practice.greatChance&&!r.injury&&energyBefore>=55;
-    const lesson=p.lesson?practice.lesson:1;
-    const technique=['dance','trick','rehearsal'].includes(p.action);
-    const gear=technique ? 1+gearBonuses(r).practice : 1;
-    const factor=spotBoost*advancedSpot*intensity.gain*(.72+.0028*r.energy)*health*gear*lesson*(great ? 1.22 : .91+form*.19);
+    const factor=trainingFactor(r,p,form,great);
     const late=RULES.growth[Math.min(7,r.year-1)];
     if(p.lesson){
       r.money-=ECONOMY.lesson;
@@ -112,7 +107,7 @@ function train(r:Rider,p:Plan) {
     r.energy=round(clamp(r.energy-RULES.energy[p.action]*intensity.cost));
     let difficulty=attempted?.difficulty??1, mastery=attempted?(r.skills[attempted.id]?.mastery??12):60;
     if(missed){
-      names.push('체력이 부족해 동작을 끝내지 못했다.');
+      names.push(`훈련에 실패했다. 훈련 전 체력 ${round(energyBefore)} · 성공률 ${Math.round(success*100)}%. 능력치는 오르지 않았다.`);
     } else if (p.action==='dance'||p.action==='trick') {
       const candidates=SKILLS.filter(s=>s.family===p.action&&canStudy(r,s.id));
       const reachable=candidates.filter(s=>!learned(r.skills,s.id));
@@ -173,7 +168,7 @@ function autoPlan(r:Rider):Plan {
   if(r.injury) return {...base,intensity:'safe'};
   const soon=(nextMeet(r)?.week??54)-r.week;
   const need=r.settings.entries.reduce((s,d)=>s+RULES.entryCost[d],0);
-  const restAt=soon<=1&&need>0?Math.min(93,44+need):r.settings.intensity==='safe'?57:r.settings.intensity==='focus'?36:45;
+  const restAt=r.settings.intensity==='safe'?57:r.settings.intensity==='focus'?36:45;
   if(r.energy<restAt) return base;
   const rng=seeded(r.seed,r.year,r.week,'auto');
   const strategy=r.settings.strategy;

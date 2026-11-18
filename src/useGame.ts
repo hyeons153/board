@@ -97,7 +97,7 @@ export function useGame(){
     };
     document.addEventListener('visibilitychange',wake);
     window.addEventListener('pagehide',leave);
-    const ticker=window.setInterval(()=>setNow(performance.now()),1000);
+    const ticker=window.setInterval(()=>setNow(performance.now()),100);
     void tick();
     return ()=>{stopped=true;window.clearTimeout(timer);window.clearInterval(ticker);document.removeEventListener('visibilitychange',wake);window.removeEventListener('pagehide',leave);};
   },[active,training,view?.pendingTraining,view?.pendingMeet,view?.fastForward,send]);

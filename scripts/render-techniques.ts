@@ -27,3 +27,9 @@ paintRider(actor.getContext('2d') as unknown as CanvasRenderingContext2D,DEFAULT
 world.getContext('2d').drawImage(actor,203,52,ACTOR_WIDTH*.9,ACTOR_HEIGHT*.9);
 scene.getContext('2d').imageSmoothingEnabled=false;scene.getContext('2d').drawImage(world,0,0,scene.width,scene.height);
 const path=resolve(folder,'scene.png');await writeFile(path,scene.toBuffer('image/png'));console.log(path);
+const stance=createCanvas(WIDTH*3,HEIGHT*3),stanceWorld=createCanvas(WIDTH,HEIGHT);
+paintLandscape(stanceWorld.getContext('2d') as unknown as CanvasRenderingContext2D,'plaza');
+paintRider(actor.getContext('2d') as unknown as CanvasRenderingContext2D,DEFAULT_LOOK,'ride',0);
+stanceWorld.getContext('2d').drawImage(actor,236,52,ACTOR_WIDTH*.9,ACTOR_HEIGHT*.9);
+stance.getContext('2d').imageSmoothingEnabled=false;stance.getContext('2d').drawImage(stanceWorld,0,0,stance.width,stance.height);
+const stancePath=resolve(folder,'stance.png');await writeFile(stancePath,stance.toBuffer('image/png'));console.log(stancePath);

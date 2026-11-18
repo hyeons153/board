@@ -30,10 +30,10 @@ export function Skills({r,onTrain}:{r:Rider;onTrain:(id:string)=>void}){
         <div className="skill-track"><span>{known?'숙련도':available?'학습 진척도':'선행 기술 필요'}</span><b>{available?Math.floor(known?progress?.mastery??0:progress?.study??0)+'%':'—'}</b></div>
         <div className="bar"><span style={{width:`${known?progress?.mastery??0:progress?.study??0}%`}}/></div>
         <p className="skill-conditions">선행 기술 {s.requires.length ? s.requires.map(id=>SKILL[id]?.name).join(' + ') : '없음'}</p>
-        <p className="skill-conditions">{known?'현재':'습득 직후'} 예상 성공률 약 {Math.round(estimate*100)}%</p>
+        <p className="skill-conditions">{known?'현재':'습득 직후'} 대회 성공률 약 {Math.round(estimate*100)}%</p>
         <div className="skill-bottom">
           <button className="text-button" aria-expanded={preview===s.id} aria-label={s.name+' 미리보기'} onClick={()=>setPreview(preview===s.id?null:s.id)}><CirclePlay size={14}/> 미리보기</button>
-          {available&&r.phase!=='retired'&&r.settings.mode==='manual'&&<button className="text-button" onClick={()=>onTrain(s.id)}>연마 <ArrowUpRight size={13}/></button>}
+          {available&&r.phase==='plan'&&!r.plan&&r.settings.mode==='manual'&&<button className="text-button" onClick={()=>onTrain(s.id)}>연마 <ArrowUpRight size={13}/></button>}
         </div>
         {preview===s.id&&<TechniquePreview r={r} id={s.id}/>}
       </article>;
@@ -60,7 +60,7 @@ function RoutineEditor({discipline,r,send,saving}:{discipline:Discipline;r:Rider
   });
   return <>
     <div className="auto-routine"><span><WandSparkles size={16}/> 자동 생성</span><div className="pill-row">{STYLES.map(s=><button className="pill" disabled={disabled} key={s} onClick={()=>setIds(generateRoutine(r,discipline,s))}>{STYLE_NAMES[s]}</button>)}</div></div>
-    <div className="routine-grid"><div className="inner-card"><h3>습득 기술 <Tag>{pool.length}</Tag></h3><ul className="routine-pool">{pool.map(s=><li key={s.id}><span><b>{s.name}</b><small>{s.seconds}초 · 현재 성공률 약 {Math.round(chance(r,s)*100)}%</small></span><button className="icon-button" aria-label={s.name+' 추가'} disabled={disabled||total+s.seconds+(ids.length?1:0)>RULES.runSeconds} onClick={()=>setIds(old=>[...old,s.id])}><Plus size={16}/></button></li>)}</ul></div>
+    <div className="routine-grid"><div className="inner-card"><h3>습득 기술 <Tag>{pool.length}</Tag></h3><ul className="routine-pool">{pool.map(s=><li key={s.id}><span><b>{s.name}</b><small>{s.seconds}초 · 대회 성공률 약 {Math.round(chance(r,s)*100)}%</small></span><button className="icon-button" aria-label={s.name+' 추가'} disabled={disabled||total+s.seconds+(ids.length?1:0)>RULES.runSeconds} onClick={()=>setIds(old=>[...old,s.id])}><Plus size={16}/></button></li>)}</ul></div>
     <div className="inner-card"><h3>실행 순서 <Tag kind="lime"><Clock3 size={13}/> {total} / 60초</Tag></h3><div className="bar"><span style={{width:`${total/60*100}%`}}/></div>
       {ids.length===0?<p className="empty">저장한 라인이 없으면 대회에서 연계형 라인을 사용해요.</p>:<ol className="routine-pool">{ids.map((id,i)=><li key={id+'-'+i}><span><b><small>{String(i+1).padStart(2,'0')}.</small> {SKILL[id]?.name}</b></span><div className="routine-order"><button className="icon-button" disabled={disabled||i===0} aria-label={`${i+1}번째 기술 위로`} onClick={()=>move(i,-1)}><ArrowUp size={14}/></button><button className="icon-button" disabled={disabled||i===ids.length-1} aria-label={`${i+1}번째 기술 아래로`} onClick={()=>move(i,1)}><ArrowDown size={14}/></button><button className="icon-button" disabled={disabled} aria-label={`${i+1}번째 기술 삭제`} onClick={()=>setIds(old=>old.filter((_,j)=>j!==i))}><X size={15}/></button></div></li>)}</ol>}
     </div></div>
