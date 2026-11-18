@@ -1,5 +1,14 @@
 import test,{before} from 'node:test';
+import {advanceClock,type AnimationClock} from '../src/scene/playback';
 import assert from 'node:assert/strict';
+
+test('playback speed scales the animation clock continuously and pauses without a jump',()=>{
+  const clock:AnimationClock={elapsed:0};
+  assert.equal(advanceClock(clock,1000,1),0);assert.equal(advanceClock(clock,2000,1),1000);
+  assert.equal(advanceClock(clock,3000,2),3000);assert.equal(advanceClock(clock,3500,1),3500);
+  assert.equal(advanceClock(clock,5000,0),3500);assert.equal(advanceClock(clock,6000,2),5500);
+  assert.equal(advanceClock(clock,5990,2),5500);
+});
 import { createCanvas,loadImage } from '@napi-rs/canvas';
 import { BOARDS, DEFAULT_LOOK, HAIR_STYLES, LOOK_PRESETS, OUTFITS, SKILLS } from '../src/game/data';
 import { lineTerms, RIVALS } from '../src/game/content';

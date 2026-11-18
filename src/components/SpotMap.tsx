@@ -4,8 +4,6 @@ import { RIVALS, SPOT_GATE, spotUnlocked } from '../game/content';
 import { SPOTS, type Rider } from '../game/types';
 import type { Submit } from './Overview';
 
-const benefits={speed:['속도','연계'],carve:['카빙','연계'],link:['연계','밸런스'],balance:['밸런스','연계'],dance:['기술 학습·숙련','카빙'],trick:['기술 학습·숙련','밸런스'],rehearsal:['라인 숙련','연계'],rest:[],hospital:[]};
-
 export function SpotMap({r,send,saving,onClose}:{r:Rider;send:Submit;saving:boolean;onClose:()=>void}){
   return <section className="spot-map" aria-label="스팟 지도">
     <header><div><span>SPOT MAP</span><h2><MapPin size={18}/> 오늘 어디에서 탈까요?</h2></div><button onClick={onClose} aria-label="스팟 지도 닫기"><X size={18}/></button></header>
@@ -16,7 +14,6 @@ export function SpotMap({r,send,saving,onClose}:{r:Rider;send:Submit;saving:bool
         <div className="spot-map-scene" aria-hidden="true"><i/><span>{spot.en}</span>{r.spot===id&&<Check size={17}/>}</div>
         <strong>{locked&&<LockKeyhole size={13}/>} {spot.name}</strong><small>{spot.detail}</small>
         <span className="spot-map-bonus">{spot.boosted.map(action=>ACTION_NAMES[action]).join(' · ')} 성장 +{bonus}%</span>
-        <span className="spot-map-extra">잘 오르는 능력 · {[...new Set(spot.boosted.flatMap(action=>benefits[action]))].join(' · ')}</span>
         <span className="spot-map-visitor">자주 오는 라이더 · {visitors.map(npc=>npc.name+' ('+npc.style+')').join(' · ')}</span>
         {id==='night'&&<span className="spot-map-extra">고급 지정 기술 연마 추가 +9%</span>}
         {['studio','night','arena'].includes(id)&&<span className="spot-map-extra">지정 기술 개인 레슨 가능</span>}

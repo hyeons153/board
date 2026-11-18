@@ -120,7 +120,7 @@ async function run(){
   assert.equal(view!.career.rider!.extras!.equipmentVersion,2);
   console.log('PASS new equipment + accessory purchase and equip -> Neon version-2 inventory persisted');
   if(competition){
-    await game({type:'settings',settings:{mode:'auto',strategy:'balanced',entries:['dance','trick'],pauseMeet:true,pauseStory:false,pauseInjury:false}});
+    await game({type:'settings',settings:{mode:'auto',strategy:'balanced',entries:['trick'],pauseMeet:true,pauseStory:false,pauseInjury:false}});
     const deadline=Date.now()+(view!.weekMs+4000)*8+30000;
     while(Date.now()<deadline&&!view!.pendingMeet){
       if(view!.pendingTraining)await game({type:'continue-training',record:view!.pendingTraining!});
@@ -147,14 +147,14 @@ async function run(){
     await game({type:'continue-meet',record:key});
     assert.equal(view!.pendingMeet,undefined);
     assert.ok(view!.pendingChoice);
-    assert.equal(view!.career.rider!.records[0].results.length,2);
+    assert.equal(view!.career.rider!.records[0].results.length,1);
     const summary=view!.career.rider!.records[0];assert.equal(summary.detail,'summary');
     assert.deepEqual(summary.results[0].run.log,[]);assert.equal(summary.results[0].opponents,undefined);
     const replay=await request<MeetRecord>('?replay='+encodeURIComponent(summary.year+':'+summary.id));
     assert.equal(replay.detail,'full');assert.ok(replay.results[0].run.log.length>0);assert.equal(Object.keys(replay.results[0].opponents??{}).length,6);
     assert.equal(replay.results[0].run.score,summary.results[0].run.score);assert.equal(replay.results[0].proof,undefined);
     console.log('PASS compact past results -> on-demand complete player/NPC line -> no proof disclosure');
-    console.log('PASS competition -> two disciplines -> durable result hold -> one acknowledgement -> fresh week');
+    console.log('PASS competition -> one selected discipline -> durable result hold -> one acknowledgement -> fresh week');
     await game({type:'settings',settings:{...view!.career.rider!.settings,mode:'manual'}});
   }
   await game({type:'retire'});

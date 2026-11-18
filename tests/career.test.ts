@@ -13,7 +13,7 @@ import { DISCIPLINES, STATS, type Career, type Plan } from '../src/game/types';
 const identity=()=>({id:'rider-1',seed:5411});
 const career=():Career=>({rider:newRider(identity().id,identity().seed,'리버',{...DEFAULT_LOOK}),hall:[]});
 const plan=(p:Plan['action']):Plan=>({action:p,spot:'river'});
-const enterAuto=(c:Career)=>command(c,{type:'settings',settings:{mode:'auto',strategy:'freestyle',entries:[...DISCIPLINES]}},identity);
+const enterAuto=(c:Career)=>command(c,{type:'settings',settings:{mode:'auto',strategy:'freestyle',entries:['freestyle']}},identity);
 
 test('career divisions follow the four age groups and stats grow above 100 up to 200',()=>{
   assert.deepEqual(Array.from({length:9},(_,year)=>divisionFor(year)),['rookie','rookie','rookie','regular','regular','open','open','master','master']);
@@ -64,6 +64,34 @@ test('international graduation meets require all disciplines in manual and autom
   const c=career(),r=c.rider!;r.year=2;r.week=52;r.phase='meet';
   command(c,{type:'settings',settings:{mode:'auto',strategy:'dance',entries:[]}},identity);
   assert.equal(r.records[0].results.length,3,'International entry overrides ordinary auto entry preferences');
+});
+
+test('ordinary competitions accept one discipline and legacy auto selections never create multiple entries',()=>{
+  const c=career(),r=c.rider!;r.week=7;r.phase='meet';
+  assert.throws(()=>command(c,{type:'entry',disciplines:['dance','trick']},identity),/1종목/);
+  assert.throws(()=>command(c,{type:'settings',settings:{mode:'auto',strategy:'balanced',entries:['dance','trick']}},identity),/1종목/);
+  assert.equal(r.records.length,0);command(c,{type:'entry',disciplines:['trick']},identity);
+  assert.deepEqual(r.records[0].results.map(result=>result.discipline),['trick']);
+  const old=career();old.rider!.week=7;old.rider!.settings={mode:'auto',strategy:'freestyle',entries:['trick','dance','freestyle']};
+  processWeek(old);assert.deepEqual(old.rider!.records[0].results.map(result=>result.discipline),['trick']);
+});
+
+test('training previews and results use the requested primary, secondary and technique stats',()=>{
+  const expected={speed:['speed','carve'],carve:['carve','balance'],link:['link','speed'],balance:['balance','carve'],dance:['speed','carve'],trick:['link','balance']} as const;
+  for(const action of Object.keys(expected) as (keyof typeof expected)[]){
+    let succeeded=false;
+    for(let seed=1;seed<=5;seed++){
+      const c:Career={rider:newRider('training-'+seed,seed,'Training',DEFAULT_LOOK),hall:[]},r=c.rider!;r.week=3;
+      const before=structuredClone(r),p:Plan={action,spot:'river',...(['dance','trick'].includes(action)?{skill:action==='dance'?'peter-pan':'pivot'}:{})};
+      const preview=previewTraining(r,p);assert.deepEqual(Object.keys(preview.gains).sort(),[...expected[action]].sort());
+      command(c,{type:'plan',plan:p},identity);processWeek(c);if(r.extras!.lastTraining!.grade==='miss')continue;succeeded=true;
+      for(const stat of STATS){const gain=r.stats[stat]-before.stats[stat],forecast=preview.gains[stat];if(forecast)assert.ok(gain>=forecast.min-.001&&gain<=forecast.max+.001);else assert.equal(gain,0);}
+      if(p.skill)assert.ok(r.skills[p.skill].mastery>before.skills[p.skill].mastery);
+      assert.ok(r.extras!.lastTraining!.narration);assert.ok(r.extras!.lastTraining!.changes!.some(change=>change.startsWith('체력')));
+    }
+    assert.ok(succeeded);
+  }
+  const c=career();c.rider!.year=4;c.rider!.spot='arena';assert.throws(()=>command(c,{type:'plan',plan:{action:'rehearsal',spot:'arena'}},identity),/종료/);
 });
 
 test('direct training spends energy, pauses for an event and awards progress only once',()=>{
@@ -132,7 +160,7 @@ test('eight consecutive seasons yield 48 distinct meets, promotion, resets, and 
       assert.equal(r.year,2);assert.equal(r.week,1);assert.equal(r.season.division,'rookie');
       assert.deepEqual(r.records.map(m=>m.id),CALENDAR.map(m=>m.id));
       assert.deepEqual(r.season.scores.dance,{});
-      assert.ok(r.seasons[0].scores.dance.player>0);
+      assert.ok(r.seasons[0].scores.freestyle.player>0);
     }
     if(i===52*4-1)assert.equal(r.season.division,'open');
     if(i===52*6-1)assert.equal(r.season.division,'master');
@@ -162,7 +190,7 @@ test('eight consecutive seasons yield 48 distinct meets, promotion, resets, and 
 });
 
 test('equipment, lesson fees, and locked spots are enforced by the career command',()=>{
-  const c=career(),r=c.rider!;
+  const c=career(),r=c.rider!;r.money=1_000_000;
   assert.throws(()=>command(c,{type:'plan',plan:{...plan('trick'),spot:'night'}},identity),GameError);
   assert.throws(()=>command(c,{type:'plan',plan:{...plan('rehearsal'),spot:'arena'}},identity),GameError);
   const initial=chance(r,SKILL.pivot!);
@@ -270,7 +298,7 @@ test('automatic play performs one action at a time and waits for its result and 
   for(const final of [false,true]){
     let save=advance(blankSave(),{type:'create',name:'Automatic',look:DEFAULT_LOOK},'first',0,week,identity);
     save.career.rider!.week=final?52:7;save.career.rider!.year=final?8:1;
-    save=advance(save,{type:'settings',settings:{mode:'auto',strategy:'balanced',entries:['dance','trick']}},'first',0,week,identity);
+    save=advance(save,{type:'settings',settings:{mode:'auto',strategy:'balanced',entries:['dance']}},'first',0,week,identity);
     const selected=structuredClone(save.career.rider!.plan);assert.ok(selected);
     const choice=save.clock.pendingChoice!;assert.ok(choice);
     assert.equal(remaining(save,week,0),0);
@@ -319,7 +347,7 @@ test('zero stamina permits all competition entries without changing execution, l
     assert.equal(empty.results[i].energy,0);
   }
   assert.ok(full.results[2].energy<full.results[0].energy);
-  const c:Career={rider:exhausted,hall:[]};exhausted.week=7;exhausted.phase='meet';
+  const c:Career={rider:exhausted,hall:[]};exhausted.year=2;exhausted.week=52;exhausted.phase='meet';
   command(c,{type:'entry',disciplines:[...DISCIPLINES]},identity);assert.equal(exhausted.records[0].results.length,3);
 });
 

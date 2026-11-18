@@ -3,10 +3,10 @@ import type { Look, Spot } from '../game/types';
 import type { Stage } from '../scene/phaserScene';
 import { armSounds, playFallChirp } from '../sounds';
 
-type Props = { spot:Spot; look:Look; guest?:Look; motion?:Stage['motion']; technique?:Stage['technique']; variant?:Stage['variant'] };
-export default function Scene({spot,look,guest,motion='ride',technique,variant='dashboard'}:Props){
+type Props = { spot:Spot; look:Look; guest?:Look; motion?:Stage['motion']; technique?:Stage['technique']; variant?:Stage['variant']; playbackRate?:Stage['playbackRate'] };
+export default function Scene({spot,look,guest,motion='ride',technique,variant='dashboard',playbackRate=1}:Props){
   const host=useRef<HTMLDivElement>(null);
-  const latest=useRef<Stage>({spot,look,guest,motion,technique,variant,reduce:false});
+  const latest=useRef<Stage>({spot,look,guest,motion,technique,variant,playbackRate,reduce:false});
   const [failed,setFailed]=useState(false);
   const chick=look.equipment?.accessories.includes('chick');
   const wasFalling=useRef(false);
@@ -14,7 +14,7 @@ export default function Scene({spot,look,guest,motion='ride',technique,variant='
     armSounds();const falling=motion==='fall'||technique?.outcome==='miss'&&(technique.progress??0)>.7;
     if(chick&&falling&&!wasFalling.current)playFallChirp();wasFalling.current=falling;
   },[chick,motion,technique?.id,technique?.outcome,technique?.progress]);
-  useEffect(()=>{Object.assign(latest.current,{spot,look,guest,motion,technique,variant});},[spot,look,guest,motion,technique,variant]);
+  useEffect(()=>{Object.assign(latest.current,{spot,look,guest,motion,technique,variant,playbackRate});},[spot,look,guest,motion,technique,variant,playbackRate]);
   useEffect(()=>{
     let cancelled=false;
     let game:Awaited<ReturnType<typeof import('../scene/phaserScene')['createStage']>>|undefined;

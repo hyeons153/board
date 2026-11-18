@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { ACTIONS, DISCIPLINES, SPOTS, STRATEGIES, type View } from '../src/game/types.js';
 import { BOARDS, BOTTOMS, EYE_COLORS, FOOTWEAR, HAIR_COLORS, HAIR_STYLES, OUTFITS, PANTS, RULES, SHIRTS, SHOES, SKINS } from '../src/game/data.js';
 import { extras, GEAR_SLOTS } from '../src/game/economy.js';
-import { divisionFor, GameError } from '../src/game/career.js';
+import { divisionFor, GameError, singleEntry } from '../src/game/career.js';
 import { advance, remaining } from './clock.js';
 import { GUEST_SECONDS, type Row, type Store } from './store.js';
 import { AccessError, type OnlineStore } from './databaseStore.js';
@@ -74,7 +74,7 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
       return {...meet,...(compact?{detail:summary?'summary' as const:'full' as const}:{}),results:meet.results.map(({proof,opponents:replays,...result})=>summary?{...result,run:{...result.run,log:[],highlight:result.run.log.find(move=>move.outcome==='great')??result.run.log.find(move=>move.outcome==='clean')}}:opponents?{...result,opponents:replays}:result)};
     });
     const hall=career.hall.map(archive=>({...archive,records:records(archive.records,false)}));
-    const rider=career.rider?{...career.rider,extras:extras(career.rider),seed:0,season:{...career.rider.season,division:divisionFor(career.rider.year)},records:records(career.rider.records,true)}:null;
+    const rider=career.rider?{...career.rider,settings:{...career.rider.settings,entries:singleEntry(career.rider.settings.entries)},extras:extras(career.rider),seed:0,season:{...career.rider.season,division:divisionFor(career.rider.year)},records:records(career.rider.records,true)}:null;
     const parked=career.parked?.map(item=>({...item,seed:0,records:records(item.records,false)}));
     return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,stateVersion:row.snapshot.clock.stateVersion??0,remainingMs:remaining(row.snapshot,weekMs),weekMs,fastForward:false,pendingMeet:row.snapshot.clock.pendingMeet,pendingTraining:row.snapshot.clock.pendingTraining,pendingChoice:row.snapshot.clock.pendingChoice,pendingEvent:row.snapshot.clock.pendingEvent,storage:store.kind,username,scope};
   };

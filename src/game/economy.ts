@@ -1,6 +1,6 @@
 import type { Discipline, Look, Result, Rider } from './types.js';
 
-import { BASIC_SLOTS, GEAR, GEAR_SLOTS, ITEM, LEGACY_BONUSES, STARTER_IDS, type Effects, type Gear, type GearSlot } from './equipmentCatalog.js';
+import { BASIC_SLOTS, GEAR, GEAR_SLOTS, ITEM, LEGACY_BONUSES, PREVIOUS_PRICES, STARTER_IDS, type Effects, type Gear, type GearSlot } from './equipmentCatalog.js';
 import { STATS, type Stats } from './types.js';
 import { round } from './random.js';
 export { GEAR, ITEM, GEAR_SLOTS, BASIC_SLOTS, STARTER_IDS } from './equipmentCatalog.js';
@@ -8,7 +8,7 @@ export type { GearSlot, Gear, Effects } from './equipmentCatalog.js';
 export type Bonus = { danceLink?: number; trickLand?: number; carve?: number; speed?: number; practice?: number; fatigue?: number };
 export const GEAR_NAMES: Record<GearSlot,string> = { deck:'데크', trucks:'트럭', wheels:'휠', accessory:'액세서리' };
 export const ECONOMY = {
-  lesson:18_000, makeover:12_000, sellRate:.55, participation:8_000, podiumSeason:[95_000,65_000,40_000],
+  lesson:18_000, makeover:12_000, sellRate:.55, participation:4_000, podiumSeason:[60_000,40_000,25_000],
   achievements:{ learn:35_000, meet:25_000, win:80_000, variety:65_000 },
 } as const;
 
@@ -23,6 +23,7 @@ export const SPONSORS: Sponsor[] = [
 export const SPONSOR = new Map(SPONSORS.map(brand => [brand.id, brand]));
 export type CareerExtras = {
   inventory: string[];
+  purchasePrices?:Record<string,number>;
   equipped: Partial<Record<'deck'|'trucks'|'wheels'|'bearings',string>>;
   accessories?:string[];
   equipmentVersion?:2;
@@ -33,7 +34,7 @@ export type CareerExtras = {
   choices: Record<string, { index:number; year:number; week:number }>;
   timeline: { year:number; week:number; title:string; text:string }[];
   lastEvent?:import('./types.js').EventOutcome;
-  lastTraining?: { reaction?:string; grade:'success'|'great'|'learned'|'mastery'|'miss'|'injury'|'recovery'; text:string; skill?:string; year:number; week:number };
+  lastTraining?: { reaction?:string; grade:'success'|'great'|'learned'|'mastery'|'miss'|'injury'|'recovery'; text:string; narration?:string; changes?:string[]; skill?:string; year:number; week:number };
 };
 export function freshExtras(): CareerExtras {
   return { inventory:[...STARTER_IDS], equipped:{deck:'deck_001',trucks:'truck_001',wheels:'wheel_001'},accessories:[],equipmentVersion:2,contract:null,signedYear:0,achievements:[],choices:{},timeline:[] };
@@ -126,6 +127,7 @@ export function equipmentReaction(rider:Pick<Rider,'extras'>,grade:string){
   return undefined;
 }
 export const playerPlace = (result: Result) => result.standings.find(row => row.id === 'player')?.place ?? Infinity;
+export const resaleValue=(rider:Pick<Rider,'extras'>,item:Gear)=>Math.floor(Math.min(item.price,extras(rider).purchasePrices?.[item.id]??PREVIOUS_PRICES[item.id]??item.price)*ECONOMY.sellRate);
 export function eligibleSponsor(rider: Rider, brand: Sponsor) {
   return rider.fame >= brand.fame && rider.year >= brand.year &&
     rider.records.some(meet => meet.results.some(result => result.discipline === brand.discipline && playerPlace(result) <= brand.place));

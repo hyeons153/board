@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { command, GameError, newRider, processWeek } from '../src/game/career';
 import { DEFAULT_LOOK, SKILL, SKILLS, RULES, CALENDAR } from '../src/game/data';
-import { GEAR, ITEM, NEW_GEAR, BASIC_SLOTS } from '../src/game/equipmentCatalog';
-import { effectiveStats, equipmentStats, extras, freshExtras, gearBonuses, legacyBonuses, upgradeEquipment, equippedLook, type CareerExtras } from '../src/game/economy';
+import { GEAR, ITEM, NEW_GEAR, BASIC_SLOTS, PREVIOUS_PRICES } from '../src/game/equipmentCatalog';
+import { ECONOMY, effectiveStats, equipmentStats, extras, freshExtras, gearBonuses, legacyBonuses, resaleValue, upgradeEquipment, equippedLook, type CareerExtras } from '../src/game/economy';
 import { previewTraining } from '../src/game/training';
 import { simulateMeet, simulateRun } from '../src/game/competition';
 import { eventFor, EVENTS, pickEvent } from '../src/game/events';
@@ -21,7 +21,7 @@ test('catalog seeds exactly 22 base items and 30 accessories with stable IDs and
   assert.equal(NEW_GEAR.filter(item=>item.slot!=='accessory').length,22);
   assert.equal(NEW_GEAR.filter(item=>item.slot==='accessory').length,30);
   assert.equal(new Set(GEAR.map(item=>item.id)).size,GEAR.length);
-  assert.equal(ITEM.get('deck_008')!.price,220000);assert.equal(ITEM.get('truck_007')!.stats.carve,7);assert.equal(ITEM.get('wheel_007')!.stats.speed,7);
+  assert.equal(ITEM.get('deck_008')!.price,3200000);assert.equal(ITEM.get('truck_007')!.stats.carve,7);assert.equal(ITEM.get('wheel_007')!.stats.speed,7);
   for(const item of NEW_GEAR){
     const allowed=item.slot==='deck'?['link','balance']:item.slot==='trucks'?['carve']:item.slot==='wheels'?['speed']:[];
     assert.ok(Object.keys(item.stats).every(stat=>allowed.includes(stat)));assert.ok(item.description.length>8);
@@ -43,8 +43,20 @@ test('legacy bearing migration is pure, idempotent and preserves unknown IDs and
   const unknown=upgradeEquipment({...old,equipped:{bearings:'lost-bearing'}});assert.ok(unknown.inventory.includes('lost-bearing'));assert.ok(unknown.legacyEquipment!.unmapped.includes('lost-bearing'));
 });
 
+test('new prices retain early gear affordability and resale uses the real purchase basis without altering existing money',()=>{
+  const c=career(),r=c.rider!,deck=ITEM.get('deck_008')!;
+  assert.ok(ITEM.get('deck_002')!.price+ITEM.get('acc_001')!.price<RULES.startMoney);
+  r.money=10_000_000;give(c,[deck.id]);const before=r.money,records=structuredClone(r.records);
+  command(c,{type:'trade',operation:'equip',item:deck.id},identity);assert.equal(r.money,before);assert.deepEqual(r.records,records);
+  assert.equal(resaleValue(r,deck),Math.floor(PREVIOUS_PRICES[deck.id]*ECONOMY.sellRate));
+  command(c,{type:'trade',operation:'sell',item:deck.id},identity);assert.equal(r.money,before+121000);
+  command(c,{type:'trade',operation:'buy',item:deck.id},identity);assert.equal(r.extras!.purchasePrices![deck.id],deck.price);
+  const paid=r.money;command(c,{type:'trade',operation:'sell',item:deck.id},identity);
+  assert.equal(r.money,paid+Math.floor(deck.price*ECONOMY.sellRate));assert.equal(r.extras!.purchasePrices![deck.id],undefined);
+});
+
 test('buy/equip/sell enforce ownership, three unique accessories and free-item protection without changing base stats',()=>{
-  const c=career(),r=c.rider!;r.money=1000000;const base={...r.stats};
+  const c=career(),r=c.rider!;r.money=3000000;const base={...r.stats};
   for(const id of ['deck_006','truck_005','wheel_005','acc_001','acc_002','acc_003','acc_004'])command(c,{type:'trade',operation:'buy',item:id},identity);
   for(const id of ['deck_006','truck_005','wheel_005','acc_001','acc_002','acc_003'])equip(c,id);
   assert.deepEqual(r.stats,base);assert.deepEqual(equipmentStats(r),{speed:5,carve:5,link:5,balance:2});

@@ -123,7 +123,7 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
     await store.replace(ownerId,before.version,before.snapshot);
     await owner.read();
     const version=owner.snapshot().version;
-    const first=await Promise.all([owner.game({type:'entry',disciplines:[...DISCIPLINES]},version),owner.game({type:'entry',disciplines:[...DISCIPLINES]},version)]);
+    const first=await Promise.all([owner.game({type:'entry',disciplines:['dance']},version),owner.game({type:'entry',disciplines:['dance']},version)]);
     assert.deepEqual(first.map(response=>response.status).sort(),[200,409]);
     const after=(await store.get(ownerId)).snapshot.career.rider!;
     assert.equal(after.records.length,1);
@@ -196,7 +196,7 @@ test('eight official seasons replay from inputs, while edited and unverifiable r
   const c:Career={rider:null,hall:[]};
   command(c,{type:'create',name:'Finalist',look:DEFAULT_LOOK},()=>({id:randomUUID(),seed:981}),true,true);
   const rider=c.rider!;
-  rider.settings={mode:'auto',strategy:'freestyle',entries:[...DISCIPLINES]};
+  rider.settings={mode:'auto',strategy:'freestyle',entries:['freestyle']};
   for(let weeks=0;weeks<416;weeks++) assert.ok(processWeek(c,true));
   const archive=c.hall[0];
   assert.equal(archive.records.length,48);

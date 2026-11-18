@@ -7,7 +7,7 @@ export const RULES = {
   statGrowth:2.8, secondaryGrowth:0.7, study:37, mastery:13, restEnergy:41,
   energy: { speed:17, carve:17, link:17, balance:15, dance:19, trick:23, rest:0, hospital:0, rehearsal:18 } satisfies Record<Action,number>,
   entryCost:{ dance:20, trick:25, freestyle:30 }, places:[100,75,60,45,35,10], majorMultiplier:1.5,
-  prizes:[190_000,130_000,95_000,55_000,40_000,22_000],
+  prizes:[80_000,55_000,40_000,25_000,18_000,10_000],
   scoreWeights: {
     dance:{ execution:40, link:35, carve:15, speed:10 },
     trick:{ execution:75, link:10, combo:15 },
@@ -31,8 +31,25 @@ export const STAT_NAMES = { speed:'속도', carve:'카빙', link:'연계', balan
 export const DISCIPLINE_NAMES: Record<Discipline,string> = { dance:'댄싱', trick:'트릭', freestyle:'프리스타일' };
 export const DIVISION_NAMES: Record<Division,string> = { rookie:'뉴비부', regular:'일반부', open:'오픈부', master:'마스터부' };
 export const STRATEGY_NAMES: Record<Strategy,string> = { balanced:'밸런스형', dance:'댄싱 중심', trick:'트릭 중심', freestyle:'프리스타일 중심' };
+export const STRATEGY_DETAILS:Record<Strategy,string> = {
+  balanced:'네 능력치 중 부족한 쪽을 보완합니다. 기술 연마보다 기본 능력치 훈련을 더 자주 선택합니다.',
+  dance:'댄싱 기술 연마를 우선하고 카빙·연계·속도를 중점적으로 보완합니다.',
+  trick:'트릭 기술 연마를 우선하고 밸런스·연계를 중점적으로 보완합니다.',
+  freestyle:'댄싱·트릭 기술을 함께 연마하고 연계·카빙·밸런스를 우선 보완합니다. 밸런스형보다 기술 연마를 더 자주 선택합니다.',
+};
 export const STYLE_NAMES: Record<RoutineStyle,string> = { stable:'안정형', flow:'연계형', score:'고득점형' };
 export const ACTION_NAMES: Record<Action,string> = { speed:'속도 훈련', carve:'카빙 훈련', link:'연계 훈련', balance:'밸런스 훈련', dance:'댄싱 연마', trick:'트릭 연마', rest:'휴식', hospital:'병원 치료', rehearsal:'라인 리허설' };
+export const ACTION_STORIES:Record<Action,{start:string;done:string}>={
+  speed:{start:'힘껏 속도를 냅니다.',done:'길게 달리며 속도를 끌어올렸습니다.'},
+  carve:{start:'몸을 기울여 코너를 돕니다.',done:'코너를 돌고 또 돌며 카빙을 연습했습니다.'},
+  link:{start:'동작을 부드럽게 이어 봅니다.',done:'발이 기억할 때까지 동작을 이어 연습했습니다.'},
+  balance:{start:'보드 위에서 중심을 잡습니다.',done:'흔들리는 보드 위에서 균형을 다졌습니다.'},
+  dance:{start:'댄싱 연습에 몰두합니다.',done:'죽도록 댄싱을 연습했습니다.'},
+  trick:{start:'착지할 때까지 트릭을 연습합니다.',done:'몇 번을 넘어져도 다시 트릭을 연습했습니다.'},
+  rest:{start:'휴식을 취합니다.',done:'보드를 내려놓고 푹 쉬었습니다.'},
+  hospital:{start:'병원에서 치료를 받습니다.',done:'치료를 받고 몸을 추슬렀습니다.'},
+  rehearsal:{start:'라인을 연습합니다.',done:'저장한 라인을 연습했습니다.'},
+};
 export const OUTCOME_NAMES = { miss:'실패', rough:'어설픈 성공', clean:'성공', great:'대성공' };
 export const KIND_NAMES = { step:'스텝', technique:'테크닉', spin:'회전', pop:'팝', flip:'플립' };
 export const DIFFICULTY_NAMES = ['','초급','중급','고급','최고급'];
@@ -71,7 +88,7 @@ export const LOCATIONS = {
   park:{ name:'공원 루프', en:'PARK LOOP', detail:'숲을 따라 굽이치는 완만한 코스.', boosted:['carve','balance'], boost:1.26, risk:.82, npc:'sol' },
   studio:{ name:'실내 연습장', en:'INDOOR STUDIO', detail:'날씨 걱정 없이 지정 기술을 연습하는 곳.', boosted:['dance','trick'], boost:1.15, risk:.7, npc:'sol' },
   night:{ name:'야간 광장', en:'NEON PLAZA', detail:'노아와 준의 심야 잼. 고급 댄싱과 트릭을 깊게 파고들 수 있어요.', boosted:['dance','trick'], boost:1.35, risk:1.18, npc:'noa' },
-  arena:{ name:'대회 연습장', en:'WARM-UP ARENA', detail:'대회 바닥에서 종목별 라인을 반복하고 연계를 점검해요.', boosted:['link','rehearsal'], boost:1.25, risk:.82, npc:'min' },
+  arena:{ name:'대회 연습장', en:'WARM-UP ARENA', detail:'대회 바닥에서 기술 사이의 연계를 집중적으로 점검해요.', boosted:['link'], boost:1.25, risk:.82, npc:'min' },
 } satisfies Record<Spot,{name:string; en:string; detail:string; boosted:Action[]; boost:number; risk:number; npc:string}>;
 
 export const CALENDAR:Meet[] = [

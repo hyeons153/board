@@ -11,18 +11,18 @@ async function send(action:GameAction){const response=await post(action);const d
 await read();assert.equal(view!.storage,'local');
 await send({type:'create',name:'장비 개편 검증',look:{hair:0,skin:0,shirt:0,board:4,gender:'female'}});
 assert.equal(view!.career.rider!.extras!.inventory.length,3);
-for(const id of ['deck_002','truck_002','wheel_002']){await send({type:'trade',operation:'buy',item:id});await send({type:'trade',operation:'equip',item:id});}
+for(const id of ['deck_002']){await send({type:'trade',operation:'buy',item:id});await send({type:'trade',operation:'equip',item:id});}
 const purchases=await Promise.all([post({type:'trade',operation:'buy',item:'acc_001'}),post({type:'trade',operation:'buy',item:'acc_001'})]);
 assert.deepEqual(purchases.map(response=>response.status).sort(),[200,409]);await read();assert.equal(view!.career.rider!.extras!.inventory.filter(id=>id==='acc_001').length,1);
-for(const id of ['acc_005','acc_009','acc_004'])await send({type:'trade',operation:'buy',item:id});
-for(const id of ['acc_001','acc_005','acc_009'])await send({type:'trade',operation:'equip',item:id});
+for(const id of ['acc_002','acc_003','acc_004'])await send({type:'trade',operation:'buy',item:id});
+for(const id of ['acc_001','acc_002','acc_003'])await send({type:'trade',operation:'equip',item:id});
 assert.equal((await post({type:'trade',operation:'equip',item:'acc_004'})).ok,false);
 await send({type:'unequip',slot:'accessory',item:'acc_001'});await send({type:'trade',operation:'equip',item:'acc_004'});
 const equipment=structuredClone(view!.career.rider!.extras!.equipped),accessories=[...view!.career.rider!.extras!.accessories!];
 await read();assert.deepEqual(view!.career.rider!.extras!.equipped,equipment);assert.deepEqual(view!.career.rider!.extras!.accessories,accessories);
 console.log('PASS starter seed, underscored IDs, concurrent purchase paid once, three accessory slots, unequip and durable reload');
 await send({type:'plan',plan:{action:'link',spot:'plaza'}});await new Promise(resolve=>setTimeout(resolve,2200));await send({type:'pulse'});
-assert.ok(view!.pendingTraining);assert.equal(view!.career.rider!.energy,84);assert.ok(view!.career.rider!.stats.link>=14);
+assert.ok(view!.pendingTraining);assert.equal(view!.career.rider!.energy,83);assert.ok(view!.career.rider!.stats.link>=14);
 await send({type:'continue-training',record:view!.pendingTraining!});if(view!.career.rider!.phase==='event')await send({type:'event',index:0});
 if(view!.pendingEvent)await send({type:'continue-event',record:view!.pendingEvent.key});
 console.log('PASS equipped training cost and permanent stat gain through HTTP + PostgreSQL');

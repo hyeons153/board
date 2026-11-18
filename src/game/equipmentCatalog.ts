@@ -13,7 +13,7 @@ export type Gear={id:string;slot:GearSlot;name:string;price:number;rarity:Rarity
 const basic=(id:string,slot:BasicSlot,name:string,price:number,stats:Gear['stats'],description:string,appearance:Partial<Gear>):Gear=>({id,slot,name,price,stats,description,rarity:price>=200000?'legendary':price>=80000?'epic':price>=26000?'rare':'common',effects:{},...appearance});
 const accessory=(id:string,name:string,rarity:Rarity,price:number,effects:Gear['effects'],description:string,visual:Visual,extra:Partial<Gear>={}):Gear=>({id,slot:'accessory',name,rarity,price,stats:{},effects,description,visual,...extra});
 export const STARTER_IDS=['deck_001','truck_001','wheel_001'];
-export const NEW_GEAR:Gear[]=[
+const ORIGINAL_GEAR:Gear[]=[
   basic('deck_001','deck','입문용 롱보드 데크',0,{},'첫 푸시부터 마지막 페스티벌까지. 마음껏 흠집 내도 괜찮다.',{shape:0}),
   basic('deck_002','deck','플랫 스텝 데크',16000,{link:2,balance:1},'발을 옮길 자리가 넉넉하다. 다음 발도 벌써 기다리는 중.',{shape:1,design:1,color:1}),
   basic('deck_003','deck','와이드 크루즈 데크',26000,{link:1,balance:3},'느긋하게 넓은 길을 고른다. 발끝까지 여유로운 데크.',{shape:2,design:3,color:6}),
@@ -65,7 +65,7 @@ export const LEGACY_BONUSES:Record<string,Partial<Effects>>={
   'deck-flow':{danceLink:.03,practice:.03},'deck-pop':{trickLand:.025},'deck-cruise':{carve:2,speed:2},'trucks-carve':{carve:4},'trucks-soft':{danceLink:.02,trickLand:.01},'wheels-grip':{carve:3,practice:.04},'wheels-slide':{trickLand:.02,speed:1},'bearings-quiet':{speed:4},'bearings-endurance':{fatigue:2},
 };
 const old=(id:string,slot:GearSlot,name:string,price:number,stats:Gear['stats'],effects:Gear['effects'],description:string,design?:number):Gear=>({id,slot,name,price,stats,effects,description,design,rarity:'rare',legacy:true});
-export const LEGACY_GEAR:Gear[]=[
+const ORIGINAL_LEGACY_GEAR:Gear[]=[
   old('deck-flow','deck','리버 플로우 데크',94000,{link:3,balance:1},{danceLink:.03,practice:.03},'이전 장비 · 연계·밸런스 보정과 연마·댄싱 연계 효과를 보존합니다.',1),
   old('deck-pop','deck','킥테일 팝 데크',98000,{link:1,balance:3},{trickLand:.025},'이전 장비 · 트릭 성공 효과를 보존한 하이브리드 데크.',2),
   old('deck-cruise','deck','선셋 올데이 데크',85000,{link:2,balance:2},{},'이전 장비 · 옛 주행 보정을 데크의 연계·밸런스로 변환했습니다.',3),
@@ -76,5 +76,14 @@ export const LEGACY_GEAR:Gear[]=[
   old('bearings-quiet','accessory','새벽 베어링',60000,{}, {speed:4},'이전 베어링 → 액세서리 · 속도 채점 +4 호환 효과. 새 행운의 베어링과 별개입니다.'),
   old('bearings-endurance','accessory','마일 베어링',65000,{}, {fatigue:2},'이전 베어링 → 액세서리 · 종목당 체력 소모 −2 효과를 보존합니다.'),
 ];
+// Keep original purchase values for resale of items owned before this price update.
+export const PREVIOUS_PRICES:Record<string,number>=Object.fromEntries([...ORIGINAL_GEAR,...ORIGINAL_LEGACY_GEAR].map(item=>[item.id,item.price]));
+const BASIC_PRICES:Record<string,number>={
+  deck_002:28000,deck_003:90000,deck_004:160000,deck_005:320000,deck_006:850000,deck_007:850000,deck_008:3200000,
+  truck_002:35000,truck_003:90000,truck_004:220000,truck_005:600000,truck_006:1100000,truck_007:2200000,
+  wheel_002:28000,wheel_003:85000,wheel_004:210000,wheel_005:620000,wheel_006:1150000,wheel_007:2400000,
+};
+export const NEW_GEAR:Gear[]=ORIGINAL_GEAR.map(item=>({...item,price:BASIC_PRICES[item.id]??Math.round(item.price*({common:1.5,rare:3,epic:5,legendary:5}[item.rarity])/1000)*1000}));
+export const LEGACY_GEAR:Gear[]=ORIGINAL_LEGACY_GEAR.map(item=>({...item,price:item.price*4}));
 export const GEAR=[...NEW_GEAR,...LEGACY_GEAR];
 export const ITEM=new Map(GEAR.map(item=>[item.id,item]));

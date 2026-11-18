@@ -12,12 +12,12 @@ for(const strategy of STRATEGIES){
   for(let seed=1;seed<=count;seed++){
     const rider=newRider('internal-'+seed,seed,'Simulation Rider',DEFAULT_LOOK);
     const career:Career={rider,hall:[]};
-    rider.settings={mode:'auto',strategy,entries:[...DISCIPLINES]};
+    rider.settings={mode:'auto',strategy,entries:[strategy==='balanced'?'dance':strategy]};
     for(let week=0;week<RULES.weeks*RULES.years;week++){
       if(!processWeek(career)) throw new Error('Automatic progression stalled on seed '+seed);
     }
     const [archive]=career.hall;
-    if(!archive||archive.records.length!==48||!archive.records.every(meet=>meet.results.length<=DISCIPLINES.length)) throw new Error('Incomplete retirement ledger');
+    if(!archive||archive.records.length!==48||!archive.records.every(meet=>meet.id.startsWith('international-')?meet.results.length===3:meet.results.length<=1)) throw new Error('Incomplete retirement ledger');
     const outcome=chooseEnding(archive).kind;
     endings[outcome]=(endings[outcome]??0)+1;
     const summary=summarize(archive);

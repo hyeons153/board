@@ -1,4 +1,4 @@
-import { command, divisionFor, GameError, prepareWeek, processWeek } from '../src/game/career.js';
+import { command, currentMeet, divisionFor, GameError, prepareWeek, processWeek, singleEntry, validateAutoEntries } from '../src/game/career.js';
 import { extras } from '../src/game/economy.js';
 import type { Career, EventOutcome, GameAction, TrainingSetup } from '../src/game/types.js';
 
@@ -7,8 +7,10 @@ export const blankSave=():Save=>({format:1,career:{rider:null,hall:[]},clock:{cr
 export const remaining=(save:Save,weekMs:number,now=Date.now())=>!save.clock.pendingChoice&&!save.clock.pendingEvent&&!save.clock.pendingMeet&&!save.clock.pendingTraining&&save.career.rider?.phase==='plan'&&!!save.career.rider.plan?Math.max(0,(save.clock.readyAt??now+weekMs)-now):0;
 
 export function advance(prev:Save,a:GameAction,tab:string,now:number,weekMs:number,identity:()=>{id:string;seed:number},official=false,account=false):Save {
+  if(a.type==='settings')validateAutoEntries(a.settings);
   if(a.type==='pulse'&&(prev.clock.pendingTraining||prev.clock.pendingEvent||prev.clock.pendingMeet||prev.clock.pendingChoice||prev.career.rider?.phase==='retired'||(prev.clock.readyAt!==undefined&&prev.clock.readyAt>now)||(prev.career.rider?.phase==='plan'&&!prev.career.rider.plan&&prev.career.rider.settings.mode==='manual')))return prev;
   const next=structuredClone(prev),r=next.career.rider,clock=next.clock;
+  if(r){r.settings.entries=singleEntry(r.settings.entries);if(r.entries&&!currentMeet(r)?.international)r.entries=singleEntry(r.entries);}
   const revise=()=>{clock.stateVersion=(prev.clock.stateVersion??0)+1;clock.credit=0;clock.stamp=now;clock.tabs={[tab]:now};return next;};
   Reflect.deleteProperty(clock,'speed');
   if(r)for(const item of [r.settings,r.plan,r.lastPlan])if(item)Reflect.deleteProperty(item,'intensity');

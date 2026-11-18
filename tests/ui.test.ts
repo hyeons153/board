@@ -44,6 +44,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
   const {WeeklyChoices}=await import('../src/components/WeeklyChoices');
   const {Meets}=await import('../src/components/Meets');
   const {newRider,command}=await import('../src/game/career');
+  const {simulateMeet}=await import('../src/game/competition');
   const {DEFAULT_LOOK,SKILL}=await import('../src/game/data');
   const {previewTraining}=await import('../src/game/training');
   const root=createRoot(win.document.getElementById('root')!);
@@ -85,7 +86,8 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     const created=await handler(new Request('http://127.0.0.1/api/game',{headers:{cookie}}));
     const createdView=await created.json();assert.equal(createdView.career.rider.look.hair,10);assert.equal(createdView.career.rider.look.outfit,1);assert.equal(createdView.career.rider.look.bottom,3);
     assert.ok(win.document.querySelector('[aria-label="이번 주 행동 선택"]'));
-    assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,9);
+    assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,8);
+    assert.equal(win.document.querySelector('[aria-label="라인 리허설 선택"]'),null);
     assert.equal(win.document.querySelectorAll('[aria-label="현재 능력치"] meter').length,4);
     assert.ok([...win.document.querySelectorAll<HTMLMeterElement>('[aria-label="현재 능력치"] meter')].every(meter=>meter.max===200));
     const headerButtons=[...win.document.querySelectorAll('.console-top-actions > button')];
@@ -104,6 +106,15 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.ok(![...win.document.querySelectorAll('.console-dock button')].some(button=>button.textContent==='훈련'));
     await click('자동 육성 설정');
     assert.doesNotMatch(win.document.querySelector('.auto-settings')!.textContent!,/훈련 강도|안전형|집중형/);
+    assert.ok(win.document.querySelector('.console-panel-settings'));
+    assert.equal(win.document.querySelectorAll('.auto-settings input[type="checkbox"]').length,0);
+    const entryRadios=[...win.document.querySelectorAll<HTMLInputElement>('.auto-settings input[type="radio"]')];assert.equal(entryRadios.filter(input=>input.checked).length,1);
+    await act(async()=>entryRadios[1].click());await settle();await act(async()=>{await Promise.all([...pendingRequests]);});
+    assert.equal(win.document.querySelectorAll('.auto-settings input[type="radio"]:checked').length,1);
+    assert.equal(win.document.querySelector<HTMLInputElement>('.auto-settings input[type="radio"]:checked')!.parentElement!.textContent,'트릭');
+    const strategy=win.document.querySelector<HTMLSelectElement>('.auto-settings select')!;
+    await act(async()=>{strategy.value='freestyle';strategy.dispatchEvent(new win.Event('change',{bubbles:true}));});await settle();await act(async()=>{await Promise.all([...pendingRequests]);});
+    assert.match(win.document.querySelector('[aria-label="자동 육성 전략 설명"]')!.textContent!,/댄싱·트릭|연계·카빙·밸런스/);
     await click('메뉴 닫기');
     for(const menu of ['기술','대회','상점','메뉴']){
       await click(menu);assert.equal(win.document.querySelector('.game-console'),frame);assert.ok(win.document.querySelector('.console-panel'));
@@ -112,7 +123,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
         assert.equal(win.document.querySelectorAll('.equipment-loadout > div').length,6);
         await click('액세서리');assert.equal(win.document.querySelectorAll('.equipment-choice').length,30);
         await click('튼튼한 헬멧 상세');assert.ok(win.document.querySelector('[aria-label="튼튼한 헬멧 착용 미리보기"]'));
-        await click('구매 ₩8,000');await click('장착');
+        await click('구매 ₩12,000');await click('장착');
         assert.match(win.document.querySelector('.equipment-panel .workshop-rider')!.textContent!,/액세서리 1\/3/);
         await click('튼튼한 헬멧 해제');
         const rarity=win.document.querySelector<HTMLSelectElement>('[aria-label="희귀도 필터"]')!;
@@ -124,6 +135,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await click('라인');
     assert.match(win.document.querySelector('.console-panel')!.textContent!,/라인 편집/);
     assert.doesNotMatch(win.document.querySelector('.console-panel')!.textContent!,/루틴/);
+    assert.ok(win.document.querySelector('.routine-save-actions')!.compareDocumentPosition(win.document.querySelector('.auto-routine')!)&win.Node.DOCUMENT_POSITION_FOLLOWING);
     await click('피터팬 추가');await click('라인 저장');
     assert.ok([...win.document.querySelectorAll('button')].some(button=>button.textContent?.includes('저장된 구성')&&button.disabled));
     await click('메뉴 닫기');
@@ -133,9 +145,9 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.equal(win.document.querySelector('.weekly-selection-slot'),selectionSlot,'Reserve the same preview area for every selection');
     assert.equal(win.document.querySelector('.stat-speed'),speedGauge,'Forecast must update the existing top gauge');
     assert.ok(win.document.querySelector('[aria-label="속도 예상 상승"]'));
-    assert.ok(win.document.querySelector('[aria-label="연계 예상 상승"]'));
+    assert.ok(win.document.querySelector('[aria-label="카빙 예상 상승"]'));
     assert.equal(win.document.querySelector<HTMLMeterElement>('meter[aria-label="속도"]')!.value,18,'A forecast must not change the saved stat');
-    assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,9);
+    assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,8);
     assert.equal(win.document.querySelector('.weekly-preview'),null,'Do not open a second detail panel');
     assert.match(win.document.querySelector('[aria-label="예상 체력 변화"]')!.textContent!,/100 → 83/);
     assert.equal(win.document.querySelector('select[aria-label="훈련 강도"]'),null);
@@ -148,7 +160,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await click('속도 훈련 선택');injectClock=true;
     assert.ok(!win.document.querySelector('.console-panel'));
     const beforePlan=requestActions.length;
-    await click('확인하고 수행');
+    await click('확인');
     assert.deepEqual(requestActions.slice(beforePlan),['plan'],'Confirmation must not trigger a redundant background request before the training deadline');
     assert.equal(clockRaces,1);assert.equal(win.document.querySelector('[role="alert"]'),null);
     assert.ok(!win.document.querySelector('.console-panel'));
@@ -175,11 +187,11 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.ok(win.document.querySelector('[aria-label="예상 체력 변화"]'));
     assert.equal(win.document.querySelector('.status-projection'),null,'Rest should preview stamina instead of stat growth');
     await click('선택 취소');await click('속도 훈련 선택');injectChoice=true;
-    await click('확인하고 수행');
+    await click('확인');
     assert.ok(win.document.querySelector('.console-sync-note'));
     assert.equal(win.document.querySelector('[role="alert"]'),null);
     assert.ok(win.document.querySelector('[aria-label="선택한 행동 확인"]'),'A rejected choice must stay selected instead of pretending it saved');
-    await click('확인하고 수행');
+    await click('확인');
     assert.ok(win.document.querySelector('[aria-label="행동 진행"]'));
     assert.equal(win.document.querySelector('.game-console'),frame);
     const rider=newRider('automatic-ui',71,'Auto rider',DEFAULT_LOOK);
@@ -193,7 +205,8 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.equal(previewTraining(rider,selected!).energyAfter,41);
     rider.week=7;rider.phase='meet';rider.settings={mode:'auto',strategy:'balanced',entries:['dance','trick']};
     const career={rider,hall:[]};
-    command(career,{type:'entry',disciplines:['dance','trick']},()=>({id:'automatic-ui',seed:71}));
+    assert.throws(()=>command(career,{type:'entry',disciplines:['dance','trick']},()=>({id:'automatic-ui',seed:71})),/1종목/);
+    rider.records.push({year:1,id:'regular-1',division:'rookie',results:simulateMeet(rider,(await import('../src/game/data')).CALENDAR[0],['dance','trick']).results});
     const record=structuredClone(rider.records[0]);
     rider.year=2;rider.week=52;rider.phase='meet';
     let selectedEntry:unknown;
@@ -220,12 +233,15 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       assert.equal(win.document.querySelector('[aria-label="대회 스킵"]')?.textContent?.includes('스킵'),true);
       assert.doesNotMatch(win.document.querySelector('[aria-label="인게임 대회"]')!.textContent!,/하이라이트/);
       assert.ok(record.results[0].run.log.length>3);
+      await click('대회 2배속');
+      assert.equal(win.document.querySelector('[aria-label="대회 2배속"]')!.getAttribute('aria-pressed'),'true');
       for(const move of record.results[0].run.log){
-        playbackNow=began+5000+(move.at+.25)*1000;await settle(120);
+        playbackNow=began+(5000+(move.at+.25)*1000)/2;await settle(120);
         assert.equal(win.document.querySelector('[aria-label="경기 진행"] h2')!.textContent,SKILL[move.id]!.name,'Every move in the complete line must be presented');
       }
-      playbackNow=began+68000;await settle(120);
+      playbackNow=began+34000;await settle(120);
       assert.ok(win.document.querySelector('[aria-label="대회 시상식"]'));
+      assert.match(win.document.querySelector('.scene-counter')!.textContent!,/60 \/ 60초/);
       for(let n=0;n<23;n++){await act(async()=>root.render(stage()));await settle(100);}
       assert.ok(win.document.querySelector('[aria-label="대회 스킵"]'),'The next discipline must start despite fresh callbacks every 100ms');
       await click('대회 스킵');
@@ -243,7 +259,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await click('등록하고 시작');await click('자동 진행');
     for(let cycle=0;cycle<2;cycle++){
       assert.ok(win.document.querySelector('[aria-label="자동 행동 선택"]'));
-      assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,9);
+      assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,8);
       assert.equal(win.document.querySelectorAll('.weekly-action-grid > button[aria-pressed="true"]').length,1);
       await settle(2150);
       assert.equal(win.document.querySelector('[aria-label="자동 행동 선택"]'),null);

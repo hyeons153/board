@@ -1,15 +1,19 @@
-import { ACTION_NAMES, calendarFor, DISCIPLINE_NAMES, LOCATIONS, RULES, SKILL, SKILLS, START_SKILLS, STAT_NAMES } from './data.js';
+import { ACTION_NAMES, ACTION_STORIES, calendarFor, DISCIPLINE_NAMES, LOCATIONS, RULES, SKILL, SKILLS, START_SKILLS, STAT_NAMES } from './data.js';
 import { generateRoutine, learned, simulateMeet, validRoutine } from './competition.js';
 import { autoChoice, canStudy, eventFor, eventPaused, pickEvent } from './events.js';
 import { chooseEnding, honors, mentorFrom } from './legacy.js';
 import { RANKING_VERSION } from './public.js';
 import { RIVALS, SPOT_GATE, spotUnlocked } from './content.js';
-import { ECONOMY, effectiveStats, eligibleSponsor, equipmentReaction, equipmentUnlocked, extras, freshExtras, gearBonuses, ITEM, maintainedSponsor, milestone, playerPlace, SPONSOR, STARTER_IDS, supply, unlockEquipment, upgradeEquipment } from './economy.js';
+import { ECONOMY, effectiveStats, eligibleSponsor, equipmentReaction, equipmentUnlocked, extras, freshExtras, gearBonuses, ITEM, maintainedSponsor, milestone, playerPlace, resaleValue, SPONSOR, STARTER_IDS, supply, unlockEquipment, upgradeEquipment } from './economy.js';
 import { clamp, round, seeded } from './random.js';
 import { statAfter, trainingCost, trainingFactor, trainingStatGains, trainingSuccess } from './training.js';
-import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family } from './types.js';
+import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family, type Settings } from './types.js';
 
 export class GameError extends Error {}
+export const singleEntry=(entries:readonly Discipline[]):Discipline[]=>entries.slice(0,1);
+export function validateAutoEntries(settings:Settings){
+  if(settings.entries.length>1)throw new GameError('일반 대회 자동 출전은 1종목만 선택할 수 있어요.');
+}
 export const divisionFor=(year:number):Division=>year<=2?'rookie':year<=4?'regular':year<=6?'open':'master';
 export const currentMeet=(r:Rider)=>calendarFor(r.year).find(m=>m.week===r.week);
 export const nextMeet=(r:Rider)=>calendarFor(r.year).find(m=>m.week>=r.week);
@@ -66,6 +70,7 @@ export function validatePlan(r:Rider,p:Plan) {
     throw new GameError('레슨은 실내·야간·대회 연습장에서 기술을 지정하고 레슨비를 확보해야 해요.');
 }
 function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
+  const before={energy:r.energy,stats:{...r.stats}};
   const rng=seeded(r.seed,r.year,r.week,'training');
   const injuryBefore=r.injury;
   r.spot=p.spot;
@@ -162,23 +167,21 @@ function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
   }
   r.money=Math.max(RULES.safetyFund,r.money+RULES.weeklyAllowance);
   const text=`${ACTION_NAMES[p.action]} · ${names.join(' ')}`;
-  progress.lastTraining={grade,text,skill:practiced,year:r.year,week:r.week,reaction:equipmentReaction(trainingRider,grade)};
+  const changes=STATS.flatMap(stat=>{const gain=round(r.stats[stat]-before.stats[stat]);return gain?[`${STAT_NAMES[stat]} ${gain>0?'+':''}${gain}`]:[];});
+  const energy=round(r.energy-before.energy);if(energy)changes.push(`체력 ${energy>0?'+':''}${energy}`);
+  changes.push(...names.filter(name=>/숙련|학습|회복|치료비|의료 지원|레슨비|부상|다쳤/.test(name)));
+  const narration=grade==='injury'?'연습하다 넘어져 몸을 다쳤습니다.':grade==='miss'?'몸이 따라주지 않아 연습을 제대로 마치지 못했습니다.':ACTION_STORIES[p.action].done;
+  progress.lastTraining={grade,text,narration,changes,skill:practiced,year:r.year,week:r.week,reaction:equipmentReaction(trainingRider,grade)};
   note(r,'training',text);
 }
 function autoPlan(r:Rider):Plan {
   const base:Plan={action:'rest',spot:r.spot};
   if(r.injury?.severity==='major'&&!r.injury.treated) return {...base,action:'hospital'};
   if(r.injury) return {...base};
-  const soon=(nextMeet(r)?.week??54)-r.week;
-  const need=r.settings.entries.reduce((s,d)=>s+RULES.entryCost[d],0);
   const restAt=45;
   if(r.energy<restAt) return base;
   const rng=seeded(r.seed,r.year,r.week,'auto');
   const strategy=r.settings.strategy;
-  if(soon===1&&need>0&&r.energy>=83&&spotUnlocked(r,'arena')&&rng()<(strategy==='freestyle'?.78:.35)){
-    const focus=strategy!=='balanced'&&r.settings.entries.includes(strategy)?strategy:r.settings.entries[0];
-    return {...base,action:'rehearsal',spot:'arena',discipline:focus};
-  }
   const family:Family=rng()<(strategy==='dance'?.86:strategy==='trick'?.16:.51)?'dance':'trick';
   const available=SKILLS.filter(s=>s.family===family&&canStudy(r,s.id));
   const priorities=available.filter(s=>!learned(r.skills,s.id)).sort((a,b)=>(r.skills[b.id]?.study??0)-(r.skills[a.id]?.study??0)||a.difficulty-b.difficulty);
@@ -272,7 +275,7 @@ function runMeet(c:Career,r:Rider,disciplines:Discipline[],official:boolean) {
   const meet=currentMeet(r);
   if(!meet) throw new GameError('이번 주에 예정된 대회가 없어요.');
   if(r.records.some(m=>m.year===r.year&&m.id===meet.id)) throw new GameError('이미 끝난 대회입니다.');
-  const entries=meet.international?[...DISCIPLINES]:r.injury?.severity==='major'&&!r.injury.treated?[]:disciplines;
+  const entries=meet.international?[...DISCIPLINES]:r.injury?.severity==='major'&&!r.injury.treated?[]:singleEntry(disciplines);
   const {results,rankings}=simulateMeet(r,meet,entries,official);
   for(const d of DISCIPLINES){
     const points=r.season.scores[d];
@@ -370,6 +373,7 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
     r.spot=a.spot;
   }
   if(a.type==='plan'){
+    if(a.plan.action==='rehearsal')throw new GameError('라인 리허설 훈련은 종료되었어요. 다른 훈련을 선택해 주세요.');
     if(r.plan) throw new GameError('이번 주 행동은 이미 시작했어요. 끝난 뒤 다음 행동을 선택해 주세요.');
     if(r.settings.mode==='auto') throw new GameError('직접 육성으로 전환한 뒤 행동을 선택해 주세요.');
     validatePlan(r,a.plan); r.plan={...a.plan};Reflect.deleteProperty(r.plan,'intensity'); r.spot=a.plan.spot;
@@ -379,6 +383,7 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
     r.routines[a.discipline]=a.skills;
   }
   if(a.type==='settings'){
+    validateAutoEntries(a.settings);
     r.settings={...a.settings};Reflect.deleteProperty(r.settings,'intensity');
     if(r.settings.mode==='auto'){
       if(r.phase==='event'){
@@ -401,6 +406,7 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
     const meet=currentMeet(r);
     if(!meet) throw new GameError('대회 주차에만 출전을 신청할 수 있어요.');
     if(meet.international&&DISCIPLINES.some(d=>!a.disciplines.includes(d)))throw new GameError('국제대회는 댄싱·트릭·프리스타일 3종목 모두 출전해요.');
+    if(!meet.international&&a.disciplines.length>1)throw new GameError('일반 대회는 1종목만 선택할 수 있어요.');
     r.entries=a.disciplines;
     if(r.phase==='meet') runMeet(c,r,r.entries,official);
   }
@@ -416,6 +422,7 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
         if(owned||r.money-reserve<item.price) throw new GameError('이미 가진 장비이거나 구매 가능 금액이 부족해요.');
         r.money-=item.price;
         progress.inventory.push(item.id);
+        (progress.purchasePrices??={})[item.id]=item.price;
         milestone(r,'장비 구매',item.name+' · '+item.price.toLocaleString('ko-KR')+'원');
         note(r,'system',item.name+' 구매 완료');
       } else if(!owned) throw new GameError('보유한 장비만 사용할 수 있어요.');
@@ -438,7 +445,8 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
         if(item.slot==='accessory')progress.accessories=progress.accessories?.filter(id=>id!==item.id);
         else if(progress.equipped[item.slot]===item.id)delete progress.equipped[item.slot];
         progress.inventory=progress.inventory.filter(id=>id!==item.id);
-        r.money+=Math.floor(item.price*ECONOMY.sellRate);
+        r.money+=resaleValue(r,item);
+        if(progress.purchasePrices)delete progress.purchasePrices[item.id];
         milestone(r,'장비 판매',item.name);
         note(r,'system',item.name+' 판매 완료');
       }
@@ -467,4 +475,4 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
   }
   if(a.type==='retire') retire(c,r,'early');
 }
-export const defaultEntries=(r:Rider):Discipline[]=>DISCIPLINES.filter(d=>r.phase!=='retired'&&(r.settings.entries.includes(d)));
+export const defaultEntries=(r:Rider):Discipline[]=>r.phase==='retired'?[]:currentMeet(r)?.international?[...DISCIPLINES]:singleEntry(r.settings.entries);

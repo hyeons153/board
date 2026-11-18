@@ -151,7 +151,7 @@ export function simulateMeet(rider:Rider,meet:Meet,entries:Discipline[],official
     if(!run) continue;
     const place=standings.find(x=>x.id==='player')!.place;
     energy=Math.max(0,energy-RULES.entryCost[d]+fatigue);
-    const prize=Math.round(RULES.prizes[Math.min(place-1,5)]*(meet.major?RULES.majorMultiplier:1));
+    const prize=Math.round(RULES.prizes[Math.min(place-1,5)]*(meet.international?2:meet.major?RULES.majorMultiplier:1));
     const proof=official&&routine?structuredClone({version:RANKING_VERSION,rules:3 as const,seed:rider.seed,routine,stats:p.stats,energy:p.energy,
       injury:p.injury,skills:p.skills,gear:p.extras?{inventory:p.extras.inventory,equipped:p.extras.equipped,accessories:p.extras.accessories,equipmentVersion:p.extras.equipmentVersion}:undefined}):undefined;
     results.push({

@@ -68,16 +68,19 @@ test('guest snapshots survive reopening storage; concurrent tournament submissio
     rider.week=7;rider.phase='meet';
     const setup=await store.replace(owner,save.version,row.snapshot);
     assert.ok(setup);
+    assert.equal((await post({type:'entry',disciplines:['dance','trick']},setup.version)).status,422);
+    assert.equal((await post({type:'settings',settings:{mode:'auto',strategy:'balanced',entries:['dance','trick']}},setup.version)).status,422);
+    assert.equal((await post({type:'plan',plan:{action:'rehearsal',spot:'arena'}},setup.version)).status,400);
     const responses=await Promise.all([
-      post({type:'entry',disciplines:['dance','trick']},setup.version),
-      post({type:'entry',disciplines:['dance','trick']},setup.version),
+      post({type:'entry',disciplines:['dance']},setup.version),
+      post({type:'entry',disciplines:['dance']},setup.version),
     ]);
     assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);
     const reload=createHandler(localStore(path),1000,false);
     const after:View=await (await reload(new Request(base,{headers:{cookie}}))).json();
     const final=after.career.rider!;
     assert.equal(final.records.length,1);
-    assert.equal(final.records[0].results.length,2);
+    assert.equal(final.records[0].results.length,1);
     assert.equal(final.week,8);
     const results=final.records[0].results;
     const reward=ECONOMY.achievements.meet+(results.some(result=>playerPlace(result)===1)?ECONOMY.achievements.win:0);

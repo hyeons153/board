@@ -21,7 +21,7 @@ export function Meets({r,onPlay,onEntry}:{r:Rider;onPlay:(record:MeetRecord)=>vo
   return <section className="panel content-panel">
     <SectionTitle code="COMPETITION CALENDAR" title="대회 일정" detail={r.year+'년차 · '+DIVISION_NAMES[divisionFor(r.year)]+' · 1시즌 6개 대회'}/>
     <p className="meet-career-guide">1~2년차 뉴비부 · 3~4년차 일반부 · 5~6년차 오픈부 · 7~8년차 마스터부</p>
-    <p className="meet-career-guide">일반 대회는 1~3종목 선택 출전. 홀수 해 연말에는 롱페, 2·4·6·8년차 연말에는 개최 도시가 바뀌는 국제대회에 3종목 모두 출전합니다. 8년차 마지막 국제대회 후 은퇴와 명예의 전당 등록으로 이어집니다.</p>
+    <p className="meet-career-guide">일반 대회는 1종목만 선택 출전. 홀수 해 연말에는 롱페, 2·4·6·8년차 연말에는 개최 도시가 바뀌는 국제대회에 3종목 모두 출전합니다. 8년차 마지막 국제대회 후 은퇴와 명예의 전당 등록으로 이어집니다.</p>
     {current&&r.phase!=='retired'&&<p className="calendar-game-link">출전과 경기는 게임 화면에서 이어집니다. <button className="text-button" onClick={onEntry}>게임으로 돌아가기 <ArrowRight size={14}/></button></p>}
     <div className="calendar-list">{calendarFor(r.year).map(m=>{
       const record=r.records.find(x=>x.year===r.year&&x.id===m.id);

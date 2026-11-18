@@ -3,8 +3,9 @@ import type { Look, Spot } from '../game/types';
 import { HEIGHT, WIDTH, paintLandscape, paintRider, type Motion } from './landscape';
 import { ACTOR_HEIGHT, ACTOR_WIDTH, type Technique } from './techniques';
 import {loadCharacterSprites} from './spriteCharacter';
+import {advanceClock, type AnimationClock} from './playback';
 
-export type Stage = { spot:Spot; look:Look; guest?:Look; motion:Motion; technique?:Technique; variant:'title'|'dashboard'|'race'|'event'|'preview'; reduce:boolean };
+export type Stage = { spot:Spot; look:Look; guest?:Look; motion:Motion; technique?:Technique; variant:'title'|'dashboard'|'race'|'event'|'preview'; reduce:boolean; playbackRate?:number };
 export async function createStage(parent:HTMLElement,latest:()=>Stage){
   await loadCharacterSprites();
   class SpotScene extends Phaser.Scene {
@@ -20,6 +21,7 @@ export async function createStage(parent:HTMLElement,latest:()=>Stage){
     private lastTechnique?:string;
     private progress?:number;
     private progressAt=0;
+    private animationClock:AnimationClock={elapsed:0};
     create(){
       this.art=this.textures.createCanvas('pixel-landscape',WIDTH,HEIGHT)!;
       this.rider=this.textures.createCanvas('pixel-rider',ACTOR_WIDTH*2,ACTOR_HEIGHT*2)!;
@@ -39,7 +41,7 @@ export async function createStage(parent:HTMLElement,latest:()=>Stage){
         this.spot=s.spot;
         this.competition=competition;
       }
-      const now=s.reduce?0:time;
+      const now=advanceClock(this.animationClock,time,s.reduce?0:s.playbackRate??1);
       if(s.motion!==this.lastMotion||s.technique?.id!==this.lastTechnique){ this.lastMotion=s.motion; this.lastTechnique=s.technique?.id; this.motionAt=now;this.progress=undefined; }
       const elapsed=now-this.motionAt;
       if(s.technique?.progress!==this.progress){this.progress=s.technique?.progress;this.progressAt=now;}

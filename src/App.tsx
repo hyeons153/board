@@ -114,9 +114,9 @@ export default function App(){
           {(!r.plan||autoChoice)&&<WeeklyChoices key={r.id+':'+r.year+':'+r.week+':'+r.settings.mode+':'+(target??'weekly')} r={r} send={game.send} saving={game.saving} target={target} onPreview={setDraft} pendingChoice={autoChoice}/>}
           <div className="console-home-shortcuts"><button onClick={()=>go('routine')}><ListOrdered size={17}/> 라인</button><button onClick={()=>go('profile')}><UserRound size={17}/> 선수</button>{last&&<button onClick={()=>openReplay(last)}>최근 경기 <PlayIcon/></button>}</div>
         </>}
-      </>:<div className="console-welcome"><span>THE LONGBOARD CAREER SIM</span><h1>LONGBOARD<br/><em>LIFE.</em></h1><p>강변의 첫 푸시부터 마지막 국제대회까지.<br/>나만의 8년 커리어를 시작하세요.</p><button className="console-primary" onClick={()=>go('new')}>새 라이더 등록 <ArrowRight size={20}/></button><small>행동 선택 → 예상 변화 확인 → 2초 수행</small></div>)}
+      </>:<div className="console-welcome"><span>THE LONGBOARD CAREER SIM</span><h1>LONGBOARD<br/><em>LIFE.</em></h1><p>강변의 첫 푸시부터 마지막 국제대회까지.<br/>나만의 8년 커리어를 시작하세요.</p><button className="console-primary" onClick={()=>go('new')}>새 라이더 등록 <ArrowRight size={20}/></button></div>)}
       {spotMap&&r&&screen==='home'&&!busyFlow&&!r.plan&&<SpotMap r={r} send={game.send} saving={game.saving} onClose={()=>setSpotMap(false)}/>}
-      {content&&screen!=='home'&&<section className={'console-panel '+(screen==='journal'?'console-panel-journal':'')} aria-label={names[screen]}>
+      {content&&screen!=='home'&&<section className={'console-panel '+(screen==='journal'?'console-panel-journal':screen==='training'?'console-panel-settings':'')} aria-label={names[screen]}>
         <header><button onClick={playHome} aria-label="게임 화면으로 돌아가기"><ArrowLeft size={18}/></button><h1>{names[screen]}</h1><button onClick={playHome} aria-label="메뉴 닫기"><X size={18}/></button></header>
         <div className="console-panel-body" ref={panel} tabIndex={-1} key={screen}>{content}</div>
       </section>}

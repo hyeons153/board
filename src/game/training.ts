@@ -3,6 +3,8 @@ import { ECONOMY, gearBonuses } from './economy.js';
 import { clamp, round } from './random.js';
 import type { Plan, Rider, Stat } from './types.js';
 
+export const SECONDARY_STAT:Record<Stat,Stat>={speed:'carve',carve:'balance',link:'speed',balance:'carve'};
+
 export const statAfter=(current:number,gain:number)=>round(clamp(current+gain*clamp((RULES.statCap-current)/RULES.statHeadroom,0,1),0,RULES.statCap));
 export const trainingCost=(r:Rider,p:Plan)=>Math.max(0,RULES.energy[p.action]-(['rest','hospital'].includes(p.action)?0:gearBonuses(r).cost));
 export function trainingSuccess(r:Rider,p:Plan){
@@ -23,11 +25,13 @@ export function trainingFactor(r:Rider,p:Plan,form:number,great=false){
 export function trainingStatGains(r:Rider,p:Plan,factor:number):Partial<Record<Stat,number>>{
   const late=RULES.growth[Math.min(7,r.year-1)],gains:Partial<Record<Stat,number>>={};
   const add=(stat:Stat,raw:number)=>{gains[stat]=round(statAfter(r.stats[stat],raw)-r.stats[stat]);};
-  if(p.action==='dance'||p.action==='trick')add(p.action==='dance'?'carve':'balance',RULES.secondaryGrowth*factor*late.stat);
+  if(p.action==='dance'||p.action==='trick'){
+    for(const stat of p.action==='dance'?['speed','carve'] as const:['link','balance'] as const)add(stat,RULES.secondaryGrowth*factor*late.stat);
+  }
   else if(p.action==='rehearsal')add('link',RULES.practice.rehearsalLink*factor*late.stat);
   else if(p.action!=='rest'&&p.action!=='hospital'){
     add(p.action,RULES.statGrowth*factor*late.stat*(1-r.stats[p.action]/RULES.statCap*.7)*(p.action==='link'?1+gearBonuses(r).linkGrowth:1));
-    add(p.action==='link'?'balance':'link',RULES.secondaryGrowth*factor*late.stat*.52);
+    add(SECONDARY_STAT[p.action],RULES.secondaryGrowth*factor*late.stat);
   }
   return gains;
 }

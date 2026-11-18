@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { ArrowRight, Package, ShoppingBag } from 'lucide-react';
 import { STAT_NAMES } from '../game/data';
 import { BASIC_SLOTS, RARITIES, RARITY_NAMES, type Effects, type Gear, type GearSlot } from '../game/equipmentCatalog';
-import { ECONOMY, effectiveStats, equipmentStats, equipmentUnlocked, extras, GEAR, GEAR_NAMES, GEAR_SLOTS, ITEM, STARTER_IDS, unlockText } from '../game/economy';
+import { ECONOMY, effectiveStats, equipmentStats, equipmentUnlocked, extras, GEAR, GEAR_NAMES, GEAR_SLOTS, ITEM, resaleValue, STARTER_IDS, unlockText } from '../game/economy';
 import { STATS, type Rider } from '../game/types';
 import { PixelRider } from './Appearance';
 import { equippedLook } from '../game/economy';
@@ -65,7 +65,7 @@ export default function EquipmentPanel({r,send,saving}:{r:Rider;send:Submit;savi
       {item.slot==='accessory'&&<p className="equipment-slot-note">최대 3개 장착 · 같은 아이템 중복 장착 불가</p>}
       <p className="equipment-unlock">{item.unlock?unlockText(item):STARTER_IDS.includes(item.id)?'처음부터 지급되는 기본 장비':owned?'보관함에 보유 중':'가격 '+money(item.price)}</p>
       <div className="equipment-actions">{owned?<><button className="button primary small" disabled={disabled||equipped||(item.slot==='accessory'&&(progress.accessories??[]).length>=3)} onClick={()=>void send({type:'trade',operation:'equip',item:item.id})}>{equipped?'장착 중':'장착'}</button>
-        {!STARTER_IDS.includes(item.id)&&!item.unlock&&<button className="button quiet small" disabled={disabled} onClick={()=>void send({type:'trade',operation:'sell',item:item.id})}>판매 {money(Math.floor(item.price*ECONOMY.sellRate))}</button>}</>:item.unlock?<button className="button primary small" disabled={disabled||!unlocked} onClick={()=>void send({type:'claim-gear'})}>{unlocked?'해금 보상 받기':'해금 대기'}</button>:<button className="button primary small" disabled={disabled||available<item.price} onClick={()=>void send({type:'trade',operation:'buy',item:item.id})}>구매 {money(item.price)}</button>}</div>
+        {!STARTER_IDS.includes(item.id)&&!item.unlock&&<button className="button quiet small" disabled={disabled} onClick={()=>void send({type:'trade',operation:'sell',item:item.id})}>판매 {money(resaleValue(r,item))}</button>}</>:item.unlock?<button className="button primary small" disabled={disabled||!unlocked} onClick={()=>void send({type:'claim-gear'})}>{unlocked?'해금 보상 받기':'해금 대기'}</button>:<button className="button primary small" disabled={disabled||available<item.price} onClick={()=>void send({type:'trade',operation:'buy',item:item.id})}>구매 {money(item.price)}</button>}</div>
     </aside></div>
     {progress.legacyEquipment&&<details className="equipment-legacy"><summary><Package size={14}/> 이전 장비 보존 기록</summary><p>기존 베어링은 같은 이름과 ID로 액세서리에 옮겼습니다. 지난 경기의 채점 입력은 원본을 유지합니다.</p>{progress.legacyEquipment.unmapped.length>0&&<p>호환 정보 보관: {progress.legacyEquipment.unmapped.join(', ')} · 보유 기록을 유지하며 능력치에는 합산하지 않습니다.</p>}{progress.legacyEquipment.overflow.length>0&&<p>슬롯이 가득 차 보관함에 남긴 장비: {progress.legacyEquipment.overflow.join(', ')}</p>}</details>}
   </section>;
