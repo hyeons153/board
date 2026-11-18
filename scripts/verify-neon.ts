@@ -6,6 +6,7 @@ import type { Directory, Publication, PublicCard } from '../src/game/public';
 const base=new URL(process.argv[2]??'http://127.0.0.1:5185');
 const deployed=process.argv.includes('--deployed');
 const fastForward=process.argv.includes('--fast-forward');
+const competition=process.argv.includes('--competition');
 const local=['127.0.0.1','localhost','[::1]'].includes(base.hostname);
 if(!local&&!(deployed&&base.protocol==='https:'&&base.hostname.endsWith('.vercel.app')))
   throw new Error('Use a local Neon-wired server, or explicitly select a Vercel deployment with --deployed.');
@@ -90,6 +91,29 @@ async function run(){
   await load();
   assert.equal(view!.career.rider!.extras!.equipped.deck,'deck-flow');
   console.log('PASS equipment transaction persisted');
+  if(competition){
+    await game({type:'settings',settings:{mode:'auto',strategy:'balanced',intensity:'safe',entries:['dance','trick'],pauseMeet:true,pauseStory:false,pauseInjury:false}});
+    const deadline=Date.now()+view!.weekMs*8+30000;
+    while(Date.now()<deadline&&view!.career.rider!.phase!=='meet'){
+      await new Promise(resolve=>setTimeout(resolve,2000));
+      await game({type:'pulse'});
+    }
+    assert.equal(view!.career.rider!.phase,'meet');
+    await game({type:'entry',disciplines:['dance','trick']});
+    const key=view!.pendingMeet;
+    assert.ok(key);
+    const saved=JSON.stringify(view!.career);
+    await load();
+    assert.equal(view!.pendingMeet,key);
+    await game({type:'pulse'});
+    assert.equal(JSON.stringify(view!.career),saved);
+    assert.equal(view!.remainingMs,0);
+    await game({type:'continue-meet',record:key});
+    assert.equal(view!.pendingMeet,undefined);
+    assert.equal(view!.remainingMs,view!.weekMs);
+    assert.equal(view!.career.rider!.records[0].results.length,2);
+    console.log('PASS competition -> two disciplines -> durable result hold -> one acknowledgement -> fresh week');
+  }
   await game({type:'retire'});
   assert.equal(view!.career.hall[0].id,riderId);
   assert.equal(view!.fastForward,fastForward);
@@ -99,7 +123,7 @@ async function run(){
   cookie='';
   const card=await request<PublicCard>('?area=public&id='+published.id);
   assert.equal(card.profile.name,'Neon 연결 검증 라이더');
-  assert.equal(card.profile.official,false);
+  assert.equal(card.profile.official,deployed&&competition);
   const found=await request<Directory>('?area=public&search='+encodeURIComponent('Neon 연결 검증'));
   assert.ok(found.rows.some(row=>row.id===published.id));
   cookie=ownerCookie;

@@ -5,9 +5,9 @@ import { CALENDAR, DIVISION_NAMES } from './game/data';
 import { useGame } from './useGame';
 import Start from './components/Start';
 import { Brand, Tag } from './components/Brand';
-import { MeetNotice, NewsCard, RiderCard, SeasonStrip, Training, Upcoming, when } from './components/Overview';
+import { NewsCard, RiderCard, SeasonStrip, Training, Upcoming, when } from './components/Overview';
 import { Skills, Routines } from './components/Skills';
-import { Meets, Race } from './components/Meets';
+import { Meets } from './components/Meets';
 import { Hall, Profile, Rankings } from './components/Records';
 import Workshop from './components/Workshop';
 import { ShoppingBag } from 'lucide-react';
@@ -16,6 +16,7 @@ import { PixelRider } from './components/Appearance';
 import Account from './components/Account';
 import OnlineHall from './components/OnlineHall';
 import Ceremony from './components/Ceremony';
+import type { MeetRecord } from './game/types';
 
 const routes=[
   {id:'overview',name:'육성 홈',icon:LayoutGrid,label:'CAREER HUB'},
@@ -39,15 +40,20 @@ export default function App(){
   const [publicId,setPublicId]=useState(()=>new URLSearchParams(location.search).get('rider')??undefined);
   const [endingId,setEndingId]=useState<string>();
   const previous=useRef<{id:string;phase:string}|undefined>(undefined);
-  const [showReplay,setShowReplay]=useState(false);
+  const [replay,setReplay]=useState<MeetRecord>();
   const view=game.view;
   const r=view?.career.rider;
   const lastPhase=r?.phase;
   const activeId=r?.id;
   useEffect(()=>{
-    if(activeId&&lastPhase==='retired'&&previous.current?.id===activeId&&previous.current.phase!=='retired') setEndingId(activeId);
+    if(activeId&&lastPhase==='retired'&&previous.current?.id===activeId&&previous.current.phase!=='retired'&&!view?.pendingMeet) setEndingId(activeId);
     if(activeId&&lastPhase) previous.current={id:activeId,phase:lastPhase};
-  },[activeId,lastPhase]);
+  },[activeId,lastPhase,view?.pendingMeet]);
+  useEffect(()=>{
+    if(r&&(r.phase==='event'||r.phase==='meet'||r.phase==='injury'||view?.pendingMeet)){
+      setRoute('overview');setTitle(null);setTarget(undefined);setReplay(undefined);
+    }
+  },[r?.id,r?.phase,view?.pendingMeet]);
   const selectPublic=(id?:string)=>{
     setPublicId(id);
     const url=new URL(location.href);
@@ -55,7 +61,7 @@ export default function App(){
     history.replaceState(null,'',url);
   };
   const go=(next:Route)=>{
-    setRoute(next);setTarget(undefined);setShowReplay(false);setEndingId(undefined);window.scrollTo({top:0,behavior:'instant'});
+    setRoute(next);setTarget(undefined);setReplay(undefined);setEndingId(undefined);window.scrollTo({top:0,behavior:'instant'});
     if(next!=='online'&&publicId) selectPublic(undefined);
   };
   const notice=game.error&&<div className="toast" role="alert"><CircleAlert size={18}/><span>{game.error}</span>
@@ -84,6 +90,15 @@ export default function App(){
   const last=r.records.findLast(m=>m.results.length);
   const latestMeetLabel=last&&CALENDAR.find(m=>m.id===last.id)?.name;
   const auto=r.settings.mode==='auto';
+  const pending=view.pendingMeet?r.records.find(m=>r.id+':'+m.year+':'+m.id===view.pendingMeet):undefined;
+  const stageRecord=pending??replay;
+  const openReplay=(record:MeetRecord)=>{go('overview');setReplay(record);};
+  const finishMeet=async()=>{
+    if(view.pendingMeet){
+      const ok=await game.send({type:'continue-meet',record:view.pendingMeet});
+      if(ok&&r.phase==='retired')setEndingId(r.id);
+    }else setReplay(undefined);
+  };
   return <div className="shell">
     <a className="skip" href="#main">본문 바로가기</a>
     <aside className="sidebar">
@@ -96,22 +111,20 @@ export default function App(){
         <button className="button quiet small" onClick={()=>{setTitle(null);go('account');}}><UserRound size={14}/> {view.username??'계정·로그인'}</button></div></header>
       <main className="workspace-main" id="main">
         <header className="page-header"><div><div className="eyebrow">SEASON {String(r.year).padStart(2,'0')} <span className="text-lime">/</span> WEEK {String(r.week).padStart(2,'0')}</div><h1>{route==='overview'?'라이더 라운지':active.name}</h1><p>{route==='overview'?`${r.name} 라이더, 오늘은 어디에서 타볼까요?`:`${r.name} · ${r.year}년차 ${r.week}주 · ${DIVISION_NAMES[divisionFor(r.year)]}`}</p></div>
-          {r.phase!=='retired'&&<div className="week-chip"><Timer size={18}/><span><small>{r.phase==='event'?'이벤트 선택 대기':r.phase==='meet'?'출전 선택 대기':r.phase==='injury'?'부상 확인 대기':game.remaining===0&&!r.plan&&!auto?'훈련 예약 대기':'다음 주 판정까지'}</small><b>{r.phase==='plan'?when(game.remaining):'—'}</b></span></div>}</header>
-        {route!=='overview'&&(r.phase==='event'||r.phase==='meet')&&<div className="meet-notice panel"><CircleAlert size={19}/><div><b>{r.phase==='event'?'응답할 이벤트가 있어요.':'대회 출전을 선택해 주세요.'}</b><span>선택을 마치면 커리어가 이어집니다.</span></div><button className="button secondary small" onClick={()=>go(r.phase==='event'?'overview':'meets')}>바로 가기 <ArrowRight size={15}/></button></div>}
+          {r.phase!=='retired'&&<div className="week-chip"><Timer size={18}/><span><small>{view.pendingMeet?'대회 결과 확인 중':r.phase==='event'?'이벤트 선택 대기':r.phase==='meet'?'출전 선택 대기':r.phase==='injury'?'부상 확인 대기':game.remaining===0&&!r.plan&&!auto?'훈련 예약 대기':'다음 주 판정까지'}</small><b>{r.phase==='plan'&&!view.pendingMeet?when(game.remaining):'—'}</b></span></div>}</header>
         {route==='overview'&&<div className="overview-grid">
           <div className="stack">
-            {r.phase==='retired'&&<div className="meet-notice panel"><Trophy size={22}/><div><b>커리어 종료</b><span>명예의 전당에 {r.name} 선수의 기록이 남았습니다.</span></div><button className="button secondary small" onClick={()=>setEndingId(r.id)}>엔딩 보기</button><button className="button primary small" onClick={()=>setTitle('new')}>새 선수</button></div>}
-            <MeetNotice r={r} onClick={()=>go('meets')}/>
-            <Training key={r.id+'-'+(target??'weekly')} r={r} send={game.send} saving={game.saving} remaining={game.remaining} weekMs={view.weekMs} fastForward={view.fastForward} target={target}/>
+            {r.phase==='retired'&&!view.pendingMeet&&<div className="meet-notice panel"><Trophy size={22}/><div><b>커리어 종료</b><span>명예의 전당에 {r.name} 선수의 기록이 남았습니다.</span></div><button className="button secondary small" onClick={()=>setEndingId(r.id)}>엔딩 보기</button><button className="button primary small" onClick={()=>setTitle('new')}>새 선수</button></div>}
+            <Training key={r.id+'-'+(target??'weekly')} r={r} send={game.send} saving={game.saving} remaining={game.remaining} weekMs={view.weekMs} fastForward={view.fastForward} target={target} record={stageRecord} onDone={()=>void finishMeet()}/>
           </div>
           <aside className="stack overview-aside"><RiderCard r={r}/><Upcoming r={r} onClick={()=>go('meets')}/><SeasonStrip r={r}/>
-            {last&&<div className="panel quick-replay"><CirclePlay size={20}/><div><span>최근 경기</span><b>{latestMeetLabel}</b></div><button className="icon-button" aria-label="최근 경기 재생" onClick={()=>{go('meets');setShowReplay(true);}}><ArrowRight size={17}/></button></div>}
+            {last&&<div className="panel quick-replay"><CirclePlay size={20}/><div><span>최근 경기</span><b>{latestMeetLabel}</b></div><button className="icon-button" aria-label="최근 경기 재생" onClick={()=>openReplay(last)}><ArrowRight size={17}/></button></div>}
             <NewsCard r={r}/>
           </aside>
         </div>}
         {route==='skills'&&<Skills r={r} onTrain={id=>{go('overview');setTarget(id);}}/>}
         {route==='routine'&&<Routines r={r} send={game.send} saving={game.saving}/>}
-        {route==='meets'&&(showReplay&&last?<Race record={last} r={r} onBack={()=>setShowReplay(false)}/>:<Meets r={r} send={game.send} saving={game.saving}/>)}
+        {route==='meets'&&<Meets r={r} onPlay={openReplay} onEntry={()=>go('overview')}/>}
         {route==='rank'&&<Rankings r={r}/>}
         {route==='workshop'&&<Workshop key={r.id} r={r} send={game.send} saving={game.saving}/>}
         {route==='profile'&&<Profile r={r} send={game.send} saving={game.saving} onNew={()=>setTitle('new')} onHall={()=>go('hall')}/>}

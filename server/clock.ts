@@ -1,15 +1,34 @@
 import { command, GameError, processWeek } from '../src/game/career.js';
 import type { Career, GameAction } from '../src/game/types.js';
 
-export type Save = { format:1; career:Career; clock:{credit:number; stamp:number; tabs:Record<string,number>; fastForward?:boolean} };
+export type Save = { format:1; career:Career; clock:{credit:number; stamp:number; tabs:Record<string,number>; fastForward?:boolean; pendingMeet?:string} };
 export const blankSave=():Save=>({format:1,career:{rider:null,hall:[]},clock:{credit:0,stamp:0,tabs:{}}});
-export const remaining=(save:Save,weekMs:number)=>save.career.rider?.phase==='plan'?Math.max(0,(weekMs-save.clock.credit)/(save.clock.fastForward?2:1)):0;
+export const remaining=(save:Save,weekMs:number)=>!save.clock.pendingMeet&&save.career.rider?.phase==='plan'?Math.max(0,(weekMs-save.clock.credit)/(save.clock.fastForward?2:1)):0;
 
 export function advance(prev:Save,a:GameAction,tab:string,now:number,weekMs:number,identity:()=>{id:string;seed:number},official=false,account=false):Save {
   const next=structuredClone(prev);
   const r=next.career.rider;
+  if(prev.clock.pendingMeet){
+    if(a.type==='pulse') return prev;
+    if(a.type!=='continue-meet'||a.record!==prev.clock.pendingMeet) throw new GameError('게임 화면에서 대회 결과를 확인하고 계속해 주세요.');
+    delete next.clock.pendingMeet;
+    next.clock.credit=0;next.clock.stamp=now;next.clock.tabs={[tab]:now};
+    return next;
+  }
+  if(a.type==='continue-meet') throw new GameError('이미 확인한 대회 결과입니다.');
   if(a.type==='pulse'&&(!r||r.phase==='retired')) return prev;
   const clock=next.clock;
+  const recordCount=r?.records.length??0;
+  const holdMeet=()=>{
+    const rider=next.career.rider;
+    if(rider&&rider.id===r?.id&&rider.records.length>recordCount){
+      const record=rider.records.at(-1)!;
+      clock.pendingMeet=`${rider.id}:${record.year}:${record.id}`;
+      clock.credit=0;clock.stamp=now;
+      return true;
+    }
+    return false;
+  };
   // Remove the retired speed preference from older saved clocks.
   Reflect.deleteProperty(clock,'speed');
   // The ID lives in one loaded page. A new page cannot claim time since an earlier page closed.
@@ -29,10 +48,11 @@ export function advance(prev:Save,a:GameAction,tab:string,now:number,weekMs:numb
     clock.fastForward=a.enabled;
   }else command(next.career,a,identity,official,account);
   const rider=next.career.rider;
-  for(let batch=0;batch<8&&clock.credit>=weekMs;batch++){
+  for(let batch=0;!holdMeet()&&batch<8&&clock.credit>=weekMs;batch++){
     if(!processWeek(next.career,official)) break;
     clock.credit-=weekMs;
   }
+  holdMeet();
   if(rider?.phase!=='plan') { clock.credit=0; clock.stamp=now; }
   return next;
 }

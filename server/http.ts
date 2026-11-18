@@ -15,6 +15,7 @@ const skill=z.string().max(40).regex(/^[a-z0-9-]+$/);
 const disciplines=z.array(z.enum(DISCIPLINES)).max(3).refine(ds=>new Set(ds).size===ds.length);
 const actionSchema=z.discriminatedUnion('type',[
   z.strictObject({type:z.literal('pulse')}),
+  z.strictObject({type:z.literal('continue-meet'),record:z.string().max(140)}),
   z.strictObject({type:z.literal('fast-forward'),enabled:z.boolean()}),
   z.strictObject({type:z.literal('create'),name:z.string().trim().min(1).max(16).regex(/^[\p{L}\p{N} _.-]+$/u),look}),
   z.strictObject({type:z.literal('plan'),plan:z.strictObject({action:z.enum(ACTIONS),spot:z.enum(SPOTS),intensity:z.enum(INTENSITIES),skill:skill.optional(),lesson:z.boolean().optional(),discipline:z.enum(DISCIPLINES).optional()})}),
@@ -66,7 +67,7 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
     const rider=career.rider?{...career.rider,seed:0,records:records(career.rider.records,true)}:null;
     const parked=career.parked?.map(item=>({...item,seed:0,records:records(item.records,false)}));
     const fastForward=row.snapshot.clock.fastForward===true;
-    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,remainingMs:remaining(row.snapshot,weekMs),weekMs:weekMs/(fastForward?2:1),fastForward,storage:store.kind,username,scope};
+    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,remainingMs:remaining(row.snapshot,weekMs),weekMs:weekMs/(fastForward?2:1),fastForward,pendingMeet:row.snapshot.clock.pendingMeet,storage:store.kind,username,scope};
   };
   return async (request:Request):Promise<Response>=>{
     try{

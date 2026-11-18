@@ -12,6 +12,8 @@ import Scene from './Scene';
 import { SectionTitle, Tag } from './Brand';
 import { TechniquePreview } from './TechniquePreview';
 import { PixelRider } from './Appearance';
+import GameStage from './GameStage';
+import type { MeetRecord } from '../game/types';
 
 export const money=(n:number)=>'₩'+n.toLocaleString('ko-KR');
 export const when=(ms:number)=>{const s=Math.ceil(ms/1000);return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;};
@@ -40,25 +42,7 @@ export function Upcoming({r,onClick}:{r:Rider;onClick:()=>void}){
 export function NewsCard({r}:{r:Rider}){
   return <article className="panel news"><div className="card-heading"><span><Activity size={16}/> 라이더 일지</span></div><ul>{r.news.slice(0,5).map((n,i)=><li key={`${n.year}-${n.week}-${i}`}><span>{n.year}Y / {String(n.week).padStart(2,'0')}W</span>{n.text}</li>)}</ul></article>;
 }
-export function EventCard({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
-  const e=eventFor(r,r.event??'');
-  if(!e)return null;
-  const person=eventNpc(e,r);
-  return <section className="panel event-panel">
-    <div className="dialogue-scene">
-      <Scene spot={r.spot} look={equippedLook(r)} guest={person?.look} motion="rest" variant="event"/>
-      <Tag kind={e.important?'orange':'lilac'}>{e.kind}</Tag>
-    </div>
-    <div className="dialogue-copy">
-      {person&&<div className="dialogue-person"><PixelRider look={person.look}/><strong>{person.name}</strong></div>}
-      <h2>{e.title}</h2><p>{e.body}</p>
-      <div className="choice-list">{e.choices.map((c,i)=><button className="button secondary" disabled={saving} key={c.label}
-        onClick={()=>void send({type:'event',index:i})}>{c.label}<ArrowRight size={16}/></button>)}</div>
-      {r.settings.mode==='auto'&&<p className="subtle">선택을 마치면 자동 육성이 재개됩니다.</p>}
-    </div>
-  </section>;
-}
-export function Training({r,send,saving,remaining,weekMs,fastForward,target}:{r:Rider;send:Submit;saving:boolean;remaining:number;weekMs:number;fastForward:boolean;target?:string}){
+export function Training({r,send,saving,remaining,weekMs,fastForward,target,record,onDone}:{r:Rider;send:Submit;saving:boolean;remaining:number;weekMs:number;fastForward:boolean;target?:string;record?:MeetRecord;onDone:()=>void}){
   const skill=SKILL[target??''];
   const [spot,setSpot]=useState<Spot>(r.plan?.spot??r.spot);
   const [action,setAction]=useState<Action>(skill?.family??r.plan?.action??'speed');
@@ -73,27 +57,16 @@ export function Training({r,send,saving,remaining,weekMs,fastForward,target}:{r:
   const auto=r.settings.mode==='auto';
   const viewSpot=auto?r.spot:spot;
   const viewMotion=actionMotion[auto?(r.lastPlan?.action??'speed'):action];
-  const canEdit=!auto&&r.phase==='plan'&&!saving;
+  const canEdit=!record&&!auto&&r.phase==='plan'&&!saving;
   const choose=(a:Action)=>{setAction(a);setTarget('');setLesson(false);};
   const blocked=(a:Action)=>a==='hospital'&&!r.injury||a==='rehearsal'&&spot!=='arena'||r.injury?.severity==='major'&&!r.injury.treated&&a!=='rest'&&a!=='hospital';
   const visitor=viewSpot==='river'&&r.events['mentor-intro']&&r.mentor?r.mentor:RIVAL.get(LOCATIONS[viewSpot].npc);
   const last=extras(r).lastTraining;
   return <>
-    {r.phase==='event'&&<EventCard r={r} send={send} saving={saving}/>}
-    {r.phase==='injury'&&<div className="meet-notice panel"><HeartPulse size={20}/><div><b>부상으로 자동 육성을 멈췄어요.</b><span>확인하면 훈련 후속 일정이 이어집니다.</span></div>
-      <button className="button primary small" disabled={saving} onClick={()=>void send({type:'resume'})}>확인하고 재개</button></div>}
-    <div className="spot-stage"><Scene spot={viewSpot} look={equippedLook(r)} guest={visitor?.look} motion={viewMotion}/><div className="scene-shade"/>
-      <div className="spot-title"><span><MapPin size={13}/> {LOCATIONS[viewSpot].en}</span><h2>{LOCATIONS[viewSpot].name}</h2><p>{LOCATIONS[viewSpot].detail}</p>
-      {visitor&&<span className="spot-visitor"><PixelRider look={visitor.look}/> {visitor.name} 연습 중</span>}</div>
-      <div className="scene-counter"><Timer size={14}/><span>{when(remaining)}</span>
-        {r.phase!=='retired'&&<button type="button" className={`fast-forward ${fastForward?'is-active':''}`} aria-label="2배속" aria-pressed={fastForward}
-          title={fastForward?'2배속 끄기':'2배속 켜기'} disabled={saving} onClick={()=>void send({type:'fast-forward',enabled:!fastForward})}>x2</button>}
-      </div>
-      <div className="scene-progress"><span style={{width:`${(1-Math.min(1,remaining/weekMs))*100}%`}}/></div>
-    </div>
+    <GameStage r={r} send={send} saving={saving} remaining={remaining} weekMs={weekMs} fastForward={fastForward} spot={viewSpot} motion={viewMotion} guest={visitor?.look} record={record} onDone={onDone}/>
     <div className="spot-picker expanded" aria-label="훈련 스팟">{SPOTS.map(s=>{
       const locked=!spotUnlocked(r,s);
-      return <button key={s} className={s===viewSpot?'active':''} aria-pressed={s===viewSpot} disabled={auto||locked} title={locked?SPOT_GATE[s]?.hint:LOCATIONS[s].detail}
+      return <button key={s} className={s===viewSpot?'active':''} aria-pressed={s===viewSpot} disabled={!!record||r.phase!=='plan'||auto||locked} title={locked?SPOT_GATE[s]?.hint:LOCATIONS[s].detail}
         onClick={()=>{setSpot(s);if(s!=='arena'&&action==='rehearsal') choose('link');}}>
         <strong>{locked&&<LockKeyhole size={13}/>} {LOCATIONS[s].name}</strong>
         <small>{locked?SPOT_GATE[s]?.hint:LOCATIONS[s].boosted.map(a=>ACTION_NAMES[a]).join(' · ')}</small>
@@ -101,7 +74,7 @@ export function Training({r,send,saving,remaining,weekMs,fastForward,target}:{r:
     })}</div>
     <StatCards r={r}/>
     {last&&<TrainingReport key={last.year+'-'+last.week} r={r} last={last} auto={auto}/>}
-    {r.phase!=='retired'&&<section className="panel training-panel">
+    {r.phase!=='retired'&&!record&&<section className="panel training-panel">
       <SectionTitle code="WEEKLY TRAINING" title={auto?'자동 육성 설정':'이번 주 훈련'} detail={auto?'설정한 전략으로 주간 행동과 이벤트 선택을 맡길 수 있어요.':'한 가지 행동을 예약하면 주간 타이머가 끝날 때 실행됩니다.'}/>
       <div className="mode-switch" aria-label="육성 모드">
         <button disabled={saving} aria-pressed={!auto} className={!auto?'active':''} onClick={()=>void send({type:'settings',settings:{...r.settings,mode:'manual'}})}>직접 육성</button>
@@ -156,11 +129,6 @@ function TrainingReport({r,last,auto}:{r:Rider;last:NonNullable<NonNullable<Ride
 }
 export function toggleEntry(list:Discipline[],d:Discipline){
   return list.includes(d)?list.filter(x=>x!==d):[...list,d];
-}
-export function MeetNotice({r,onClick}:{r:Rider;onClick:()=>void}){
-  const m=currentMeet(r);
-  if(!m||r.phase==='retired')return null;
-  return <div className="meet-notice panel"><CalendarDays size={20}/><div><b>{m.name}</b><span>{r.phase==='meet'?'출전 종목을 선택하면 이번 주가 마무리됩니다.':r.entries!==null?'출전 신청이 저장됐어요.':'이번 주에 대회가 열립니다.'}</span></div><button className="button secondary small" onClick={onClick}>출전 메뉴 <ArrowRight size={15}/></button></div>;
 }
 export function SeasonStrip({r}:{r:Rider}){
   return <div className="season-strip panel"><Gauge size={18}/><span>시즌 진행</span><b>{String(r.week).padStart(2,'0')} / {RULES.weeks}주</b><div className="strip-ticks">{CALENDAR.map(m=><i key={m.id} title={m.name} className={m.week<=r.week?'done':''}/>)}</div></div>;

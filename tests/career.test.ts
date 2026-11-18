@@ -169,6 +169,43 @@ test('the x2 toggle preserves progress, pauses and normal speed when turned off'
   }
 });
 
+test('a completed meet holds the career until its exact result is acknowledged, without duplicate rewards or catch-up',()=>{
+  let save=advance(blankSave(),{type:'create',name:'In game',look:DEFAULT_LOOK},'first',0,RULES.weekMs,identity);
+  save.career.rider!.week=7;save.career.rider!.phase='meet';
+  save=advance(save,{type:'entry',disciplines:['dance','trick']},'first',1000,RULES.weekMs,identity,true);
+  const key=save.clock.pendingMeet!;
+  assert.ok(key);
+  const completed=structuredClone(save.career);
+  assert.equal(remaining(save,RULES.weekMs),0);
+  assert.equal(advance(save,{type:'pulse'},'other-tab',600000,RULES.weekMs,identity),save);
+  assert.throws(()=>advance(save,{type:'continue-meet',record:'wrong'},'first',600000,RULES.weekMs,identity),GameError);
+  assert.throws(()=>advance(save,{type:'entry',disciplines:['dance']},'first',600000,RULES.weekMs,identity),GameError);
+  save=advance(JSON.parse(JSON.stringify(save)),{type:'continue-meet',record:key},'new-tab',600000,RULES.weekMs,identity);
+  assert.deepEqual(save.career,completed);
+  assert.equal(save.clock.pendingMeet,undefined);
+  assert.equal(remaining(save,RULES.weekMs),RULES.weekMs);
+  assert.throws(()=>advance(save,{type:'continue-meet',record:key},'new-tab',600001,RULES.weekMs,identity),GameError);
+});
+
+test('auto career catch-up stops at the first meet and the final festival remains viewable after retirement',()=>{
+  for(const final of [false,true]){
+    let save=advance(blankSave(),{type:'create',name:'Auto stage',look:DEFAULT_LOOK},'first',0,RULES.weekMs,identity);
+    const r=save.career.rider!;
+    r.year=final?8:1;r.week=final?52:7;
+    r.settings={mode:'auto',strategy:'balanced',intensity:'safe',entries:['dance']};
+    save=advance(save,{type:'pulse'},'first',300000,RULES.weekMs,identity,true);
+    assert.ok(save.clock.pendingMeet);
+    assert.equal(save.career.rider!.records.length,1);
+    assert.equal(save.career.rider!.phase,final?'retired':'plan');
+    const paused=structuredClone(save);
+    save=advance(save,{type:'pulse'},'first',900000,RULES.weekMs,identity);
+    assert.deepEqual(save,paused);
+    save=advance(save,{type:'continue-meet',record:save.clock.pendingMeet!},'first',900000,RULES.weekMs,identity);
+    assert.equal(save.clock.pendingMeet,undefined);
+    assert.equal(save.career.rider!.records.length,1);
+  }
+});
+
 test('equipment, lesson fees, and locked spots are enforced by the career command',()=>{
   const c=career(),r=c.rider!;
   assert.throws(()=>command(c,{type:'plan',plan:{...plan('trick'),spot:'night'}},identity),GameError);

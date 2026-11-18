@@ -106,6 +106,10 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
     assert.ok(after.records[0].results.every(result=>result.proof));
     const visible=await owner.read();
     assert.ok(visible.career.rider?.records[0].results.every(result=>!result.proof));
+    assert.ok(visible.pendingMeet);
+    const held=await owner.read();
+    assert.equal(held.pendingMeet,visible.pendingMeet);
+    await status(owner.game({type:'continue-meet',record:visible.pendingMeet!}),200);
 
     await status(owner.game({type:'retire'}),200);
     await status(owner.game({type:'retire'},owner.snapshot().version),422);
