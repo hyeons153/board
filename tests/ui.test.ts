@@ -7,7 +7,7 @@ import {JSDOM} from 'jsdom';
 import {createHandler} from '../server/http';
 import {localStore} from '../server/store';
 
-test('one game frame handles menus, weekly choice, result/event flow and silent clock rebasing',{timeout:45000},async()=>{
+test('one game frame previews choices on the existing HUD before confirmation, then handles results and automatic competition',{timeout:45000},async()=>{
   const directory=await mkdtemp(join(process.cwd(),'.longboard-test-'));
   const dom=new JSDOM('<!doctype html><div id="root"></div>',{url:'http://127.0.0.1/',pretendToBeVisual:true});
   const win=dom.window;
@@ -42,6 +42,7 @@ test('one game frame handles menus, weekly choice, result/event flow and silent 
   const {WeeklyChoices}=await import('../src/components/WeeklyChoices');
   const {newRider,command}=await import('../src/game/career');
   const {DEFAULT_LOOK}=await import('../src/game/data');
+  const {previewTraining}=await import('../src/game/training');
   const root=createRoot(win.document.getElementById('root')!);
   const settle=async(ms=40)=>{await act(async()=>{await new Promise(resolve=>setTimeout(resolve,ms));});};
   const click=async(label:string)=>{
@@ -63,6 +64,9 @@ test('one game frame handles menus, weekly choice, result/event flow and silent 
     assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,9);
     assert.equal(win.document.querySelectorAll('[aria-label="현재 능력치"] meter').length,4);
     assert.ok(![...win.document.querySelectorAll('.console-dock button')].some(button=>button.textContent==='훈련'));
+    await click('자동 육성 설정');
+    assert.match(win.document.querySelector('.auto-settings .intensity-hint')!.textContent!,/성장 100%.*체력 소모 100%.*부상 위험 100%/);
+    await click('메뉴 닫기');
     for(const menu of ['기술','대회','상점','메뉴']){
       await click(menu);assert.equal(win.document.querySelector('.game-console'),frame);assert.ok(win.document.querySelector('.console-panel'));await click('메뉴 닫기');
     }
@@ -72,8 +76,30 @@ test('one game frame handles menus, weekly choice, result/event flow and silent 
     await click('피터팬 추가');await click('라인 저장');
     assert.ok([...win.document.querySelectorAll('button')].some(button=>button.textContent?.includes('저장된 구성')&&button.disabled));
     await click('메뉴 닫기');
+    const speedGauge=win.document.querySelector('.stat-speed');
+    await click('속도 훈련 선택');
+    assert.equal(win.document.querySelector('.stat-speed'),speedGauge,'Forecast must update the existing top gauge');
+    assert.ok(win.document.querySelector('[aria-label="속도 예상 상승"]'));
+    assert.ok(win.document.querySelector('[aria-label="연계 예상 상승"]'));
+    assert.equal(win.document.querySelector<HTMLMeterElement>('meter[aria-label="속도"]')!.value,18,'A forecast must not change the saved stat');
+    assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,9);
+    assert.equal(win.document.querySelector('.weekly-preview'),null,'Do not open a second detail panel');
+    assert.match(win.document.querySelector('[aria-label="예상 체력 변화"]')!.textContent!,/100 → 83/);
+    const intensity=win.document.querySelector<HTMLSelectElement>('select[aria-label="훈련 강도"]')!;
+    await act(async()=>{intensity.value='safe';intensity.dispatchEvent(new win.Event('change',{bubbles:true}));});await settle();
+    assert.match(win.document.querySelector('[aria-label="예상 체력 변화"]')!.textContent!,/100 → 89/);
+    assert.match(win.document.querySelector('.intensity-hint')!.textContent!,/성장 78%.*체력 소모 65%.*부상 위험 55%/);
+    await act(async()=>{intensity.value='focus';intensity.dispatchEvent(new win.Event('change',{bubbles:true}));});await settle();
+    assert.match(win.document.querySelector('[aria-label="예상 체력 변화"]')!.textContent!,/77\.6/);
+    assert.match(win.document.querySelector('.intensity-hint')!.textContent!,/성장 130%.*체력 소모 132%.*부상 위험 165%/);
+    await act(async()=>{intensity.value='safe';intensity.dispatchEvent(new win.Event('change',{bubbles:true}));});await settle();
+    await click('카빙 훈련 선택');
+    assert.equal(win.document.querySelector('[aria-label="속도 예상 상승"]'),null);
+    assert.ok(win.document.querySelector('[aria-label="카빙 예상 상승"]'));
+    await click('선택 취소');
+    assert.equal(win.document.querySelector('.status-projection'),null);
+    assert.equal(win.document.querySelector('[aria-label="예상 체력 변화"]'),null);
     await click('속도 훈련 선택');injectClock=true;
-    assert.ok(win.document.querySelector('[aria-label="행동 미리보기"]'));
     assert.ok(!win.document.querySelector('.console-panel'));
     await click('확인하고 수행');
     assert.equal(clockRaces,1);assert.equal(win.document.querySelector('[role="alert"]'),null);
@@ -88,23 +114,25 @@ test('one game frame handles menus, weekly choice, result/event flow and silent 
     await act(async()=>{await Promise.all([...pendingRequests]);});await settle(10);
     assert.match(win.document.querySelector('.console-rider')!.textContent!,/2주/);
     await click('휴식 선택');
-    assert.ok(win.document.querySelector('[aria-label="예상 체력"]'));
-    await click('선택지로');await click('속도 훈련 선택');injectChoice=true;
+    assert.ok(win.document.querySelector('[aria-label="예상 체력 변화"]'));
+    assert.equal(win.document.querySelector('.status-projection'),null,'Rest should preview stamina instead of stat growth');
+    await click('선택 취소');await click('속도 훈련 선택');injectChoice=true;
     await click('확인하고 수행');
     assert.ok(win.document.querySelector('.console-sync-note'));
     assert.equal(win.document.querySelector('[role="alert"]'),null);
-    assert.ok(win.document.querySelector('[aria-label="행동 미리보기"]'),'A rejected choice must stay open instead of pretending it saved');
+    assert.ok(win.document.querySelector('[aria-label="선택한 행동 확인"]'),'A rejected choice must stay selected instead of pretending it saved');
     await click('확인하고 수행');
     assert.ok(win.document.querySelector('[aria-label="행동 진행"]'));
     assert.equal(win.document.querySelector('.game-console'),frame);
     const rider=newRider('automatic-ui',71,'Auto rider',DEFAULT_LOOK);
     rider.energy=0;
-    await act(async()=>root.render(createElement(WeeklyChoices,{r:rider,send:async()=>true,saving:false,onSettings:()=>{}})));
+    let selected:Parameters<typeof previewTraining>[1]|undefined;
+    await act(async()=>root.render(createElement(WeeklyChoices,{r:rider,send:async()=>true,saving:false,onSettings:()=>{},onPreview:plan=>{selected=plan;}})));
     await click('속도 훈련 선택');
-    assert.match(win.document.querySelector('.preview-success')!.textContent!,/12%/);
-    assert.match(win.document.querySelector('.preview-success')!.textContent!,/실패 위험/);
+    assert.match(win.document.querySelector('.weekly-success')!.textContent!,/12%/);
+    assert.match(win.document.querySelector('.weekly-success')!.textContent!,/실패 위험/);
     await click('휴식 선택');
-    assert.match(win.document.querySelector('.preview-energy')!.textContent!,/0 → 41/);
+    assert.equal(previewTraining(rider,selected!).energyAfter,41);
     rider.week=7;rider.phase='meet';rider.settings={mode:'auto',strategy:'balanced',intensity:'safe',entries:['dance','trick']};
     const career={rider,hall:[]};
     command(career,{type:'entry',disciplines:['dance','trick']},()=>({id:'automatic-ui',seed:71}));

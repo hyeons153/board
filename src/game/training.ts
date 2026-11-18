@@ -47,3 +47,4 @@ export function previewTraining(r:Rider,p:Plan){
   }
   return {success,energyAfter,energy:round(energyAfter-r.energy),money,gains,skill,recovery};
 }
+export type TrainingPreview=ReturnType<typeof previewTraining>;

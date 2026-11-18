@@ -4,6 +4,7 @@ import { useGame } from './useGame';
 import { ACTION_NAMES, CALENDAR, DEFAULT_LOOK, DIVISION_NAMES, LOCATIONS } from './game/data';
 import { divisionFor } from './game/career';
 import { lineTerms } from './game/content';
+import { previewTraining } from './game/training';
 import { equippedLook, extras } from './game/economy';
 import { Brand } from './components/Brand';
 import { LookFields, PixelRider } from './components/Appearance';
@@ -18,7 +19,7 @@ import Ceremony from './components/Ceremony';
 import GameStage from './components/GameStage';
 import Scene from './components/Scene';
 import { AutoSettings, StatusGauges, WeeklyChoices } from './components/WeeklyChoices';
-import type { Look, MeetRecord } from './game/types';
+import type { Look, MeetRecord, Plan } from './game/types';
 
 type Screen='home'|'training'|'skills'|'routine'|'meets'|'rank'|'workshop'|'profile'|'hall'|'online'|'account'|'menu'|'new'|'ending'|'journal';
 const names:Record<Screen,string>={home:'육성',training:'자동 육성 설정',skills:'기술 도감',routine:'라인 편집',meets:'대회',rank:'시즌 랭킹',workshop:'장비·스폰서',profile:'선수 정보',hall:'명예의 전당',online:'온라인 명예의 전당',account:'계정',menu:'전체 메뉴',new:'라이더 등록',ending:'커리어 엔딩',journal:'라이더 일지'};
@@ -29,6 +30,7 @@ export default function App(){
   const game=useGame();
   const [screen,setScreen]=useState<Screen>(()=>new URLSearchParams(location.search).has('rider')?'online':'home');
   const [target,setTarget]=useState<string>();
+  const [draft,setDraft]=useState<Plan>();
   const [publicId,setPublicId]=useState(()=>new URLSearchParams(location.search).get('rider')??undefined);
   const [endingId,setEndingId]=useState<string>();
   const [replay,setReplay]=useState<MeetRecord>();
@@ -57,6 +59,7 @@ export default function App(){
   if(!view)return <main className="boot"><Brand/><p role="status">{game.error||'라이더 기록을 불러오는 중…'}</p>{game.error&&<button className="button primary" onClick={()=>void game.load()}>다시 연결</button>}</main>;
   const stageRecord=r?.records.find(m=>r.id+':'+m.year+':'+m.id===pending)??replay;
   const busyFlow=!!r&&(!!pending||!!trainingResult||['event','meet','injury'].includes(r.phase));
+  const preview=r&&draft&&screen==='home'&&!busyFlow&&!replay&&!r.plan&&r.settings.mode==='manual'?previewTraining(r,draft):undefined;
   const active=!!r&&r.phase!=='retired';
   const last=r?.records.findLast(record=>record.results.length);
   const archive=view.career.hall.find(a=>a.id===endingId);
@@ -90,11 +93,11 @@ export default function App(){
     </header>
     <div className="console-world">
       <div className="console-stage" inert={screen!=='home'}>{r?<GameStage r={r} send={game.send} saving={game.saving} remaining={game.remaining} weekMs={view.weekMs} fastForward={view.fastForward} spot={r.plan?.spot??r.spot} motion={r.plan?.action==='rest'||r.plan?.action==='hospital'?'rest':'ride'} record={stageRecord} pendingTraining={trainingResult} onDone={()=>void finishMeet()}/>:<><Scene spot="river" look={DEFAULT_LOOK} variant="title"/><div className="console-title-shade"/></>}</div>
-      {r&&<div className="console-vitals" aria-label="선수 상태"><span>체력 <b>{Math.round(r.energy)}</b><i><em style={{width:r.energy+'%'}}/></i></span><span>₩{r.money.toLocaleString('ko-KR')}</span><span>명성 {r.fame}</span>{r.injury&&<span className="console-injury">{r.injury.severity==='major'?'중상':'경상'} · {r.injury.weeks}주</span>}</div>}
-      {r&&<StatusGauges r={r}/>}
+      {r&&<div className="console-vitals" aria-label="선수 상태"><span className={'console-energy '+(preview?'has-projection':'')}><span className="console-energy-label">체력 <b>{Math.round(r.energy)}</b></span><i><em style={{width:r.energy+'%'}}/>{preview&&preview.energy!==0&&<span className={'energy-projection '+(preview.energy<0?'is-cost':'')} style={{left:Math.min(r.energy,preview.energyAfter)+'%',width:Math.abs(preview.energy)+'%'}} aria-hidden="true"/>}</i>{preview&&<strong className={'energy-change '+(preview.energy<0?'is-cost':'')} aria-label="예상 체력 변화">{r.energy.toFixed(1).replace('.0','')} → {preview.energyAfter.toFixed(1).replace('.0','')} ({preview.energy>0?'+':''}{preview.energy})</strong>}</span><span className={'console-money '+(preview?.money?'has-projection':'')}>₩{r.money.toLocaleString('ko-KR')}{!!preview?.money&&<small className="money-change">예상 비용 ₩{(-preview.money).toLocaleString('ko-KR')}</small>}</span><span>명성 {r.fame}</span>{r.injury&&<span className="console-injury">{r.injury.severity==='major'?'중상':'경상'} · {r.injury.weeks}주</span>}</div>}
+      {r&&<StatusGauges r={r} preview={preview}/>}
       {screen==='home'&&!busyFlow&&!replay&&(r?<>
         {r.phase==='retired'?<div className="console-home-actions"><button className="console-primary" onClick={()=>{setEndingId(r.id);go('ending');}}>은퇴식 보기 <Trophy size={18}/></button><button onClick={()=>go('new')}>새 선수 육성</button></div>:<>
-          {!r.plan&&<WeeklyChoices key={r.id+':'+r.year+':'+r.week+':'+(target??'weekly')} r={r} send={game.send} saving={game.saving} target={target} onSettings={()=>go('training')}/>}
+          {!r.plan&&<WeeklyChoices key={r.id+':'+r.year+':'+r.week+':'+(target??'weekly')} r={r} send={game.send} saving={game.saving} target={target} onSettings={()=>go('training')} onPreview={setDraft}/>}
           <div className="console-home-shortcuts"><button onClick={()=>go('routine')}><ListOrdered size={17}/> 라인</button><button onClick={()=>go('profile')}><UserRound size={17}/> 선수</button>{last&&<button onClick={()=>openReplay(last)}>최근 경기 <PlayIcon/></button>}</div>
         </>}
       </>:<div className="console-welcome"><span>THE LONGBOARD CAREER SIM</span><h1>LONGBOARD<br/><em>LIFE.</em></h1><p>강변의 첫 푸시부터 마지막 페스티벌까지.<br/>나만의 8년 커리어를 시작하세요.</p><button className="console-primary" onClick={()=>go('new')}>새 라이더 등록 <ArrowRight size={20}/></button><small>행동 선택 → 예상 변화 확인 → 약 4초 수행</small></div>)}
