@@ -10,7 +10,7 @@ import type { Submit } from './Overview';
 import { AUTO_FLOW, useAutoAdvance } from '../useAutoAdvance';
 
 const icons={speed:Wind,carve:Route,link:Link2,balance:MoveDiagonal2,dance:Footprints,trick:Aperture,rest:Coffee,hospital:Cross};
-const details={speed:'속도 +++ · 카빙 +',carve:'카빙 +++ · 밸런스 +',link:'연계 +++ · 속도 +',balance:'밸런스 +++ · 카빙 +',dance:'기술 숙련 · 속도·카빙',trick:'기술 숙련 · 연계·밸런스',rest:'체력 회복',hospital:'부상 치료·체력 회복'};
+const choiceLabels={...STAT_NAMES,dance:DISCIPLINE_NAMES.dance,trick:DISCIPLINE_NAMES.trick,rest:ACTION_NAMES.rest,hospital:ACTION_NAMES.hospital};
 const signed=(n:number)=>(n>0?'+':'')+n.toFixed(1).replace('.0','');
 const range=(min:number,max:number)=>min===max?signed(min):signed(min)+' ~ '+signed(max);
 
@@ -38,27 +38,29 @@ export function WeeklyChoices({r,send,saving,target,onPreview,pendingChoice}:{r:
   const choose=(next:typeof ACTIONS[number])=>{setAction(current=>current===next?undefined:next);setSkill('');setLesson(false);};
   const plan=useMemo<Plan|undefined>(()=>action?{action,spot,...(skill?{skill}:{}),...(lesson?{lesson:true}:{})}:undefined,[action,spot,skill,lesson]);
   const preview=plan?previewTraining(r,plan):undefined;
+  const note=preview?.recovery
+    ? action==='hospital'?'치료를 받으면 회복이 2주 빨라진다.':r.injury?'휴식으로 회복에 한 주를 보낸다.':''
+    : '실패하면 체력만 소모된다. 부상에 주의하자.';
   let blocked='';if(plan)try{validatePlan(r,plan);}catch(error){blocked=error instanceof Error?error.message:'이 행동을 선택할 수 없어요.';}
   const auto=r.settings.mode==='auto';
   useEffect(()=>{onPreview?.(auto&&pendingChoice?r.plan??undefined:!blocked&&!auto?plan:undefined);},[plan,blocked,auto,pendingChoice,r.plan,onPreview]);
   useAutoAdvance(pendingChoice??'',auto&&!!pendingChoice&&!saving,AUTO_FLOW.choiceMs,()=>void send({type:'start-training',record:pendingChoice!}));
   useEffect(()=>()=>onPreview?.(undefined),[onPreview]);
   return <section className={'weekly-choices '+(auto?'is-auto ':'')+(action||pendingChoice?'has-preview':'')} aria-label={auto?'자동 행동 선택':'이번 주 행동 선택'}>
-    <header><div><span>{r.year}년차 · {r.week}주</span><h2>{auto?'이번 주 행동을 선택합니다.':'이번 주에는 무엇을 할까요?'}</h2></div></header>
-      <div className="weekly-action-grid">{ACTIONS.map(next=>{
-        const Icon=icons[next],unavailable=next==='hospital'&&!r.injury;
-        return <button key={next} aria-label={ACTION_NAMES[next]+' 선택'} aria-pressed={(auto?r.plan?.action:action)===next} disabled={saving||auto} onClick={()=>choose(next)}><Icon size={20}/><strong>{ACTION_NAMES[next]}</strong><small>{unavailable?'현재 부상 없음':details[next]}</small></button>;
-      })}</div>
+    <h2>이번 주엔 무엇을 할까?</h2>
+    <div className="weekly-action-grid">{ACTIONS.map(next=>{
+      const Icon=icons[next];
+      return <button key={next} aria-label={ACTION_NAMES[next]+' 선택'} aria-pressed={(auto?r.plan?.action:action)===next} disabled={saving||auto} onClick={()=>choose(next)}><Icon size={16} aria-hidden="true"/><strong>{choiceLabels[next]}</strong></button>;
+    })}</div>
     <div className="weekly-selection-slot">
-    {auto?<div className="weekly-auto"><div><strong>{r.plan?ACTION_STORIES[r.plan.action].start:'행동 선택 중'}</strong></div><button onClick={()=>void send({type:'settings',settings:{...r.settings,mode:'manual'}})} disabled={saving}>직접 선택으로 전환</button></div>:<>
-      {plan&&preview?<>
-        <div className="weekly-inline-controls" aria-label="행동 설정">
-          {(action==='dance'||action==='trick')&&<label>연마 목표<select aria-label="연마 목표" value={skill} disabled={saving} onChange={e=>{setSkill(e.target.value);setLesson(false);}}><option value="">자유 연마</option>{SKILLS.filter(s=>s.family===action&&canStudy(r,s.id)).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
+    {auto?<div className="weekly-auto"><strong>{r.plan?ACTION_STORIES[r.plan.action].start:'이번 주 일정을 고르는 중…'}</strong><button onClick={()=>void send({type:'settings',settings:{...r.settings,mode:'manual'}})} disabled={saving}>직접 고르기</button></div>:plan&&preview&&<>
+        {(action==='dance'||action==='trick')&&<div className="weekly-inline-controls" aria-label="행동 설정">
+          <label>연마 목표<select aria-label="연마 목표" value={skill} disabled={saving} onChange={e=>{setSkill(e.target.value);setLesson(false);}}><option value="">자유 연마</option>{SKILLS.filter(s=>s.family===action&&canStudy(r,s.id)).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           {!!skill&&['studio','night','arena'].includes(spot)&&<label className="weekly-lesson"><input type="checkbox" checked={lesson} disabled={saving} onChange={e=>setLesson(e.target.checked)}/> 개인 레슨</label>}
-        </div>
-        {blocked?<p className="weekly-blocked" role="status">{blocked}</p>:<p className="weekly-selection-note" role="status">
+        </div>}
+        {blocked?<p className="weekly-blocked" role="status">{blocked}</p>:(note||preview.skill)&&<p className="weekly-selection-note" role="status">
           {preview.skill&&<span>{SKILL[preview.skill.id]?.name} {preview.skill.label} {range(preview.skill.min,preview.skill.max)}% · </span>}
-          {preview.recovery?(action==='rest'?'부상 회복 1주 진행':'치료로 회복 2주 단축 · 이번 주 회복 추가'):'실패 시 성장 없음 · 체력 소모 · 부상 가능'}
+          {note}
         </p>}
         <footer className="weekly-confirm" aria-label="선택한 행동 확인">
           <button className="weekly-cancel" aria-label="선택 취소" disabled={saving} onClick={()=>setAction(undefined)}><X size={15}/></button>
@@ -66,7 +68,6 @@ export function WeeklyChoices({r,send,saving,target,onPreview,pendingChoice}:{r:
           {!preview.recovery&&<span className={'weekly-success '+(preview.success<.7?'is-risky':'')}>성공률 <b>{Math.round(preview.success*100)}%</b>{preview.success<.7&&<small>체력 부족 · 실패 위험 높음</small>}</span>}
           <button className="weekly-execute" disabled={saving||!!blocked} onClick={()=>void send({type:'plan',plan})}>확인 <Check size={16}/></button>
         </footer>
-      </>:<footer className="weekly-confirm"><span>행동을 선택해 주세요.</span><button className="weekly-execute" disabled>확인 <Check size={16}/></button></footer>}
     </>}
     </div>
   </section>;

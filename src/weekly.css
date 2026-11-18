@@ -7,13 +7,13 @@
 .status-gauge meter::-webkit-meter-bar { border:0; background:#6b7776; border-radius:3px; }
 .status-gauge meter::-webkit-meter-optimum-value { background:#c6a1ef; }.stat-carve meter::-webkit-meter-optimum-value { background:#71d1bc; }.stat-link meter::-webkit-meter-optimum-value { background:#eda780; }.stat-balance meter::-webkit-meter-optimum-value { background:#b5d982; }
 .status-gauge meter::-moz-meter-bar { background:#a5d5b0; }
-.weekly-choices { position:absolute; z-index:4; bottom:20px; left:clamp(22px,5vw,90px); width:min(930px,calc(100% - 180px)); max-height:calc(100% - 190px); overflow:auto; padding:16px; border:1px solid #d0ddc6; border-radius:12px; color:#25384b; background:#fffcefef; box-shadow:0 8px 35px #0a18296b; backdrop-filter:blur(8px); scrollbar-color:#7d9a83 #eee9dc; }
-.weekly-choices > header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }.weekly-choices > header span { font:700 .65rem var(--mono); color:#4d7560; }.weekly-choices h2 { margin:3px 0 0; font-size:1.15rem; }
-.weekly-action-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; }
-.weekly-action-grid > button { display:grid; grid-template-columns:21px 1fr; align-content:center; gap:4px 7px; min-height:67px; padding:10px; color:#2a4350; background:#f9f5e9; border:1px solid #c8cbb6; border-radius:7px; text-align:left; }
-.weekly-action-grid > button > svg { grid-row:1/3; align-self:center; color:#567970; }.weekly-action-grid strong { font-size:.8rem; }.weekly-action-grid small { font-size:.63rem; color:#647363; white-space:nowrap; }
-.weekly-action-grid > button[aria-pressed=true],.weekly-action-grid > button:hover:not(:disabled) { border-color:#668d6c; background:#deedc8; }.weekly-action-grid > button[aria-label="휴식 선택"] { background:#e8efdc; }
-.weekly-hint { margin:10px 0 0; font-size:.7rem; color:#596e63; }
+.weekly-choices { position:absolute; z-index:4; bottom:20px; left:clamp(16px,4vw,72px); width:min(520px,calc(100% - 156px)); max-height:calc(100% - 160px); overflow:auto; padding:12px; border:1px solid #d0ddc6; border-radius:10px; color:#25384b; background:#fffcefef; box-shadow:0 8px 35px #0a18296b; backdrop-filter:blur(8px); scrollbar-color:#7d9a83 #eee9dc; }
+.weekly-choices h2 { margin:0 0 9px; font-size:1.05rem; }
+.weekly-action-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+.weekly-action-grid > button { display:flex; align-items:center; justify-content:center; gap:6px; min-width:0; min-height:42px; padding:6px; color:#2a4350; background:#f9f5e9; border:1px solid #c8cbb6; border-radius:6px; text-align:center; }
+.weekly-action-grid > button > svg { flex:none; color:#567970; }.weekly-action-grid strong { font-size:.8rem; word-break:keep-all; }
+.weekly-action-grid > button[aria-label="휴식 선택"] { background:#e8efdc; }
+.weekly-action-grid > button[aria-pressed=true],.weekly-action-grid > button:hover:not(:disabled) { border-color:#668d6c; background:#deedc8; }
 .status-track { grid-column:1/-1; position:relative; height:6px; overflow:hidden; border-radius:3px; }
 .status-track meter { display:block; }
 .status-projection { position:absolute; top:0; bottom:0; min-width:2px; background:repeating-linear-gradient(90deg,#e4f6b390 0 2px,#e4f6b330 2px 4px); box-shadow:0 0 6px #d5f788; }
@@ -28,12 +28,12 @@
 .energy-change { grid-column:1/-1; font:700 .65rem var(--mono); color:#dff5a8; }
 .energy-change.is-cost { color:#ffc0a4; }
 .console-vitals .console-money.has-projection { display:grid; gap:3px; }.money-change { font-size:.64rem; color:#ffcf9e; }
-.weekly-inline-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin-top:12px; }
+.weekly-inline-controls { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-top:8px; }
 .weekly-inline-controls > label { display:flex; align-items:center; gap:6px; font-size:.68rem; color:#526c5c; }
 .weekly-inline-controls select { min-height:30px; padding:4px 7px; font-size:.73rem; width:auto; max-width:185px; }
 .weekly-inline-controls .weekly-lesson { gap:5px; }.weekly-lesson input { width:15px; height:15px; }
 .weekly-selection-note,.weekly-blocked { margin:8px 0 0; font-size:.66rem; line-height:1.5; color:#6c735d; }.weekly-blocked { color:#a34231; font-weight:700; }
-.weekly-confirm { display:flex; align-items:center; gap:10px; margin-top:9px; padding-top:9px; border-top:1px solid #d0d6be; }
+.weekly-confirm { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin-top:7px; padding-top:7px; border-top:1px solid #d0d6be; }
 .weekly-confirm > strong { font-size:.8rem; }.weekly-confirm button { display:flex; align-items:center; justify-content:center; gap:5px; min-height:35px; padding:7px 10px; border:1px solid #bbc8a5; border-radius:6px; font-size:.77rem; font-weight:700; }
 .weekly-confirm .weekly-cancel { min-height:29px; width:29px; padding:4px; background:#f7f3e6; color:#65765e; }
 .weekly-success { display:flex; align-items:baseline; gap:5px; font-size:.72rem; color:#526d50; }.weekly-success b { font-family:var(--mono); color:#2f634d; }.weekly-success small { font-size:.65rem; }.weekly-success.is-risky,.weekly-success.is-risky b { color:#a94b32; }
@@ -42,25 +42,16 @@
 .console-world:has(.weekly-choices) .console-home-shortcuts { flex-direction:column; }.game-console .game-stage .spot-title { bottom:285px; }.console-world:has(.has-preview) .spot-title { display:none; }
 .weekly-running { position:absolute; z-index:3; bottom:35px; left:clamp(22px,5vw,90px); width:min(450px,calc(100% - 44px)); display:grid; gap:9px; padding:18px; color:#f6f2db; border:1px solid #d1dfa25c; background:#21374be8; border-radius:10px; }.weekly-running strong { font-size:1.1rem; }.weekly-running span { font-size:.78rem; color:#c5d3cb; }.weekly-running progress { width:100%; height:7px; accent-color:#d9efa2; }
 .auto-settings { padding:22px; display:grid; gap:18px; max-width:650px; margin:auto; }.auto-settings p { line-height:1.7; }.auto-settings > label { display:grid; gap:7px; }.auto-settings fieldset { display:flex; gap:15px; padding:15px; }.auto-settings fieldset label { display:flex; align-items:center; gap:5px; }.weekly-auto { display:flex; align-items:center; gap:12px; font-size:.8rem; }.weekly-auto button { background:#d9efa2; padding:9px; border:1px solid #a9b88f; border-radius:6px; }
-@media(max-width:1050px){ .weekly-choices { left:16px; width:calc(100% - 145px); }.weekly-action-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }.weekly-action-grid > button { min-height:57px; }.weekly-action-grid small { white-space:normal; }.game-console .game-stage .spot-title { bottom:310px; } }
-@media(max-width:700px){ .console-stats { top:104px; width:calc(100% - 24px); left:12px; gap:5px; }.status-gauge { gap:5px; padding:7px; font-size:.65rem; }.status-gauge b { font-size:.72rem; }.weekly-choices { left:10px; bottom:56px; width:calc(100% - 20px); max-height:calc(100% - 235px); padding:11px; }.weekly-choices h2 { font-size:.97rem; }.weekly-action-grid > button { min-height:56px; padding:8px 6px; gap:3px 5px; }.weekly-action-grid strong { font-size:.71rem; }.weekly-action-grid small { font-size:.58rem; }.weekly-hint { font-size:.64rem; }.console-home-shortcuts,.console-world:has(.weekly-choices) .console-home-shortcuts { flex-direction:row; bottom:10px; right:10px; gap:6px; }.console-home-shortcuts button { padding:7px 10px; font-size:.67rem; }.game-console .game-stage .spot-title { bottom:310px; left:16px; }.game-console .game-stage .spot-title h2 { font-size:1.6rem; }.game-console .game-stage .spot-title p { display:none; }.weekly-running { bottom:65px; left:12px; }.console-vitals { top:55px; } }
-@media(max-height:620px) and (min-width:701px){ .console-stats { left:auto; right:16px; top:64px; width:390px; }.weekly-choices { max-height:calc(100% - 65px); }.console-world:has(.weekly-choices) .spot-title { display:none; }.weekly-action-grid > button { min-height:48px; }.weekly-choices { padding:10px; }.weekly-choices > header { margin-bottom:8px; }.weekly-choices h2 { font-size:1rem; } }
+@media(max-width:1050px){ .game-console .game-stage .spot-title { bottom:310px; } }
+@media(max-width:700px){ .console-stats { top:104px; width:calc(100% - 24px); left:12px; gap:5px; }.status-gauge { gap:5px; padding:7px; font-size:.65rem; }.status-gauge b { font-size:.72rem; }.weekly-choices { left:10px; bottom:56px; width:min(520px,calc(100% - 20px)); max-height:min(calc(100% - 64px),max(200px,calc(100% - 216px))); padding:10px; }.weekly-choices h2 { font-size:1rem; }.weekly-action-grid > button { min-height:44px; }.weekly-action-grid strong { font-size:.75rem; }.console-home-shortcuts,.console-world:has(.weekly-choices) .console-home-shortcuts { flex-direction:row; bottom:10px; right:10px; gap:6px; }.console-home-shortcuts button { padding:7px 10px; font-size:.67rem; }.game-console .game-stage .spot-title { bottom:310px; left:16px; }.game-console .game-stage .spot-title h2 { font-size:1.6rem; }.game-console .game-stage .spot-title p { display:none; }.weekly-running { bottom:65px; left:12px; }.console-vitals { top:55px; } }
+@media(max-width:480px){ .weekly-action-grid > button > svg { display:none; } }
+@media(max-height:620px) and (min-width:701px){ .console-stats { left:auto; right:16px; top:64px; width:390px; }.weekly-choices { max-height:calc(100% - 34px); padding:10px; } }
 
 @media(max-width:700px){
- .console-vitals .console-energy.has-projection { grid-template-columns:auto 40px; }.status-delta { font-size:.58rem; }.weekly-inline-controls { gap:6px 9px; margin-top:9px; }.weekly-inline-controls label { font-size:.63rem; }.weekly-inline-controls select { max-width:165px; font-size:.67rem; min-height:28px; }.weekly-confirm { gap:6px; flex-wrap:wrap; position:sticky; bottom:-11px; padding:9px 0 3px; background:#fffcef; }.weekly-confirm > strong { font-size:.72rem; }.weekly-confirm button { min-height:33px; font-size:.68rem; padding:6px 8px; }.weekly-success { font-size:.65rem; }.weekly-success small { flex-basis:100%; font-size:.59rem; }.weekly-success { flex-wrap:wrap; gap:2px 5px; }.weekly-selection-note { font-size:.61rem; }
+ .console-vitals .console-energy.has-projection { grid-template-columns:auto 40px; }.status-delta { font-size:.58rem; }.weekly-inline-controls select { max-width:165px; }.weekly-confirm > strong { font-size:.75rem; }.weekly-success { flex-wrap:wrap; gap:2px 5px; }
 }
 
-.weekly-choices.is-auto .weekly-action-grid button:disabled { opacity:.8; cursor:default; }.weekly-choices.is-auto .weekly-action-grid button[aria-pressed=true] { opacity:1; outline:2px solid #b6d971; outline-offset:-2px; }.weekly-auto { justify-content:space-between; margin-top:12px; }.weekly-auto strong { font-size:.9rem; color:#365e45; }.weekly-auto p { margin:5px 0 0; font-size:.7rem; color:#60745b; }
-
-/* Fixed row counts keep every action visible without scrolling or moving the panel on selection. */
-.weekly-choices { height:350px; display:flex; flex-direction:column; overflow:hidden; }
-.weekly-choices > header { flex:none; }
-.weekly-action-grid { grid-template-columns:repeat(4,minmax(0,1fr)); flex:1; min-height:0; overflow:visible; grid-template-rows:repeat(2,minmax(0,1fr)); grid-auto-rows:auto; align-content:stretch; }
-.weekly-action-grid > button { min-height:0; min-width:0; }
-.weekly-selection-slot { height:122px; flex:none; display:flex; flex-direction:column; justify-content:flex-end; overflow:visible; }
-.weekly-selection-slot .weekly-confirm { flex:none; margin-top:auto; position:static; }
-.weekly-selection-slot .weekly-hint { margin-top:12px; margin-bottom:12px; }
-.weekly-inline-controls { flex:none; min-height:0; }
+.weekly-choices.is-auto .weekly-action-grid button:disabled { opacity:.8; cursor:default; }.weekly-choices.is-auto .weekly-action-grid button[aria-pressed=true] { opacity:1; outline:2px solid #b6d971; outline-offset:-2px; }.weekly-auto { justify-content:space-between; margin-top:8px; }.weekly-auto strong { color:#365e45; }.weekly-auto button { flex:none; font-size:.75rem; }
 .swatch-grid fieldset > div { flex-wrap:wrap; }
 .swatch-grid .gender-options button { min-height:32px; padding:5px 15px; border:1px solid #a6b89a; border-radius:6px; background:#f8f4e8; color:#344d46; font-size:.78rem; }
 .swatch-grid .gender-options button[aria-pressed=true] { background:#deedc8; border-color:#678a60; font-weight:750; }
@@ -106,7 +97,4 @@
 .spot-map-studio .spot-map-scene { background:linear-gradient(#808eae 0 55%,#45516d 55% 78%,#9b8264 78%); }
 .spot-map-night .spot-map-scene { background:linear-gradient(#3f416c 0 55%,#43394e 55% 78%,#30283f 78%); }
 .spot-map-arena .spot-map-scene { background:linear-gradient(#95c6d8 0 55%,#526b71 55% 78%,#a58e6c 78%); }
-@media(max-width:1050px){ .weekly-choices { height:395px; }.weekly-action-grid { grid-template-rows:repeat(3,minmax(0,1fr)); } }
-@media(max-width:700px){ .weekly-choices { height:390px; }.weekly-selection-slot { height:142px; }.spot-map { top:8px; right:8px; width:calc(100% - 16px); max-height:calc(100% - 16px); padding:12px; }.spot-map-grid { gap:7px; }.spot-map-bonus { font-size:.65rem; }.game-console .game-hud .spot-map-trigger { min-height:32px; padding:7px 9px; font-size:.67rem; }.game-console .game-hud:has(.spot-map-trigger) .scene-counter { margin-top:39px; } }
-
-@media(max-width:700px){.weekly-action-grid > button {grid-template-columns:1fr;text-align:center;justify-items:center;padding:6px 3px;gap:3px;}.weekly-action-grid > button > svg {display:none;}.weekly-action-grid strong {font-size:.67rem;}.weekly-action-grid small {font-size:.56rem;white-space:normal;}}
+@media(max-width:700px){ .spot-map { top:8px; right:8px; width:calc(100% - 16px); max-height:calc(100% - 16px); padding:12px; }.spot-map-grid { gap:7px; }.spot-map-bonus { font-size:.65rem; }.game-console .game-hud .spot-map-trigger { min-height:32px; padding:7px 9px; font-size:.67rem; }.game-console .game-hud:has(.spot-map-trigger) .scene-counter { margin-top:39px; } }

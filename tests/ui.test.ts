@@ -85,8 +85,10 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await click('등록하고 시작');
     const created=await handler(new Request('http://127.0.0.1/api/game',{headers:{cookie}}));
     const createdView=await created.json();assert.equal(createdView.career.rider.look.hair,10);assert.equal(createdView.career.rider.look.outfit,1);assert.equal(createdView.career.rider.look.bottom,3);
-    assert.ok(win.document.querySelector('[aria-label="이번 주 행동 선택"]'));
-    assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,8);
+    const options=win.document.querySelector('[aria-label="이번 주 행동 선택"]')!;
+    assert.equal(options.querySelector('h2')?.textContent,'이번 주엔 무엇을 할까?');
+    assert.deepEqual([...options.querySelectorAll('.weekly-action-grid > button')].map(button=>button.textContent),
+      ['속도','카빙','연계','밸런스','댄싱','트릭','휴식','병원 치료']);
     assert.equal(win.document.querySelector('[aria-label="라인 리허설 선택"]'),null);
     assert.equal(win.document.querySelectorAll('[aria-label="현재 능력치"] meter').length,4);
     assert.ok([...win.document.querySelectorAll<HTMLMeterElement>('[aria-label="현재 능력치"] meter')].every(meter=>meter.max===200));
@@ -169,8 +171,8 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await settle(2400);
     assert.ok(win.document.querySelector('.equipment-panel'),'Background completion must not close the equipment menu');
     await click('메뉴 닫기');
-    assert.ok(win.document.querySelector('[aria-label="이번 주 행동 결과"]'));
-    await click('확인하고 계속');
+    assert.ok(win.document.querySelector('[aria-labelledby="training-outcome-title"]'));
+    await click('계속');
     const event=win.document.querySelector('[aria-label="이벤트 선택"]');assert.ok(event);
     const choice=event.querySelector<HTMLButtonElement>('button')!;
     await act(async()=>{choice.click();});await settle();
@@ -181,7 +183,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.equal(win.document.querySelector('.console-flow-notice'),null);
     await click('메뉴 닫기');
     assert.ok(win.document.querySelector('[aria-label="이벤트 결과"]'));
-    await click('결과 확인하고 계속');
+    await click('계속');
     assert.match(win.document.querySelector('.console-rider')!.textContent!,/2주/);
     await click('휴식 선택');
     assert.ok(win.document.querySelector('[aria-label="예상 체력 변화"]'));
@@ -203,6 +205,18 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.match(win.document.querySelector('.weekly-success')!.textContent!,/실패 위험/);
     await click('휴식 선택');
     assert.equal(previewTraining(rider,selected!).energyAfter,41);
+    for(const [action,grade,title] of [
+      ['rest','recovery','휴식을 완료했다'],
+      ['dance','success','댄싱 연습에 몰두했다'],
+      ['trick','miss','연습이 뜻대로 풀리지 않았다'],
+      ['carve','injury','연습 중 다쳤다'],
+    ] as const){
+      rider.lastPlan={action,spot:'river'};
+      rider.extras!.lastTraining={grade,year:1,week:1,text:'',changes:['체력 -23']};
+      await act(async()=>root.render(createElement(GameStage,{r:rider,send:async()=>true,saving:false,remaining:0,weekMs:2000,fastForward:false,spot:'river',motion:'rest',pendingTraining:'test',onDone:()=>{}})));
+      assert.equal(win.document.querySelector('#training-outcome-title')?.textContent,title);
+      assert.equal(win.document.querySelector('.game-reward')?.textContent,'체력 -23');
+    }
     rider.week=7;rider.phase='meet';rider.settings={mode:'auto',strategy:'balanced',entries:['dance','trick']};
     const career={rider,hall:[]};
     assert.throws(()=>command(career,{type:'entry',disciplines:['dance','trick']},()=>({id:'automatic-ui',seed:71})),/1종목/);
@@ -258,16 +272,16 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await act(async()=>{Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype,'value')!.set!.call(autoName,'Auto cycle');autoName.dispatchEvent(new win.Event('input',{bubbles:true}));});
     await click('등록하고 시작');await click('자동 진행');
     for(let cycle=0;cycle<2;cycle++){
-      assert.ok(win.document.querySelector('[aria-label="자동 행동 선택"]'));
+      assert.equal(win.document.querySelector('[aria-label="자동 행동 선택"] h2')?.textContent,'이번 주엔 무엇을 할까?');
       assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,8);
       assert.equal(win.document.querySelectorAll('.weekly-action-grid > button[aria-pressed="true"]').length,1);
       await settle(2150);
       assert.equal(win.document.querySelector('[aria-label="자동 행동 선택"]'),null);
       assert.ok(win.document.querySelector('[aria-label="행동 진행"]'));
       await settle(2250);
-      assert.ok(win.document.querySelector('[aria-label="이번 주 행동 결과"]'));
+      assert.ok(win.document.querySelector('[aria-labelledby="training-outcome-title"]'));
       await settle(1000);
-      assert.ok(win.document.querySelector('[aria-label="이번 주 행동 결과"]'),'Result should remain visible for two seconds');
+      assert.ok(win.document.querySelector('[aria-labelledby="training-outcome-title"]'),'Result should remain visible for two seconds');
       await settle(1150);
       if(win.document.querySelector('[aria-label="이벤트 결과"]')){
         await settle(1000);assert.ok(win.document.querySelector('[aria-label="이벤트 결과"]'),'Automatic event result must remain visible');

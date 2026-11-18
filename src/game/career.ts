@@ -170,7 +170,7 @@ function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
   const changes=STATS.flatMap(stat=>{const gain=round(r.stats[stat]-before.stats[stat]);return gain?[`${STAT_NAMES[stat]} ${gain>0?'+':''}${gain}`]:[];});
   const energy=round(r.energy-before.energy);if(energy)changes.push(`체력 ${energy>0?'+':''}${energy}`);
   changes.push(...names.filter(name=>/숙련|학습|회복|치료비|의료 지원|레슨비|부상|다쳤/.test(name)));
-  const narration=grade==='injury'?'연습하다 넘어져 몸을 다쳤습니다.':grade==='miss'?'몸이 따라주지 않아 연습을 제대로 마치지 못했습니다.':ACTION_STORIES[p.action].done;
+  const narration=grade==='injury'?'연습 도중 넘어져 보드를 내려놓았다.':grade==='miss'?'몸이 따라주지 않아 이번 연습은 여기까지였다.':ACTION_STORIES[p.action].done;
   progress.lastTraining={grade,text,narration,changes,skill:practiced,year:r.year,week:r.week,reaction:equipmentReaction(trainingRider,grade)};
   note(r,'training',text);
 }

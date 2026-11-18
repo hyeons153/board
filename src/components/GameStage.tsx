@@ -51,7 +51,7 @@ export default function GameStage({r,send,saving,remaining,weekMs,fastForward,sp
   return <section className={'spot-stage game-stage '+(overlay?'has-dialogue':'')} aria-label="인게임 화면">
     <Scene spot={viewSpot} look={equippedLook(r)} guest={person?.look??guest} motion={overlay||autoChoosing?'rest':r.plan?actionMotion[r.plan.action]??'ride':motion} technique={technique} variant={meet?'race':event?'event':'dashboard'}/>
     <div className="scene-shade"/>
-    <div className="game-hud">{!overlay&&onSpotMenu?<button className="spot-map-trigger" aria-label="스팟 지도 열기" disabled={saving||!!r.plan||r.settings.mode==='auto'||r.phase!=='plan'} onClick={onSpotMenu}><MapPin size={13}/>{LOCATIONS[viewSpot].name} · 지도</button>:<span><MapPin size={13}/> {meet?meet.name:LOCATIONS[viewSpot].en}</span>}<div className="scene-counter"><Timer size={14}/><span>{meet?'대회 출전 선택':event?'이벤트 선택':autoChoosing?'자동 행동 선택':r.plan?'수행 중 · '+when(remaining):'이번 주 행동 선택'}</span>
+    <div className="game-hud">{!overlay&&onSpotMenu?<button className="spot-map-trigger" aria-label="스팟 지도 열기" disabled={saving||!!r.plan||r.settings.mode==='auto'||r.phase!=='plan'} onClick={onSpotMenu}><MapPin size={13}/>{LOCATIONS[viewSpot].name} · 지도</button>:<span><MapPin size={13}/> {meet?meet.name:LOCATIONS[viewSpot].en}</span>}<div className="scene-counter"><Timer size={14}/><span>{meet?'출전 준비':event?'스팟 이야기':autoChoosing?'자동 육성 중':r.plan?when(remaining)+' 남음':'훈련 준비'}</span>
     </div></div>
     {event?<div className="game-dialogue" role="region" aria-label="이벤트 선택" key={r.event} ref={dialogue} tabIndex={-1}>
       <div className="game-caption">{event.kind}{person&&<span className="game-speaker"><PixelRider look={person.look}/>{person.name}</span>}</div>
@@ -147,14 +147,29 @@ function Playback({record,index,r,saving,active,playbackRate,onSpeed,onNext}:{re
 
 function TrainingOutcome({r,saving,active,onDone}:{r:Rider;saving:boolean;active:boolean;onDone:()=>void}){
   const result=r.extras?.lastTraining;
+  const title=result?.grade==='injury'?'연습 중 다쳤다':result?.grade==='miss'?'연습이 뜻대로 풀리지 않았다'
+    :r.lastPlan?ACTION_STORIES[r.lastPlan.action].title:'한 주를 마쳤다';
+  const narration=result?.narration??result?.text;
   const dialogue=useDialogueFocus(r.id+':training:'+result?.year+':'+result?.week,active);
   useAutoAdvance(r.id+':'+result?.year+':'+result?.week,r.settings.mode==='auto'&&!saving,AUTO_FLOW.resultMs,onDone);
-  return <section className="spot-stage game-stage has-dialogue" aria-label="인게임 행동 결과"><Scene spot={r.spot} look={equippedLook(r)} motion={result?.grade==='injury'?'fall':result?.grade==='miss'?'lose':result?.grade==='recovery'?'rest':result?.grade==='great'||result?.grade==='learned'?'great':'success'} variant="event"/><div className="scene-shade"/><div className="game-dialogue" role="region" aria-label="이번 주 행동 결과" tabIndex={-1} ref={dialogue}><div className="game-caption">{result?.year}년차 · {result?.week}주</div><h2>이번 주 행동 결과</h2><p>{lineTerms(result?.narration??result?.text??'이번 주 행동을 마쳤습니다.')}</p>{!!result?.changes?.length&&<p className="game-reward">{result.changes.join(' · ')}</p>}{result?.reaction&&<p className="equipment-reaction">{result.reaction}</p>}<p>체력 {Math.round(r.energy)} · 보유금 {money(r.money)}</p><div className="game-actions"><button disabled={saving} onClick={onDone}>확인하고 계속 <ArrowRight size={15}/></button></div></div></section>;
+  return <section className="spot-stage game-stage has-dialogue">
+    <Scene spot={r.spot} look={equippedLook(r)} motion={result?.grade==='injury'?'fall':result?.grade==='miss'?'lose':result?.grade==='recovery'?'rest':result?.grade==='great'||result?.grade==='learned'?'great':'success'} variant="event"/>
+    <div className="scene-shade"/>
+    <div className="game-dialogue" role="region" aria-labelledby="training-outcome-title" tabIndex={-1} ref={dialogue}>
+      {result&&<div className="game-caption">{result.year}년차 · {result.week}주</div>}
+      <h2 id="training-outcome-title">{title}</h2>
+      {narration&&<p>{lineTerms(narration)}</p>}
+      {!!result?.changes?.length&&<p className="game-reward">{result.changes.join(' · ')}</p>}
+      {result?.reaction&&<p className="equipment-reaction">{result.reaction}</p>}
+      <p>체력 {Math.round(r.energy)} · 보유금 {money(r.money)}</p>
+      <div className="game-actions"><button disabled={saving} onClick={onDone}>계속 <ArrowRight size={15}/></button></div>
+    </div>
+  </section>;
 }
 
 function EventResult({r,result,saving,active,onDone}:{r:Rider;result:EventOutcome;saving:boolean;active:boolean;onDone:()=>void}){
   const dialogue=useDialogueFocus(result.key,active);
   useAutoAdvance(result.key,r.settings.mode==='auto'&&!saving,AUTO_FLOW.resultMs,onDone);
   const person=result.npc==='mentor'?r.mentor:result.npc?RIVAL.get(result.npc):undefined;
-  return <section className="spot-stage game-stage has-dialogue" aria-label="인게임 이벤트 결과"><Scene spot={r.spot} look={equippedLook(r)} guest={person?.look} motion="success" variant="event"/><div className="scene-shade"/><div className="game-dialogue" role="region" aria-label="이벤트 결과" ref={dialogue} tabIndex={-1}><div className="game-caption">{result.year}년차 · {result.week}주 · {result.kind}{person&&<span className="game-speaker"><PixelRider look={person.look}/>{person.name}</span>}</div><h2>{result.title}</h2><p>{lineTerms(result.choice)}</p><p className="game-reward">{result.details.length?result.details.join(' / '):'선택한 이야기를 마쳤습니다.'}</p><div className="game-actions"><button disabled={saving} onClick={onDone}>결과 확인하고 계속 <ArrowRight size={15}/></button></div></div></section>;
+  return <section className="spot-stage game-stage has-dialogue" aria-label="인게임 이벤트 결과"><Scene spot={r.spot} look={equippedLook(r)} guest={person?.look} motion="success" variant="event"/><div className="scene-shade"/><div className="game-dialogue" role="region" aria-label="이벤트 결과" ref={dialogue} tabIndex={-1}><div className="game-caption">{result.year}년차 · {result.week}주 · {result.kind}{person&&<span className="game-speaker"><PixelRider look={person.look}/>{person.name}</span>}</div><h2>{result.title}</h2><p>{lineTerms(result.choice)}</p>{result.details.length>0&&<p className="game-reward">{result.details.join(' / ')}</p>}<div className="game-actions"><button disabled={saving} onClick={onDone}>계속 <ArrowRight size={15}/></button></div></div></section>;
 }

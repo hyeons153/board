@@ -39,16 +39,16 @@ export const STRATEGY_DETAILS:Record<Strategy,string> = {
 };
 export const STYLE_NAMES: Record<RoutineStyle,string> = { stable:'안정형', flow:'연계형', score:'고득점형' };
 export const ACTION_NAMES: Record<Action,string> = { speed:'속도 훈련', carve:'카빙 훈련', link:'연계 훈련', balance:'밸런스 훈련', dance:'댄싱 연마', trick:'트릭 연마', rest:'휴식', hospital:'병원 치료', rehearsal:'라인 리허설' };
-export const ACTION_STORIES:Record<Action,{start:string;done:string}>={
-  speed:{start:'힘껏 속도를 냅니다.',done:'길게 달리며 속도를 끌어올렸습니다.'},
-  carve:{start:'몸을 기울여 코너를 돕니다.',done:'코너를 돌고 또 돌며 카빙을 연습했습니다.'},
-  link:{start:'동작을 부드럽게 이어 봅니다.',done:'발이 기억할 때까지 동작을 이어 연습했습니다.'},
-  balance:{start:'보드 위에서 중심을 잡습니다.',done:'흔들리는 보드 위에서 균형을 다졌습니다.'},
-  dance:{start:'댄싱 연습에 몰두합니다.',done:'죽도록 댄싱을 연습했습니다.'},
-  trick:{start:'착지할 때까지 트릭을 연습합니다.',done:'몇 번을 넘어져도 다시 트릭을 연습했습니다.'},
-  rest:{start:'휴식을 취합니다.',done:'보드를 내려놓고 푹 쉬었습니다.'},
-  hospital:{start:'병원에서 치료를 받습니다.',done:'치료를 받고 몸을 추슬렀습니다.'},
-  rehearsal:{start:'라인을 연습합니다.',done:'저장한 라인을 연습했습니다.'},
+export const ACTION_STORIES:Record<Action,{start:string;title:string;done:string}>={
+  speed:{start:'보드를 힘껏 밀어 보자.',title:'속도를 내며 달렸다',done:'발끝에 힘을 싣고 보드를 길게 밀었다.'},
+  carve:{start:'몸을 기울여 코너를 돌아 보자.',title:'카빙 감각을 익혔다',done:'보드가 그리는 곡선을 따라 체중을 옮겼다.'},
+  link:{start:'동작을 하나로 이어 보자.',title:'동작을 하나로 이었다',done:'다음 동작이 자연스럽게 나올 때까지 반복했다.'},
+  balance:{start:'흔들려도 중심을 잡아 보자.',title:'보드 위에서 중심을 잡았다',done:'보드가 흔들릴 때마다 발의 위치를 조금씩 바꿨다.'},
+  dance:{start:'보드 위에서 스텝을 맞춰 보자.',title:'댄싱 연습에 몰두했다',done:'스텝을 반복하다 보니 리듬이 발에 익었다.'},
+  trick:{start:'이번엔 착지까지 해 보자.',title:'트릭 연습에 집중했다',done:'몇 번을 넘어져도 보드를 주워 다시 시도했다.'},
+  rest:{start:'이번 주는 푹 쉬자.',title:'휴식을 완료했다',done:'보드를 내려놓고 한 주 쉬어 갔다.'},
+  hospital:{start:'병원에 들러 치료를 받자.',title:'병원에서 치료를 받았다',done:'치료를 받고 몸을 추슬렀다.'},
+  rehearsal:{start:'경기처럼 라인을 달려 보자.',title:'실전처럼 라인을 달렸다',done:'처음부터 끝까지 라인을 맞춰 봤다.'},
 };
 export const OUTCOME_NAMES = { miss:'실패', rough:'어설픈 성공', clean:'성공', great:'대성공' };
 export const KIND_NAMES = { step:'스텝', technique:'테크닉', spin:'회전', pop:'팝', flip:'플립' };
