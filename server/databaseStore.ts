@@ -126,9 +126,9 @@ export function databaseStore(db:Database,kind:Store['kind'],legacy?:LocalLegacy
             const current=await readCareer(tx,target,true);
             const source=await readCareer(tx,guest.id,true);
             const career=mergeCareers(current.snapshot.career,source.snapshot.career);
-            const clock=career.rider?.id===current.snapshot.career.rider?.id
-              ? current.snapshot.clock : source.snapshot.clock;
-            const combined={format:1,career,clock:{...clock,stamp:0,tabs:{}}};
+            const credit=career.rider?.id===current.snapshot.career.rider?.id
+              ? current.snapshot.clock.credit : source.snapshot.clock.credit;
+            const combined={format:1,career,clock:{credit,stamp:0,tabs:{}}};
             await tx.query('UPDATE rider_careers SET snapshot=$2::jsonb,version=version+1,updated_at=now() WHERE user_id=$1',
               [target,JSON.stringify(combined)]);
             await tx.query('DELETE FROM rider_users WHERE id=$1',[guest.id]);

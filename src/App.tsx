@@ -16,7 +16,6 @@ import { PixelRider } from './components/Appearance';
 import Account from './components/Account';
 import OnlineHall from './components/OnlineHall';
 import Ceremony from './components/Ceremony';
-import { GAME_SPEEDS } from './game/types';
 
 const routes=[
   {id:'overview',name:'육성 홈',icon:LayoutGrid,label:'CAREER HUB'},
@@ -98,14 +97,6 @@ export default function App(){
       <main className="workspace-main" id="main">
         <header className="page-header"><div><div className="eyebrow">SEASON {String(r.year).padStart(2,'0')} <span className="text-lime">/</span> WEEK {String(r.week).padStart(2,'0')}</div><h1>{route==='overview'?'라이더 라운지':active.name}</h1><p>{route==='overview'?`${r.name} 라이더, 오늘은 어디에서 타볼까요?`:`${r.name} · ${r.year}년차 ${r.week}주 · ${DIVISION_NAMES[divisionFor(r.year)]}`}</p></div>
           {r.phase!=='retired'&&<div className="week-chip"><Timer size={18}/><span><small>{r.phase==='event'?'이벤트 선택 대기':r.phase==='meet'?'출전 선택 대기':r.phase==='injury'?'부상 확인 대기':game.remaining===0&&!r.plan&&!auto?'훈련 예약 대기':'다음 주 판정까지'}</small><b>{r.phase==='plan'?when(game.remaining):'—'}</b></span></div>}</header>
-        {r.phase!=='retired'&&<div className="speed-controls">
-          <span><Timer size={16}/> 진행 속도</span>
-          <div className="speed-options" role="group" aria-label="게임 진행 배속">
-            {GAME_SPEEDS.map(speed=><button key={speed} type="button" className={`pill ${view.speed===speed?'active':''}`}
-              aria-pressed={view.speed===speed} disabled={game.saving} onClick={()=>void game.send({type:'speed',speed})}>x{speed}</button>)}
-          </div>
-          <small>게임 내 1주 = {view.weekMs/1000}초</small>
-        </div>}
         {route!=='overview'&&(r.phase==='event'||r.phase==='meet')&&<div className="meet-notice panel"><CircleAlert size={19}/><div><b>{r.phase==='event'?'응답할 이벤트가 있어요.':'대회 출전을 선택해 주세요.'}</b><span>선택을 마치면 커리어가 이어집니다.</span></div><button className="button secondary small" onClick={()=>go(r.phase==='event'?'overview':'meets')}>바로 가기 <ArrowRight size={15}/></button></div>}
         {route==='overview'&&<div className="overview-grid">
           <div className="stack">
@@ -127,7 +118,7 @@ export default function App(){
         {screen==='hall'&&<Hall hall={view.career.hall} view={view} onEnding={setEndingId} onAccount={()=>go('account')}/>}
         {screen==='online'&&<OnlineHall view={view} initialId={publicId} onSelect={selectPublic}/>}
         {screen==='account'&&<Account view={view} send={game.send} onSwitch={()=>{setTitle(null);go('overview');}}/>}
-        <footer className="workspace-footer"><span>LONGBOARD LIFE · CAREER SIM</span><span>x{view.speed} · {view.weekMs/1000}초 / 게임 내 1주</span></footer>
+        <footer className="workspace-footer"><span>LONGBOARD LIFE · CAREER SIM</span><span>{Math.round(view.weekMs/1000)}초 / 게임 내 1주</span></footer>
       </main>
     </div>
     {notice}
