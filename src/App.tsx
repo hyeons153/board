@@ -7,7 +7,7 @@ import { lineTerms, RIVAL } from './game/content';
 import { previewTraining } from './game/training';
 import { equippedLook, extras } from './game/economy';
 import { Brand } from './components/Brand';
-import { LookFields, PixelRider } from './components/Appearance';
+import { LookFields, LookPreview } from './components/Appearance';
 import { NewsCard } from './components/Overview';
 import { Skills, Routines } from './components/Skills';
 import { Meets } from './components/Meets';
@@ -121,5 +121,5 @@ function FlowNotice({onReturn}:{onReturn:()=>void}){return <div className="conso
 function NewRider({saving,onCreate}:{saving:boolean;onCreate:(name:string,look:Look)=>Promise<boolean>}){
   const [name,setName]=useState('');const [look,setLook]=useState<Look>(DEFAULT_LOOK);
   const submit=(event:FormEvent)=>{event.preventDefault();void onCreate(name.trim(),look);};
-  return <form className="console-create" onSubmit={submit}><div className="console-create-preview"><PixelRider look={look} label="새 라이더 외형"/><p>강변에서 시작할 새 얼굴</p></div><label>라이더 이름<input aria-label="라이더 이름" value={name} onChange={e=>setName(e.target.value)} required minLength={1} maxLength={16} autoComplete="off"/></label><LookFields look={look} onChange={setLook}/><button className="button primary" disabled={saving||!name.trim()}>등록하고 시작 <ArrowRight size={17}/></button></form>;
+  return <form className="console-create" onSubmit={submit}><div className="console-create-preview"><LookPreview look={look} label="새 라이더 외형"/><p>강변에서 시작할 새 얼굴</p></div><label>라이더 이름<input aria-label="라이더 이름" value={name} onChange={e=>setName(e.target.value)} required minLength={1} maxLength={16} autoComplete="off"/></label><LookFields look={look} onChange={setLook}/><button className="button primary" disabled={saving||!name.trim()}>등록하고 시작 <ArrowRight size={17}/></button></form>;
 }

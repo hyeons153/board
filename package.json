@@ -11,6 +11,7 @@
     "build": "tsc --noEmit && tsc -p tsconfig.server.json && vite build",
     "test": "tsx --test tests/career.test.ts tests/api.test.ts tests/online.test.ts tests/ui.test.ts tests/motion.test.ts tests/equipment.test.ts",
     "review:animation": "tsx scripts/render-techniques.ts",
+    "review:appearance": "tsx scripts/render-appearance.ts",
     "simulate": "tsx scripts/simulate.ts",
     "verify:neon": "tsx scripts/verify-neon.ts",
     "db:generate": "drizzle-kit generate",

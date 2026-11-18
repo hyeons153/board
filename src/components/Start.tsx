@@ -4,7 +4,7 @@ import { DEFAULT_LOOK } from '../game/data';
 import type { Look } from '../game/types';
 import Scene from './Scene';
 import { Brand, Tag } from './Brand';
-import { LookFields, PixelRider } from './Appearance';
+import { LookFields, LookPreview } from './Appearance';
 export default function Start({onCreate,onHall,onOnline,onAccount,username,hasHall,saving}:{onCreate:(name:string,look:Look)=>Promise<boolean>;onHall:()=>void;onOnline:()=>void;onAccount:()=>void;username?:string;hasHall:boolean;saving:boolean}){
   const [creating,setCreating]=useState(false);
   const [name,setName]=useState('');
@@ -29,7 +29,7 @@ export default function Start({onCreate,onHall,onOnline,onAccount,username,hasHa
         </div>
         {creating&&<form className="create-form" onSubmit={e=>{e.preventDefault();void onCreate(name,look);}}>
           <div className="form-head"><Tag kind="lime">NEW RIDER</Tag><button type="button" className="button quiet small" onClick={()=>setCreating(false)}>닫기</button></div>
-          <div className="create-preview"><h2>라이더 등록</h2><PixelRider look={look} label="라이더 외형 미리보기"/></div>
+          <div className="create-preview"><h2>라이더 등록</h2><LookPreview look={look} label="라이더 외형 미리보기"/></div>
           <label className="name-field">라이더 이름<input autoFocus maxLength={16} required value={name} onChange={e=>setName(e.target.value)} placeholder="예: 리버 김" autoComplete="off"/></label>
           <LookFields look={look} onChange={setLook}/>
           <button className="button primary" disabled={saving||!name.trim()}>등록하고 첫 주 시작 <ArrowRight size={17}/></button>

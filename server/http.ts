@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ACTIONS, DISCIPLINES, SPOTS, STRATEGIES, type View } from '../src/game/types.js';
-import { BOARDS, HAIR_COLORS, PANTS, RULES, SHIRTS, SHOES, SKINS } from '../src/game/data.js';
+import { BOARDS, BOTTOMS, EYE_COLORS, FOOTWEAR, HAIR_COLORS, HAIR_STYLES, OUTFITS, PANTS, RULES, SHIRTS, SHOES, SKINS } from '../src/game/data.js';
 import { extras, GEAR_SLOTS } from '../src/game/economy.js';
 import { divisionFor, GameError } from '../src/game/career.js';
 import { advance, remaining } from './clock.js';
@@ -11,7 +11,7 @@ import { onlineRequest, rawSession, sessionCookie, sessionScope } from './online
 
 const style=z.number().int().min(0).max(3);
 const color=(palette:readonly string[])=>z.number().int().min(0).max(palette.length-1);
-const look=z.strictObject({hair:style,skin:color(SKINS),shirt:color(SHIRTS),board:color(BOARDS),gender:z.enum(['male','female']).optional(),hairColor:color(HAIR_COLORS).optional(),pants:color(PANTS).optional(),shoes:color(SHOES).optional(),deckDesign:style.optional()});
+const look=z.strictObject({hair:color(HAIR_STYLES),skin:color(SKINS),shirt:color(SHIRTS),board:color(BOARDS),gender:z.enum(['male','female']).optional(),hairColor:color(HAIR_COLORS).optional(),pants:color(PANTS).optional(),shoes:color(SHOES).optional(),deckDesign:style.optional(),outfit:color(OUTFITS).optional(),bottom:color(BOTTOMS).optional(),footwear:color(FOOTWEAR).optional(),eyes:color(EYE_COLORS).optional()});
 const skill=z.string().max(40).regex(/^[a-z0-9-]+$/);
 const itemId=z.string().max(60).regex(/^[a-z0-9_-]+$/);
 const disciplines=z.array(z.enum(DISCIPLINES)).max(3).refine(ds=>new Set(ds).size===ds.length);

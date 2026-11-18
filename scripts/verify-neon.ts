@@ -61,12 +61,12 @@ async function run(){
   if(deployed) assert.equal(view!.weekMs,2000);
   assert.equal('speed' in view!,false);
   console.log('PASS /api/game -> Neon guest session');
-  const appearance={gender:'female' as const,hair:2,skin:SKINS.length-1,shirt:SHIRTS.length-1,board:5,pants:PANTS.length-1,shoes:SHOES.length-1,hairColor:HAIR_COLORS.length-1};
+  const appearance={gender:'female' as const,hair:10,outfit:5,bottom:3,footwear:1,eyes:2,skin:SKINS.length-1,shirt:SHIRTS.length-1,board:5,pants:PANTS.length-1,shoes:SHOES.length-1,hairColor:HAIR_COLORS.length-1};
   assert.equal(BOARDS.length,8);
   await game({type:'create',name:'Neon 연결 검증 라이더',look:appearance});await load();
   assert.deepEqual(view!.career.rider!.look,appearance);
   await game({type:'makeover',look:{...appearance,board:4}});await load();assert.equal(view!.career.rider!.look.board,4);
-  console.log('PASS gender and expanded colors -> white deck creation -> black deck makeover -> durable reload');
+  console.log('PASS customized hair, outfit, bottoms, footwear, eyes and colors -> white/black deck makeover -> durable Neon reload');
   await game({type:'routine',discipline:'dance',skills:['peter-pan']});
   await load();assert.deepEqual(view!.career.rider!.routines.dance,['peter-pan']);
   console.log('PASS saved line -> durable reload');
@@ -96,11 +96,15 @@ async function run(){
   assert.equal(view!.username,username);
   assert.equal(view!.career.rider!.id,riderId);
   console.log('PASS account creation -> guest record attached -> session rotated');
-  await game({type:'trade',operation:'buy',item:'deck-flow'});
-  await game({type:'trade',operation:'equip',item:'deck-flow'});
+  await game({type:'trade',operation:'buy',item:'deck_002'});
+  await game({type:'trade',operation:'equip',item:'deck_002'});
+  await game({type:'trade',operation:'buy',item:'acc_001'});
+  await game({type:'trade',operation:'equip',item:'acc_001'});
   await load();
-  assert.equal(view!.career.rider!.extras!.equipped.deck,'deck-flow');
-  console.log('PASS equipment transaction persisted');
+  assert.equal(view!.career.rider!.extras!.equipped.deck,'deck_002');
+  assert.deepEqual(view!.career.rider!.extras!.accessories,['acc_001']);
+  assert.equal(view!.career.rider!.extras!.equipmentVersion,2);
+  console.log('PASS new equipment + accessory purchase and equip -> Neon version-2 inventory persisted');
   if(competition){
     await game({type:'settings',settings:{mode:'auto',strategy:'balanced',entries:['dance','trick'],pauseMeet:true,pauseStory:false,pauseInjury:false}});
     const deadline=Date.now()+(view!.weekMs+4000)*8+30000;

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { DISCIPLINE_NAMES } from '../game/data';
 import { ECONOMY, eligibleSponsor, equippedLook, extras, GEAR, SPONSOR, SPONSORS } from '../game/economy';
 import type { Rider } from '../game/types';
-import { LookFields, PixelRider } from './Appearance';
+import { LookFields, LookPreview } from './Appearance';
 import { SectionTitle, Tag } from './Brand';
 import { money, type Submit } from './Overview';
 import EquipmentPanel from './EquipmentPanel';
@@ -36,7 +36,7 @@ export default function Workshop({r,send,saving}:{r:Rider;send:Submit;saving:boo
     <section className="panel content-panel">
       <SectionTitle code="RIDER STYLE" title="외형 변경"/>
       <div className="makeover-grid">
-        <div className="makeover-rider"><PixelRider look={equippedLook({...r,look})} label="외형 변경 미리보기"/></div>
+        <div className="makeover-rider"><LookPreview look={equippedLook({...r,look})} label="외형 변경 미리보기"/></div>
         <LookFields look={look} onChange={setLook}/>
       </div>
       {progress.equipped.deck&&<p className="subtle"><Settings2 size={14}/> 장착한 데크의 디자인이 기본 데크 디자인보다 먼저 표시됩니다.</p>}

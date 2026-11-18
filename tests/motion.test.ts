@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCanvas } from '@napi-rs/canvas';
-import { BOARDS, DEFAULT_LOOK, SKILLS } from '../src/game/data';
-import { lineTerms } from '../src/game/content';
+import { BOARDS, DEFAULT_LOOK, HAIR_STYLES, LOOK_PRESETS, OUTFITS, SKILLS } from '../src/game/data';
+import { lineTerms, RIVALS } from '../src/game/content';
 import { paintRider } from '../src/scene/rider';
 import { NEW_GEAR } from '../src/game/equipmentCatalog';
 import { equippedLook, freshExtras } from '../src/game/economy';
@@ -24,13 +24,13 @@ test('every new equipment appearance renders safely through riding, spinning, ju
   }
 });
 
-test('rounded male and female riders retain every hairstyle, black/white decks and safe motion bounds',()=>{
+test('customized riders retain every hairstyle, black/white decks and safe motion bounds',()=>{
   const canvas=createCanvas(ACTOR_WIDTH,ACTOR_HEIGHT),c=canvas.getContext('2d');
   const portrait=(look:Look)=>{paintRider(c as unknown as CanvasRenderingContext2D,look,'rest',0);return canvas.toBuffer('image/png');};
   const legacy={hair:0,skin:0,shirt:0,board:0};
   assert.deepEqual(portrait(legacy),portrait({...legacy,gender:'male'}));
   assert.notDeepEqual(portrait({...legacy,gender:'male'}),portrait({...legacy,gender:'female'}));
-  for(const gender of ['male','female'] as const)for(const hair of [0,1,2,3])for(const board of [4,5]){
+  for(const gender of ['male','female'] as const)for(const hair of HAIR_STYLES.keys())for(const board of [4,5]){
     const look:Look={...DEFAULT_LOOK,gender,hair,board,hairColor:7,skin:5,shirt:7,pants:7,shoes:7};
     portrait(look);
     const color=BOARDS[board];
@@ -44,6 +44,24 @@ test('rounded male and female riders retain every hairstyle, black/white decks a
       const rgba=c.getImageData(0,0,ACTOR_WIDTH,ACTOR_HEIGHT).data;
       for(let y=0;y<ACTOR_HEIGHT;y++)for(let x=0;x<ACTOR_WIDTH;x++)if(rgba[(y*ACTOR_WIDTH+x)*4+3])assert.ok(x>0&&x<ACTOR_WIDTH-1&&y>0&&y<ACTOR_HEIGHT-1,'Appearance must fit the texture during movement');
     }
+  }
+});
+
+test('all streetwear combinations and NPCs have distinct front/profile/rear views and unclipped action layers',()=>{
+  const canvas=createCanvas(ACTOR_WIDTH,ACTOR_HEIGHT),c=canvas.getContext('2d');
+  const looks=[...LOOK_PRESETS.male,...LOOK_PRESETS.female,...RIVALS.map(npc=>npc.look),...OUTFITS.map((_,outfit)=>({...DEFAULT_LOOK,outfit,bottom:outfit%4,footwear:outfit%3}))];
+  for(const look of looks){
+    const views:string[]=[];
+    for(const heading of [0,Math.PI/2,Math.PI,-Math.PI/2]){
+      paintRider(c as unknown as CanvasRenderingContext2D,look,'rest',0,{id:'peter-pan',progress:0,bodyHeading:heading,boardHeading:heading});
+      views.push(canvas.toBuffer('image/png').toString('base64'));
+      for(const technique of [{id:'kickflip',progress:.4},{id:'cross',progress:.4},{id:'wood',progress:.5},{id:'treflip',progress:.9,outcome:'miss' as const}]){
+        paintRider(c as unknown as CanvasRenderingContext2D,look,'ride',0,{...technique,bodyHeading:heading,boardHeading:heading});
+        const rgba=c.getImageData(0,0,ACTOR_WIDTH,ACTOR_HEIGHT).data;
+        for(let y=0;y<ACTOR_HEIGHT;y++)for(let x=0;x<ACTOR_WIDTH;x++)if(rgba[(y*ACTOR_WIDTH+x)*4+3])assert.ok(x>0&&x<ACTOR_WIDTH-1&&y>0&&y<ACTOR_HEIGHT-1,JSON.stringify(look)+' clips at '+x+','+y);
+      }
+    }
+    assert.equal(new Set(views).size,4,'Every direction must show a different view');
   }
 });
 test('step turns, shuvits, flips and compound spins keep their prescribed independent rotations',()=>{

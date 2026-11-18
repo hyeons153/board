@@ -5,7 +5,7 @@ import { mkdtemp, readdir, rmdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHandler } from '../server/http';
 import { localStore } from '../server/store';
-import { BOARDS, DEFAULT_LOOK, HAIR_COLORS, PANTS, SHIRTS, SHOES, SKINS } from '../src/game/data';
+import { BOARDS, BOTTOMS, DEFAULT_LOOK, EYE_COLORS, FOOTWEAR, HAIR_COLORS, HAIR_STYLES, OUTFITS, PANTS, SHIRTS, SHOES, SKINS } from '../src/game/data';
 import { ECONOMY, playerPlace } from '../src/game/economy';
 import type { View } from '../src/game/types';
 
@@ -29,7 +29,9 @@ test('guest snapshots survive reopening storage; concurrent tournament submissio
     assert.equal((await post({type:'create',name:'Tester',look:{...DEFAULT_LOOK,board:BOARDS.length}},0)).status,400);
     assert.equal((await post({type:'create',name:'Tester',look:{...DEFAULT_LOOK,skin:SKINS.length}},0)).status,400);
     assert.equal((await post({type:'create',name:'Tester',look:{...DEFAULT_LOOK,gender:'invalid'}},0)).status,400);
-    const appearance={...DEFAULT_LOOK,gender:'female' as const,board:5,shirt:SHIRTS.length-1,hairColor:HAIR_COLORS.length-1,pants:PANTS.length-1,shoes:SHOES.length-1,skin:SKINS.length-1};
+    for(const [field,choices] of [['hair',HAIR_STYLES],['outfit',OUTFITS],['bottom',BOTTOMS],['footwear',FOOTWEAR],['eyes',EYE_COLORS]] as const)
+      assert.equal((await post({type:'create',name:'Tester',look:{...DEFAULT_LOOK,[field]:choices.length}},0)).status,400);
+    const appearance={...DEFAULT_LOOK,gender:'female' as const,hair:HAIR_STYLES.length-1,outfit:OUTFITS.length-1,bottom:BOTTOMS.length-1,footwear:FOOTWEAR.length-1,eyes:EYE_COLORS.length-1,board:5,shirt:SHIRTS.length-1,hairColor:HAIR_COLORS.length-1,pants:PANTS.length-1,shoes:SHOES.length-1,skin:SKINS.length-1};
     const create=await post({type:'create',name:'Tester',look:appearance},0);
     assert.equal(create.status,200);
     let save:View=await create.json();

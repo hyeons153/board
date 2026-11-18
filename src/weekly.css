@@ -65,6 +65,18 @@
 .swatch-grid .gender-options button { min-height:32px; padding:5px 15px; border:1px solid #a6b89a; border-radius:6px; background:#f8f4e8; color:#344d46; font-size:.78rem; }
 .swatch-grid .gender-options button[aria-pressed=true] { background:#deedc8; border-color:#678a60; font-weight:750; }
 .swatch-grid .swatch { flex:none; border-color:#8c9b8d; }
+.swatch-grid .look-presets { grid-column:1/-1; }
+.swatch-grid .look-presets > div { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; }
+.look-presets button { position:relative; padding:0; overflow:hidden; border:1px solid #c7c9ba; border-radius:7px; background:#eee9df; color:#433449; }
+.look-presets button:hover,.look-presets button:focus-visible { background:#dfedcd; border-color:#708761; }
+.look-presets .pixel-rider { width:80px; height:85px; max-width:100%; margin:0 auto; display:block; }
+.look-presets span { position:absolute; top:5px; left:6px; font-size:11px; }
+.look-preview { display:grid; justify-items:center; gap:5px; padding:6px; }
+.look-preview > .pixel-rider { width:168px; height:auto; }
+.look-views { display:flex; gap:3px; flex-wrap:wrap; justify-content:center; }
+.look-views button { border:1px solid #c6c9bb; border-radius:5px; padding:4px 7px; color:#483a4d; background:#f8f3e9; font-size:11px; }
+.look-views button[aria-pressed=true] { border-color:#687c59; background:#deedc8; font-weight:700; }
+.swatch-grid select { width:100%; max-width:100%; }
 .console-world:has(.weekly-choices) .spot-title { display:none; }
 .game-console .game-hud .spot-map-trigger { position:absolute; top:0; right:0; display:flex; align-items:center; gap:7px; min-height:36px; padding:8px 12px; border:1px solid #c4d69c; border-radius:7px; background:#1d2d43; color:#eff9cf; font:750 .75rem/1.3 var(--mono); box-shadow:0 2px 9px #101b3155; cursor:pointer; }
 .game-console .game-hud .spot-map-trigger:hover:not(:disabled) { background:#344b50; border-color:#e0f5ab; }
