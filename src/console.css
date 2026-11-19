@@ -44,9 +44,8 @@
 .console-panel-body { padding:18px; min-height:0; overflow:auto; overscroll-behavior:contain; scrollbar-color:#8eaa93 #eee9dc; }
 .console-panel-body > .panel,.console-panel-body > .stack > .panel { background:#fffdf5; }
 .console-panel .training-panel { margin-top:12px; }.console-panel .spot-picker { margin:0 0 12px; }
-.console-panel .skill-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }.console-panel .skill-card { min-width:0; }
 .console-panel .section-title { margin-bottom:14px; }.console-panel .content-panel { padding:18px; }
-.console-panel-journal { left:auto; width:min(440px,calc(100% - 24px)); right:12px; }
+.console-panel-sidebar { left:auto; width:min(440px,calc(100% - 24px)); right:12px; }
 .game-console .console-panel-settings { left:50%; right:auto; bottom:auto; transform:translateX(-50%); width:min(640px,calc(100% - 24px)); max-height:calc(100% - 28px); }
 .console-panel-settings .console-panel-body { padding:0; }
 .console-panel-settings .auto-settings { margin:0; max-width:none; padding:20px; border:0; border-radius:0; box-shadow:none; }
@@ -59,10 +58,6 @@
 .scene-counter .competition-speed { min-width:32px; min-height:26px; padding:3px 6px; border:1px solid #9fafb9; border-radius:4px; color:#fff3e0; background:#33465b; font:750 .72rem var(--mono); cursor:pointer; }
 .scene-counter .competition-speed[aria-pressed="true"] { color:#253d34; border-color:#d8f29d; background:#d8f29d; }
 .console-journal > p { font-size:.82rem; padding:10px 4px; border-bottom:1px solid #d8d0bc; }
-.console-menu-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
-.console-menu-grid > button { display:flex; align-items:center; gap:12px; min-height:90px; padding:17px; background:#fffdf4; color:#293f50; border:1px solid #cbc9b6; border-radius:10px; text-align:left; }
-.console-menu-grid > button > span { display:grid; gap:5px; flex:1; }.console-menu-grid strong { font-size:.95rem; }.console-menu-grid small { font-size:.74rem; line-height:1.4; }
-.console-menu-grid > button:hover { border-color:#71917c; background:#e7efdc; }
 .console-panel-create .console-panel-body {
   flex:1;
   display:flex;
@@ -163,7 +158,6 @@
 @media(min-width:1600px){ .game-console { grid-template-rows:70px minmax(0,1fr) 90px; } }
 @media(max-width:850px){
  .console-top { gap:12px; padding:0 14px; }.console-rider { gap:8px; }.console-rider small,.console-motto { display:none; }
- .console-panel .skill-grid,.console-menu-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
  .game-console .game-dialogue { left:14px; bottom:14px; width:calc(100% - 28px); max-height:calc(100% - 115px); padding:15px; }
  .console-home-actions { left:20px; right:20px; bottom:20px; }.console-home-actions button { padding:10px 12px; }
 }
@@ -173,9 +167,9 @@
  .game-console .game-stage .scene-media canvas { object-position:70% 50%; }.game-console .game-stage .spot-title { left:18px; bottom:180px; }.game-console .game-stage .spot-title p { max-width:230px; }
  .game-console .game-hud { left:10px; right:10px; top:10px; }.console-vitals { left:10px; top:59px; gap:5px; max-width:calc(100% - 20px); }.console-vitals > span { font-size:.65rem; padding:6px; }.console-vitals i { width:40px; }
  .console-home-actions { left:14px; right:14px; gap:6px; }.console-home-actions .console-primary { min-width:0; flex-basis:100%; }.console-home-actions button:not(.console-primary) { flex:1; min-height:39px; font-size:.7rem; }.console-home-actions .console-last-training { font-size:.65rem; }
- .console-panel { left:7px; right:7px; top:7px; bottom:7px; border-radius:9px; }.console-panel-body { padding:10px; }.console-panel .content-panel { padding:12px; }.console-panel .skill-grid { grid-template-columns:1fr; }.console-panel .routine-grid { grid-template-columns:1fr; }.console-menu-grid { gap:8px; }.console-menu-grid > button { padding:12px 9px; gap:8px; min-height:90px; }.console-menu-grid > button > svg:last-child { display:none; }.console-menu-grid strong { font-size:.83rem; }.console-menu-grid small { font-size:.68rem; }
+ .console-panel { left:7px; right:7px; top:7px; bottom:7px; border-radius:9px; }.console-panel-body { padding:10px; }.console-panel .content-panel { padding:12px; }.console-panel .routine-grid { grid-template-columns:1fr; }
  .console-dock { padding:0 4px; gap:0; }.console-dock button { font-size:.65rem; }.console-dock button > svg { width:20px; height:20px; }
- .console-panel-journal { width:auto; }.console-welcome { left:24px; right:20px; }.console-welcome > span { font-size:.6rem; }.console-welcome p { font-size:.8rem; }
+ .console-panel-sidebar { width:auto; }.console-welcome { left:24px; right:20px; }.console-welcome > span { font-size:.6rem; }.console-welcome p { font-size:.8rem; }
  .game-console .game-dialogue p { font-size:.8rem; }.game-console .game-dialogue { max-height:calc(100% - 105px); }
 }
 @media(max-height:570px) and (min-width:650px){

@@ -120,6 +120,13 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await click('메뉴 닫기');
     for(const menu of ['기술','대회','상점','메뉴']){
       await click(menu);assert.equal(win.document.querySelector('.game-console'),frame);assert.ok(win.document.querySelector('.console-panel'));
+      if(menu==='기술'){
+        assert.equal(win.document.querySelector('.skill-detail'),null);
+        await click('피터팬 상세');
+        assert.match(win.document.querySelector('.skill-detail')!.textContent!,/선행 기술|대회 성공률/);
+        await click('피터팬 미리보기');
+        assert.ok(win.document.querySelector('.technique-preview'));
+      }
       if(menu==='상점'){
         assert.equal(win.document.querySelectorAll('.equipment-choice').length,8);
         assert.equal(win.document.querySelectorAll('.equipment-loadout > div').length,6);
@@ -134,13 +141,18 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       }
       await click('메뉴 닫기');
     }
-    await click('라인');
+    await click('메뉴');await click('라인 편집');
     assert.match(win.document.querySelector('.console-panel')!.textContent!,/라인 편집/);
     assert.doesNotMatch(win.document.querySelector('.console-panel')!.textContent!,/루틴/);
     assert.ok(win.document.querySelector('.routine-save-actions')!.compareDocumentPosition(win.document.querySelector('.auto-routine')!)&win.Node.DOCUMENT_POSITION_FOLLOWING);
-    await click('피터팬 추가');await click('라인 저장');
+    await click('피터팬 추가');
+    await click('뒤로 가기');
+    assert.ok(win.document.querySelector('.console-panel-menu'));
+    await click('라인 편집');
+    assert.match(win.document.querySelector('.routine-order')!.parentElement!.textContent!,/피터팬/);
+    await click('라인 저장');
     assert.ok([...win.document.querySelectorAll('button')].some(button=>button.textContent?.includes('저장된 구성')&&button.disabled));
-    await click('메뉴 닫기');
+    await click('뒤로 가기');await click('메뉴 닫기');
     const speedGauge=win.document.querySelector('.stat-speed');
     const selectionSlot=win.document.querySelector('.weekly-selection-slot');
     await click('속도 훈련 선택');
@@ -229,12 +241,25 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.equal(win.document.querySelectorAll('.game-disciplines button[aria-pressed="true"]:disabled').length,3);
     assert.equal([...win.document.querySelectorAll('button')].some(button=>button.textContent==='이번 대회 쉬기'),false);
     await click('경기장 입장');assert.deepEqual(selectedEntry,{type:'entry',disciplines:['dance','trick','freestyle']});
-    await act(async()=>root.render(createElement(Meets,{r:rider,onPlay:()=>{},onEntry:()=>{}})));
-    const history=win.document.querySelector('.meet-history-card')!;
+    let loadedLogs=0;
+    const summary={...record,detail:'summary' as const,results:record.results.map(result=>({...result,run:{...result.run,log:[]}}))};
+    await act(async()=>root.render(createElement(Meets,{
+      r:{...rider,records:[summary]},onPlay:()=>{},onEntry:()=>{},
+      onLoadRecord:async selected=>{assert.equal(selected,summary);loadedLogs++;return record;},
+    })));
+    assert.equal(win.document.querySelectorAll('.meet-list-row').length,6);
+    assert.match(win.document.querySelector('.calendar-list')!.textContent!,/국제대회 · 서울|3종목 필수/);
+    await click('최근 성적');
+    const history=win.document.querySelector('.meet-detail')!;
     assert.match(history.textContent!,/위|점|상금 ₩|미출전/);
     assert.equal(history.querySelectorAll('.meet-result-grid > div').length,3);
     assert.equal(history.querySelectorAll('.meet-standings li').length,14);
-    assert.match(win.document.querySelector('.calendar-list')!.textContent!,/국제대회 · 서울|3종목 필수/);
+    assert.equal(loadedLogs,0);
+    await click('기술별 기록');
+    assert.equal(loadedLogs,1);
+    assert.equal(history.querySelectorAll('.meet-moves li').length,record.results.reduce((sum,result)=>sum+result.run.log.length,0));
+    await click('현재 시즌');
+    assert.match(win.document.querySelector('.meet-detail')!.textContent!,/서울|3종목/);
     rider.year=1;rider.week=8;rider.phase='plan';
     let continued=0;
     const realNow=Object.getOwnPropertyDescriptor(performance,'now');

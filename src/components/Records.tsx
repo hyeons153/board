@@ -22,7 +22,7 @@ export function Rankings({r}:{r:Rider}){
   const scores=season.scores[discipline];
   const board=Object.entries(scores).sort(([a,x],[b,y])=>y-x||a.localeCompare(b));
   return <section className="panel content-panel">
-    <SectionTitle code="SEASON STANDINGS" title="시즌 랭킹" detail="부문과 종목별 포인트로 순위를 정합니다. 메이저 대회에서는 1.5배를 받습니다."/>
+    <p className="game-section-note">부문과 종목별 시즌 포인트 순위예요.</p>
     <div className="filter-line"><div className="pill-row">{DISCIPLINES.map(d=><button key={d} aria-pressed={d===discipline} className={`pill ${d===discipline?'active':''}`} onClick={()=>setDiscipline(d)}>{DISCIPLINE_NAMES[d]}</button>)}</div><label className="inline-select">시즌<select value={season.year} onChange={e=>setYear(Number(e.target.value))}>{history.map(s=><option value={s.year} key={s.year}>{s.year}년차 · {DIVISION_NAMES[s.division]}</option>)}</select></label></div>
     <div className="inner-card rankings">
       <div className="card-heading"><span><Trophy size={19}/> {DISCIPLINE_NAMES[discipline]} 순위표</span><Tag kind="lime">{DIVISION_NAMES[season.division]}</Tag></div>
@@ -46,7 +46,7 @@ export function Profile({r,send,saving,onHall,onNew}:{r:Rider;send:Submit;saving
       {r.mentor&&<div className="account-identity"><PixelRider look={r.mentor.look}/><div><strong>이전 회차의 선배 {r.mentor.name}</strong>
         <p>{r.mentor.title} · {r.mentor.wins}승 {r.mentor.skill&&' · '+SKILL[r.mentor.skill]?.name}</p></div></div>}
     </section>
-    <section className="panel content-panel">
+    <section className="panel content-panel" id="rider-rivals" tabIndex={-1}>
       <SectionTitle code="THE LOCAL CREW" title="라이벌" detail="연습 스팟과 대회에서 만나며 관계가 바뀝니다."/>
       <div className="rival-grid">{RIVALS.map(n=>{
         const progress=competitor(n,r.year,r.week);

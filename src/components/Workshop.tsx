@@ -1,23 +1,29 @@
-import { BadgeCheck, CircleDollarSign, Package, Settings2, Sparkles } from 'lucide-react';
+import { BadgeCheck, CircleDollarSign, Package, Settings2, ShoppingBag, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { DISCIPLINE_NAMES } from '../game/data';
 import { ECONOMY, eligibleSponsor, equippedLook, extras, GEAR, SPONSOR, SPONSORS } from '../game/economy';
-import type { Rider } from '../game/types';
+import type { Look, Rider } from '../game/types';
 import { LookFields, LookPreview } from './Appearance';
 import { SectionTitle, Tag } from './Brand';
 import { money, type Submit } from './Overview';
 import EquipmentPanel from './EquipmentPanel';
 
-export default function Workshop({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
+const tabs=[['gear','장비',ShoppingBag],['sponsor','스폰서',BadgeCheck],['style','외형',Sparkles]] as const;
+
+export default function Workshop({r,send,saving,lookDraft,onLookDraft}:{r:Rider;send:Submit;saving:boolean;lookDraft?:Look;onLookDraft:(value:Look|undefined)=>void}){
   const progress=extras(r);
-  const [look,setLook]=useState(r.look);
+  const [tab,setTab]=useState<typeof tabs[number][0]>('gear');
+  const look=lookDraft??r.look;
   const active=SPONSOR.get(progress.contract?.id??'');
   const disabled=saving||r.phase==='retired';
   const available=r.money-(r.plan?.lesson?ECONOMY.lesson:0);
   const changed=JSON.stringify(look)!==JSON.stringify(r.look);
   return <div className="stack workshop">
-    <EquipmentPanel r={r} send={send} saving={saving}/>
-    <section className="panel content-panel">
+    <div className="game-toolbar" role="group" aria-label="상점 메뉴">
+      {tabs.map(([key,label,Icon])=><button key={key} className="pill" aria-pressed={key===tab} onClick={()=>setTab(key)}><Icon size={16}/> {label}</button>)}
+    </div>
+    {tab==='gear'&&<EquipmentPanel r={r} send={send} saving={saving}/>}
+    {tab==='sponsor'&&<section className="panel content-panel">
       <SectionTitle code="SPONSOR CLUB" title="스폰서 계약" detail="시즌마다 한 곳과 계약할 수 있습니다. 해당 시즌에 협찬 종목으로 대회에서 한 번이라도 입상하면 계약을 갱신합니다."/>
       <div className="gear-grid">{SPONSORS.map(brand=>{
         const current=active?.id===brand.id;
@@ -32,16 +38,16 @@ export default function Workshop({r,send,saving}:{r:Rider;send:Submit;saving:boo
             onClick={()=>void send({type:'sponsor',id:brand.id})}>{current?'계약 중':qualified?'계약하기':'조건 미달'}</button></div>
         </article>;
       })}</div>
-    </section>
-    <section className="panel content-panel">
+    </section>}
+    {tab==='style'&&<section className="panel content-panel">
       <SectionTitle code="RIDER STYLE" title="외형 변경"/>
       <div className="makeover-grid">
         <div className="makeover-rider"><LookPreview look={equippedLook({...r,look})} label="외형 변경 미리보기"/></div>
-        <LookFields look={look} onChange={setLook}/>
+        <LookFields look={look} onChange={onLookDraft}/>
       </div>
       {progress.equipped.deck&&<p className="subtle"><Settings2 size={14}/> 장착한 데크의 디자인이 기본 데크 디자인보다 먼저 표시됩니다.</p>}
       <div className="bottom-actions"><button className="button primary" disabled={disabled||!changed||available<ECONOMY.makeover}
-        onClick={()=>void send({type:'makeover',look})}><Sparkles size={15}/> 적용 {money(ECONOMY.makeover)}</button></div>
-    </section>
+        onClick={async()=>{if(await send({type:'makeover',look}))onLookDraft(undefined);}}><Sparkles size={15}/> 적용 {money(ECONOMY.makeover)}</button></div>
+    </section>}
   </div>;
 }

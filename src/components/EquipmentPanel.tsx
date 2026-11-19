@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
-import { ArrowRight, Package, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Package, Volume2, VolumeX } from 'lucide-react';
 import { STAT_NAMES } from '../game/data';
 import { BASIC_SLOTS, RARITIES, RARITY_NAMES, type Effects, type Gear, type GearSlot } from '../game/equipmentCatalog';
 import { ECONOMY, effectiveStats, equipmentStats, equipmentUnlocked, extras, GEAR, GEAR_NAMES, GEAR_SLOTS, ITEM, resaleValue, STARTER_IDS, unlockText } from '../game/economy';
-import { STATS, type Rider } from '../game/types';
+import { STATS, type GameAction, type Rider } from '../game/types';
 import { PixelRider } from './Appearance';
 import { equippedLook } from '../game/economy';
 import { setSoundsEnabled, soundsEnabled } from '../sounds';
@@ -28,45 +28,96 @@ export function EquipmentIcon({item}:{item?:Gear}){
 }
 
 export default function EquipmentPanel({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
-  const progress=extras(r),[slot,setSlot]=useState<GearSlot>('deck'),[rarity,setRarity]=useState('all'),[ownership,setOwnership]=useState('all'),[selected,setSelected]=useState('deck_001');
+  const progress=extras(r),[slot,setSlot]=useState<GearSlot>('deck'),[rarity,setRarity]=useState('all');
+  const [ownership,setOwnership]=useState<'all'|'owned'|'equipped'>('all'),[selected,setSelected]=useState<string>();
   const [sound,setSound]=useState(soundsEnabled);
+  const [feedback,setFeedback]=useState('');
   const disabled=saving||r.phase==='retired',available=r.money-(r.plan?.lesson?ECONOMY.lesson:0);
   const isEquipped=(id:string)=>Object.values(progress.equipped).includes(id)||(progress.accessories??[]).includes(id);
-  const item=ITEM.get(selected)??GEAR.find(item=>item.slot===slot)!;
-  const owned=progress.inventory.includes(item.id),equipped=isEquipped(item.id),unlocked=equipmentUnlocked(r,item);
-  const current=item.slot==='accessory'?undefined:ITEM.get(progress.equipped[item.slot]??'');
-  const detail=useRef<HTMLElement>(null);
-  const previewExtras={...progress,inventory:[...new Set([...progress.inventory,item.id])],equipped:{...progress.equipped},accessories:[...(progress.accessories??[])]};
-  if(item.slot==='accessory')previewExtras.accessories=[item.id];else previewExtras.equipped[item.slot]=item.id;
-  const selectItem=(id:string)=>{setSelected(id);if(matchMedia('(max-width:650px)').matches)detail.current?.scrollIntoView({block:'start',behavior:'smooth'});};
+  const chosenButton=useRef<HTMLButtonElement|null>(null);
+  const detail=useRef<HTMLElement|null>(null);
+  const selectItem=(id:string,button:HTMLButtonElement)=>{
+    chosenButton.current=button;setSelected(id);
+    if(matchMedia('(max-width:760px)').matches)window.requestAnimationFrame(()=>{
+      detail.current?.focus({preventScroll:true});detail.current?.scrollIntoView({block:'nearest'});
+    });
+  };
+  const closeDetail=()=>{
+    setSelected(undefined);const button=chosenButton.current;
+    window.requestAnimationFrame(()=>button?.focus());
+  };
   const bonus=equipmentStats(r),total=effectiveStats(r);
-  const chooseSlot=(next:GearSlot)=>{setSlot(next);setSelected(GEAR.find(item=>item.slot===next)!.id);};
+  const chooseSlot=(next:GearSlot)=>{setSlot(next);setSelected(undefined);};
   const items=GEAR.filter(item=>item.slot===slot&&(!item.legacy||progress.inventory.includes(item.id))&&(rarity==='all'||item.rarity===rarity)&&(ownership==='all'||ownership==='owned'&&progress.inventory.includes(item.id)||ownership==='equipped'&&isEquipped(item.id)));
+  const item=items.find(item=>item.id===selected);
+  const apply=async (action:GameAction,message:string)=>{
+    setFeedback('');
+    if(await send(action))setFeedback(message);
+  };
+  const status=(item:Gear)=>isEquipped(item.id)?'장착 중':progress.inventory.includes(item.id)?'보유':item.unlock?
+    equipmentUnlocked(r,item)?'보상 받기':'잠김':available>=item.price?'구매 가능':'보유금 부족';
   return <section className="panel content-panel equipment-panel">
-    <div className="workshop-rider"><PixelRider look={equippedLook(r)} label="현재 장비를 장착한 라이더"/><div><h2>장비와 액세서리</h2><p>보유금 <strong>{money(available)}</strong> · 액세서리 {(progress.accessories??[]).length}/3</p></div><ShoppingBag size={24}/></div>
-    <button className="text-button equipment-sound" aria-pressed={sound} onClick={()=>{setSound(!sound);setSoundsEnabled(!sound);}}>효과음 {sound?'켜짐':'꺼짐'}</button>
-    {r.plan&&<p className="subtle">진행 중인 훈련에는 시작할 때의 장비가 적용됩니다. 장비 변경은 다음 훈련부터 반영됩니다.</p>}
+    <div className="workshop-rider"><PixelRider look={equippedLook(r)} label="현재 장비를 장착한 라이더"/><div><h2>내 장비</h2><p>보유금 <strong>{money(available)}</strong> · 액세서리 {(progress.accessories??[]).length}/3</p></div>
+      <button className="button quiet small equipment-sound" aria-pressed={sound} onClick={()=>{setSound(!sound);setSoundsEnabled(!sound);}}>{sound?<Volume2 size={16}/>:<VolumeX size={16}/>} 효과음 {sound?'켜짐':'꺼짐'}</button>
+    </div>
+    {r.plan&&<p className="game-section-note">장비 교체는 다음 훈련부터 적용돼요.</p>}
     <div className="equipment-totals" aria-label="장비 적용 능력치">{STATS.map(stat=><div key={stat}><span>{STAT_NAMES[stat]}</span><b>{total[stat].toFixed(1)}</b><small>기본 {r.stats[stat]} + 장비 {bonus[stat]}</small></div>)}</div>
     <div className="equipment-loadout" aria-label="현재 장착 장비">
       {BASIC_SLOTS.map(slot=>{const item=ITEM.get(progress.equipped[slot]??'');return <div key={slot}><small>{GEAR_NAMES[slot]}</small><EquipmentIcon item={item}/><strong>{item?.name??'미장착'}</strong>{item&&<button className="text-button" aria-label={item.name+' 해제'} disabled={disabled} onClick={()=>void send({type:'unequip',slot})}>해제</button>}</div>;})}
       {[0,1,2].map(index=>{const item=ITEM.get(progress.accessories?.[index]??'');return <div key={'acc'+index}><small>액세서리 {index+1}</small><EquipmentIcon item={item}/><strong>{item?.name??'빈 슬롯'}</strong>{item&&<button className="text-button" aria-label={item.name+' 해제'} disabled={disabled} onClick={()=>void send({type:'unequip',slot:'accessory',item:item.id})}>해제</button>}</div>;})}
     </div>
-    <div className="equipment-filters"><div className="pill-row" aria-label="장비 종류">{GEAR_SLOTS.map(key=><button key={key} className={'pill'+(slot===key?' active':'')} aria-pressed={slot===key} onClick={()=>chooseSlot(key)}>{GEAR_NAMES[key]}</button>)}</div>
-      <label>목록<select aria-label="보유 상태 필터" value={ownership} onChange={e=>setOwnership(e.target.value)}><option value="all">상점과 보관함</option><option value="owned">보유 아이템</option><option value="equipped">장착 아이템</option></select></label>
-      <label>희귀도<select aria-label="희귀도 필터" value={rarity} onChange={e=>setRarity(e.target.value)}><option value="all">전체 희귀도</option>{RARITIES.map(key=><option key={key} value={key}>{RARITY_NAMES[key]}</option>)}</select></label>
+    <div className="equipment-filters">
+      <div className="pill-row" role="group" aria-label="보유 상태 필터">
+        {([['all','상점'],['owned','보관함'],['equipped','장착 중']] as const).map(([key,label])=><button key={key} className="pill" aria-pressed={ownership===key} onClick={()=>{setOwnership(key);setSelected(undefined);}}>{label}</button>)}
+      </div>
+      <div className="pill-row" role="group" aria-label="장비 종류">{GEAR_SLOTS.map(key=><button key={key} className="pill" aria-pressed={slot===key} onClick={()=>chooseSlot(key)}>{GEAR_NAMES[key]}</button>)}</div>
+      <label>희귀도<select aria-label="희귀도 필터" value={rarity} onChange={e=>{setRarity(e.target.value);setSelected(undefined);}}><option value="all">전체</option>{RARITIES.map(key=><option key={key} value={key}>{RARITY_NAMES[key]}</option>)}</select></label>
     </div>
-    <div className="equipment-browser"><div className="equipment-items" aria-label="장비 아이템 목록">{items.map(item=><button key={item.id} className={'equipment-choice'+(selected===item.id?' selected':'')} aria-label={item.name+' 상세'} aria-pressed={selected===item.id} onClick={()=>selectItem(item.id)}>
-      <EquipmentIcon item={item}/><span className={'equipment-rarity rarity-'+item.rarity}>{RARITY_NAMES[item.rarity]}</span><strong>{item.name}</strong><small>{effectsText(item).join(' · ')}</small><span>{isEquipped(item.id)?'장착 중':progress.inventory.includes(item.id)?'보유':item.unlock?unlockText(item):money(item.price)}{item.legacy?' · 이전 장비':''}</span>
-    </button>)}{!items.length&&<p>조건에 맞는 아이템이 없습니다.</p>}</div>
-    <aside className="equipment-detail" aria-label="아이템 상세" ref={detail}><div className="equipment-detail-title"><EquipmentIcon item={item}/><span className={'equipment-rarity rarity-'+item.rarity}>{RARITY_NAMES[item.rarity]}</span><h3>{item.name}</h3></div>
-      <PixelRider look={equippedLook({look:r.look,extras:previewExtras})} label={item.name+' 착용 미리보기'}/>
-      <p>{item.description}</p><ul>{effectsText(item).map(line=><li key={line}>{line}</li>)}</ul>
-      {item.slot!=='accessory'&&<div className="equipment-comparison" aria-label="장비 교체 비교"><strong>{current?.name??'미장착'} <ArrowRight size={14}/> {item.name}</strong>{STATS.filter(stat=>item.stats[stat]||current?.stats[stat]).map(stat=>{const difference=(item.stats[stat]??0)-(current?.stats[stat]??0);return <p key={stat}>{STAT_NAMES[stat]} 장비 {current?.stats[stat]??0} → {item.stats[stat]??0} <b className={difference<0?'is-loss':''}>({difference>=0?'+':''}{difference})</b></p>;})}<small>기본 능력치는 유지됩니다.</small></div>}
-      {item.slot==='accessory'&&<p className="equipment-slot-note">최대 3개 장착 · 같은 아이템 중복 장착 불가</p>}
-      <p className="equipment-unlock">{item.unlock?unlockText(item):STARTER_IDS.includes(item.id)?'처음부터 지급되는 기본 장비':owned?'보관함에 보유 중':'가격 '+money(item.price)}</p>
-      <div className="equipment-actions">{owned?<><button className="button primary small" disabled={disabled||equipped||(item.slot==='accessory'&&(progress.accessories??[]).length>=3)} onClick={()=>void send({type:'trade',operation:'equip',item:item.id})}>{equipped?'장착 중':'장착'}</button>
-        {!STARTER_IDS.includes(item.id)&&!item.unlock&&<button className="button quiet small" disabled={disabled} onClick={()=>void send({type:'trade',operation:'sell',item:item.id})}>판매 {money(resaleValue(r,item))}</button>}</>:item.unlock?<button className="button primary small" disabled={disabled||!unlocked} onClick={()=>void send({type:'claim-gear'})}>{unlocked?'해금 보상 받기':'해금 대기'}</button>:<button className="button primary small" disabled={disabled||available<item.price} onClick={()=>void send({type:'trade',operation:'buy',item:item.id})}>구매 {money(item.price)}</button>}</div>
-    </aside></div>
+    <div className="equipment-feedback" role="status">{feedback}</div>
+    <div className="equipment-browser"><div className="equipment-items" aria-label="장비 아이템 목록">{items.map(item=><button key={item.id} className={'equipment-choice'+(selected===item.id?' selected':'')} aria-label={item.name+' 상세'} aria-pressed={selected===item.id} onClick={event=>selectItem(item.id,event.currentTarget)}>
+      <EquipmentIcon item={item}/>
+      <span className="equipment-choice-name"><strong>{item.name}</strong><small>{RARITY_NAMES[item.rarity]}{item.legacy?' · 이전 장비':''}</small></span>
+      <span className="equipment-choice-status" data-state={status(item)}>{status(item)}{!item.unlock&&!progress.inventory.includes(item.id)&&<b>{money(item.price)}</b>}</span>
+    </button>)}{!items.length&&<p className="game-empty">조건에 맞는 아이템이 없어요.</p>}</div>
+    {item&&<aside className="equipment-detail" aria-label="아이템 상세" tabIndex={-1} ref={detail}>
+      <ItemDetail item={item} r={r} owned={progress.inventory.includes(item.id)} equipped={isEquipped(item.id)} disabled={disabled}
+        available={available} status={status(item)} total={total} apply={apply} onClose={closeDetail}/>
+    </aside>}</div>
     {progress.legacyEquipment&&<details className="equipment-legacy"><summary><Package size={14}/> 이전 장비 보존 기록</summary><p>기존 베어링은 같은 이름과 ID로 액세서리에 옮겼습니다. 지난 경기의 채점 입력은 원본을 유지합니다.</p>{progress.legacyEquipment.unmapped.length>0&&<p>호환 정보 보관: {progress.legacyEquipment.unmapped.join(', ')} · 보유 기록을 유지하며 능력치에는 합산하지 않습니다.</p>}{progress.legacyEquipment.overflow.length>0&&<p>슬롯이 가득 차 보관함에 남긴 장비: {progress.legacyEquipment.overflow.join(', ')}</p>}</details>}
   </section>;
+}
+
+function ItemDetail({item,r,owned,equipped,disabled,available,status,total,apply,onClose}:{
+  item:Gear;r:Rider;owned:boolean;equipped:boolean;disabled:boolean;available:number;status:string;
+  total:ReturnType<typeof effectiveStats>;apply:(action:GameAction,message:string)=>Promise<void>;onClose:()=>void;
+}){
+  const {slot}=item;
+  const progress=extras(r),accessory=slot==='accessory',slots=progress.accessories??[];
+  const full=accessory&&slots.length>=3;
+  const current=accessory?undefined:ITEM.get(progress.equipped[slot]??'');
+  const previewExtras={...progress,inventory:[...new Set([...progress.inventory,item.id])],equipped:{...progress.equipped},accessories:[...slots]};
+  if(accessory&&!equipped)previewExtras.accessories=[...slots.slice(0,2),item.id];
+  if(!accessory)previewExtras.equipped[slot]=item.id;
+  const after=effectiveStats({...r,extras:previewExtras});
+  const differenceStats=STATS.filter(stat=>after[stat]!==total[stat]);
+  const unlocked=equipmentUnlocked(r,item);
+  return <>
+    <button className="text-button equipment-back" onClick={onClose}><ArrowLeft size={15}/> 아이템 목록</button>
+    <div className="equipment-detail-title"><EquipmentIcon item={item}/><span className={'equipment-rarity rarity-'+item.rarity}>{RARITY_NAMES[item.rarity]} · {status}</span><h3>{item.name}</h3></div>
+    <div className="equipment-detail-overview">
+      <PixelRider look={equippedLook({look:r.look,extras:previewExtras})} label={item.name+' 착용 미리보기'}/>
+      <div><p>{item.description}</p><ul>{effectsText(item).map(line=><li key={line}>{line}</li>)}</ul></div>
+    </div>
+    {!accessory&&<div className="equipment-comparison" aria-label="장비 교체 비교">
+      <strong>{current?.name??'미장착'} <ArrowRight size={14}/> {item.name}</strong>
+      {differenceStats.length?<dl className="game-facts">{differenceStats.map(stat=>{
+        const diff=after[stat]-total[stat];
+        return <div key={stat}><dt>{STAT_NAMES[stat]}</dt><dd>{total[stat].toFixed(1)} → {after[stat].toFixed(1)} <b className={diff<0?'is-loss':''}>({diff>0?'+':''}{Number(diff.toFixed(1))})</b></dd></div>;
+      })}</dl>:<p>능력치 변화 없음</p>}
+    </div>}
+    {full&&!equipped&&<p className="game-section-note">장착하려면 액세서리 한 개를 먼저 해제하세요.</p>}
+    {item.unlock&&<p className="equipment-unlock">{unlockText(item)}</p>}
+    <div className="equipment-actions">{owned?<><button className="button primary" disabled={disabled||equipped||full} onClick={()=>void apply({type:'trade',operation:'equip',item:item.id},item.name+' 장착 완료')}>{equipped?'장착 중':'장착'}</button>
+      {!STARTER_IDS.includes(item.id)&&!item.unlock&&<button className="button quiet" disabled={disabled} onClick={()=>void apply({type:'trade',operation:'sell',item:item.id},item.name+' 판매 완료')}>판매 {money(resaleValue(r,item))}</button>}</>:item.unlock?<button className="button primary" disabled={disabled||!unlocked} onClick={()=>void apply({type:'claim-gear'},'해금 장비를 보관함에 넣었어요.')}>{unlocked?'해금 보상 받기':'해금 대기'}</button>:<button className="button primary" disabled={disabled||available<item.price} onClick={()=>void apply({type:'trade',operation:'buy',item:item.id},item.name+' 구매 완료')}>구매 {money(item.price)}</button>}</div>
+  </>;
 }

@@ -1,0 +1,408 @@
+.game-console {
+  --game-edge:clamp(14px,3vw,46px);
+  --game-ink:#22364a;
+  --game-paper:#f9f5e8;
+  --game-border:#c7ceb8;
+  --game-soft:#eeeadc;
+  --game-selected:#e1edc9;
+  --game-accent:#487254;
+  --console-top-size:64px;
+  --console-dock-size:72px;
+  grid-template-rows:calc(var(--console-top-size) + env(safe-area-inset-top)) minmax(0,1fr) calc(var(--console-dock-size) + env(safe-area-inset-bottom));
+}
+.console-top { padding-top:env(safe-area-inset-top); }
+.console-dock { padding-bottom:env(safe-area-inset-bottom); }
+.console-dock button { font-size:.82rem; }
+.console-panel {
+  background:var(--game-paper);
+  border-color:#c5cfb6;
+  box-shadow:0 5px 0 #0b1926a8,0 14px 36px #0b192669;
+  backdrop-filter:none;
+}
+.console-panel > header {
+  padding:6px 14px;
+  background:#24394e;
+  border-bottom:2px solid #63786e;
+}
+.console-panel > header h1 { font-size:1.12rem; }
+.console-panel > header button { width:40px; height:40px; }
+.console-panel-body { flex:1; padding:clamp(12px,2vw,22px); }
+.console-panel-body:focus,.equipment-detail:focus,.meet-detail:focus,.skill-detail:focus { outline:none; }
+.console-panel-standard,.console-panel-wide,.console-panel-create {
+  left:50%;
+  right:auto;
+  width:min(850px,calc(100% - 28px));
+  transform:translateX(-50%);
+}
+.console-panel-standard,.console-panel-wide { bottom:auto; max-height:calc(100% - 28px); }
+.console-panel-wide { width:min(1170px,calc(100% - 28px)); }
+.console-panel-create { width:min(920px,calc(100% - 28px)); }
+.console-panel-sidebar .console-panel-body { padding:clamp(10px,2vw,18px); }
+.console-panel-menu {
+  top:auto;
+  left:auto;
+  right:14px;
+  width:min(330px,calc(100% - 28px));
+  max-height:calc(100% - 28px);
+}
+.console-panel-menu .console-panel-body { padding:10px; }
+.console-menu { display:grid; gap:10px; }
+.console-menu h2 { padding:4px 8px 6px; color:#4d675d; font-size:.82rem; }
+.console-menu section+section { border-top:1px solid var(--game-border); padding-top:8px; }
+.console-menu button {
+  display:grid;
+  grid-template-columns:22px minmax(0,1fr) auto;
+  align-items:center;
+  text-align:left;
+  gap:8px;
+  width:100%;
+  min-height:44px;
+  padding:8px 10px;
+  border:1px solid transparent;
+  border-radius:6px;
+  color:var(--game-ink);
+  background:transparent;
+  font-weight:750;
+}
+.console-menu button:hover { background:var(--game-selected); border-color:#a8bf92; }
+.console-menu button svg { color:var(--game-accent); }
+.console-panel .content-panel,.console-panel .panel { box-shadow:none; border-color:var(--game-border); }
+.console-panel .section-title h2 { font-size:clamp(1.13rem,2vw,1.42rem); letter-spacing:-.02em; }
+.console-panel .section-title .eyebrow { display:none; }
+.console-panel .section-title p,.console-panel .content-panel > p { font-size:.89rem; line-height:1.65; }
+.console-panel .pill { min-height:40px; padding:7px 12px; font-size:.85rem; }
+.console-panel .pill[aria-pressed=true] { color:#294c3b; background:var(--game-selected); border-color:#789666; font-weight:800; }
+.console-panel input,.console-panel select { min-width:0; }
+.console-panel .account-identity { flex-wrap:wrap; }
+.console-panel .account-form .button,.console-panel .account-form .pill-row { max-width:100%; }
+.game-toolbar {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px 14px;
+  align-items:center;
+  padding:8px 0 12px;
+  border-bottom:1px solid var(--game-border);
+  margin-bottom:12px;
+}
+.game-toolbar label { display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:.83rem; font-weight:750; }
+.game-toolbar select,.equipment-filters select { min-height:40px; }
+.game-toolbar-end { margin-left:auto; }
+.game-toolbar .tag { font-size:.77rem; }
+.game-section-note { margin:0 0 10px; color:#526057; font-size:.85rem; line-height:1.6; }
+.game-empty { padding:16px 10px; color:#596456; }
+.game-facts { display:grid; gap:5px; margin:10px 0; font-size:.84rem; }
+.game-facts > div { display:flex; align-items:baseline; justify-content:space-between; gap:6px 14px; }
+.game-facts dt { color:#536457; }
+.game-facts dd { text-align:right; margin:0; font-weight:750; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.game-rule-note { margin-top:16px; padding:10px 12px; background:var(--game-soft); border:1px solid var(--game-border); border-radius:7px; font-size:.85rem; }
+.game-rule-note summary { font-weight:750; padding:6px 0; cursor:pointer; }
+.game-rule-note p { line-height:1.6; margin:5px 0; }
+.game-console button:focus-visible,.game-console summary:focus-visible { outline:2px solid #56816c; outline-offset:2px; }
+.console-top button:focus-visible,.console-dock button:focus-visible,.console-panel > header button:focus-visible { outline-color:#e0f0a3; outline-offset:1px; }
+.console-menu button:active,.weekly-action-grid > button:active,.skill-entry-summary:active,.meet-list-row:active,.equipment-choice:active,.game-console .button:active:not(:disabled) { box-shadow:inset 0 2px 0 #263c3033; }
+
+.console-status {
+  position:absolute;
+  z-index:2;
+  top:66px;
+  left:var(--game-edge);
+  width:min(510px,calc(100% - 2 * var(--game-edge)));
+  display:grid;
+  gap:6px;
+  pointer-events:none;
+}
+.console-status .console-vitals,.console-status .console-stats {
+  position:static;
+  width:100%;
+  max-width:none;
+}
+.console-status .console-stats { gap:5px; }
+.console-vitals > span { font-size:.78rem; font-variant-numeric:tabular-nums; }
+.status-gauge { gap:4px; padding:8px; font-size:.77rem; }
+.status-gauge b { font-size:.82rem; }
+.status-equipment { font-size:.65rem; line-height:1.25; }
+.status-delta { font-size:.69rem; }
+.console-training-area {
+  position:absolute;
+  z-index:4;
+  left:var(--game-edge);
+  bottom:16px;
+  display:grid;
+  gap:6px;
+  width:min(536px,calc(100% - 2 * var(--game-edge)));
+  max-height:calc(100% - 26px);
+  overflow:auto;
+  padding:2px;
+  overscroll-behavior:contain;
+  scrollbar-color:#99b28c #203346;
+}
+.console-training-area[hidden] { display:none; }
+.console-training-area .console-status { position:static; width:100%; }
+.console-field-links { display:flex; gap:6px; min-width:0; }
+.console-next-meet {
+  display:grid;
+  grid-template-columns:18px minmax(0,1fr) auto 16px;
+  align-items:center;
+  gap:8px;
+  min-height:40px;
+  padding:7px 11px;
+  border:1px solid #889e98;
+  border-radius:7px;
+  background:#263d53;
+  color:#fff7e1;
+  text-align:left;
+  font-size:.88rem;
+  font-weight:750;
+  flex:1;
+  min-width:0;
+}
+.console-next-meet span { overflow-wrap:anywhere; }
+.console-next-meet b { color:#dcf1a7; white-space:nowrap; font-size:.78rem; }
+.console-next-meet:hover { background:#354f62; }
+.console-visitor {
+  display:flex;
+  align-items:center;
+  gap:5px;
+  flex:none;
+  min-height:40px;
+  padding:6px 9px;
+  border:1px solid #889e98;
+  border-radius:7px;
+  background:#263d53;
+  color:#fff7e1;
+  font-size:.83rem;
+  font-weight:750;
+}
+.console-visitor:hover { background:#354f62; }
+.console-visitor svg { color:#dcecc0; flex:none; }
+.console-training-area .weekly-choices {
+  position:static;
+  width:auto;
+  max-height:none;
+  overflow:visible;
+  padding:12px;
+  background:#f9f5e8;
+  border-color:#c5cdb3;
+  border-top:3px solid #88a56f;
+  box-shadow:none;
+  backdrop-filter:none;
+}
+.weekly-action-grid > button { min-height:44px; }
+.weekly-action-grid strong { font-size:.88rem; }
+.weekly-choices h2 { font-size:1.12rem; }
+.weekly-selection-note,.weekly-blocked,.weekly-inline-controls > label,.weekly-success { font-size:.78rem; }
+.weekly-inline-controls select,.weekly-confirm button { min-height:38px; }
+.weekly-confirm { flex-wrap:nowrap; min-height:54px; }
+.weekly-summary { flex:1; min-width:0; display:grid; gap:2px; font-size:.8rem; line-height:1.3; }
+.weekly-summary > strong { font-size:.85rem; }
+.weekly-summary > span:not(.weekly-success) { color:#566254; }
+.weekly-confirm .weekly-execute { min-height:40px; flex:none; }
+.game-console .game-dialogue {
+  left:var(--game-edge);
+  bottom:16px;
+  width:min(610px,calc(100% - 2 * var(--game-edge)));
+  padding:14px 16px;
+  background:#1d3046;
+}
+.game-console .game-dialogue h2 { font-size:clamp(1.12rem,2.3vw,1.54rem); }
+.game-console .game-dialogue p { font-size:.9rem; }
+.game-console .game-dialogue button { min-height:42px; }
+
+.skill-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:8px; }
+.skill-browser.has-detail { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.06fr); align-items:start; gap:12px; }
+.skill-browser.has-detail .skill-list { grid-template-columns:1fr; }
+.skill-entry-summary,.skill-detail,.meet-list-row,.meet-detail {
+  color:var(--game-ink);
+  background:#fffcf1;
+  border:1px solid var(--game-border);
+  border-radius:8px;
+}
+.skill-entry-summary[aria-expanded=true],.meet-list-row[aria-pressed=true] { border-color:#79966c; }
+.skill-entry-summary.is-locked { background:#efece4; }
+.skill-entry-summary {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto 16px;
+  align-items:center;
+  gap:6px;
+  width:100%;
+  min-height:64px;
+  padding:9px 12px;
+  color:inherit;
+  text-align:left;
+}
+.skill-entry-summary:hover,.skill-entry-summary[aria-expanded=true] { background:var(--game-selected); border-radius:7px; }
+.skill-entry-title { display:grid; gap:2px; line-height:1.32; overflow-wrap:anywhere; }
+.skill-entry-title strong { font-size:1rem; }
+.skill-entry-title small,.skill-entry-state { color:#52655a; font-size:.77rem; }
+.skill-entry-state { display:flex; align-items:center; gap:4px; white-space:nowrap; }
+.is-known .skill-entry-state { color:#345f45; font-weight:800; }
+.skill-entry-summary[aria-expanded=true] .skill-chevron { color:#487254; }
+.skill-entry-progress { grid-column:1/-1; display:grid; grid-template-columns:auto minmax(0,1fr) minmax(3ch,auto); gap:8px; align-items:center; color:#4e6259; font-size:.74rem; }
+.skill-entry-progress progress { width:100%; height:6px; accent-color:#7b986b; }
+.skill-entry-progress b { text-align:right; font-variant-numeric:tabular-nums; }
+.skill-detail { position:sticky; top:0; padding:13px; }
+.skill-detail > header { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
+.skill-detail > header h2 { font-size:1.15rem; }
+.skill-detail > header .icon-button { width:40px; height:40px; flex:none; }
+.skill-detail p { font-size:.88rem; line-height:1.65; }
+.skill-detail-actions { display:flex; flex-wrap:wrap; align-items:center; gap:7px; }
+.skill-detail-actions .button { min-height:40px; }
+.skill-detail .technique-preview { height:clamp(128px,18vw,190px); }
+.skill-library .technique-source { padding:12px 0 0; font-size:.8rem; }
+
+.meet-browser-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:start; gap:12px; }
+.meet-browser .calendar-list { gap:7px; margin:0; }
+.meet-list-row {
+  display:grid;
+  grid-template-columns:50px minmax(0,1fr) auto;
+  align-items:center;
+  gap:9px;
+  text-align:left;
+  width:100%;
+  min-height:60px;
+  padding:8px;
+}
+.meet-list-row:hover,.meet-list-row[aria-pressed=true] { background:var(--game-selected); }
+.meet-list-row .date-block { min-width:0; padding:3px; gap:2px; white-space:nowrap; }
+.meet-list-row .date-block span { font-size:.7rem; }
+.meet-list-row .date-block b { font-size:1rem; }
+.meet-list-name { display:grid; gap:2px; line-height:1.35; }
+.meet-list-name strong { font-size:.91rem; overflow-wrap:anywhere; }
+.meet-list-name small,.meet-results-inline { color:#526457; font-size:.76rem; }
+.meet-results-inline { color:#345944; font-weight:750; }
+.meet-detail { position:sticky; top:0; padding:14px; }
+.meet-detail > header { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 8px; align-items:center; margin-bottom:12px; }
+.meet-detail > header > div { display:flex; gap:6px; align-items:center; color:#53695a; font-size:.82rem; }
+.meet-detail h2,.meet-detail header p { grid-column:1/-1; }
+.meet-detail h2 { font-size:clamp(1.15rem,2vw,1.48rem); line-height:1.3; }
+.meet-detail header p { font-size:.85rem; }
+.meet-detail .meet-results { padding:0; margin:12px 0; background:none; border:0; }
+.meet-detail .meet-result-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.meet-detail .meet-result-grid p { word-break:keep-all; overflow-wrap:anywhere; }
+.meet-detail .meet-standings > div { grid-template-columns:minmax(0,1fr); }
+.meet-detail .meet-standings summary { padding-block:9px; }
+.meet-countdown { font-weight:750; color:#345c42; }
+.meet-detail-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.meet-moves ol { padding:0; list-style:none; }
+.meet-moves li {
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  gap:8px;
+  padding:5px 0;
+  border-bottom:1px solid var(--game-border);
+  font-variant-numeric:tabular-nums;
+}
+
+.workshop { gap:10px; }
+.workshop > .game-toolbar { margin-bottom:0; }
+.equipment-panel .workshop-rider { gap:10px; margin-bottom:6px; }
+.equipment-panel .workshop-rider h2 { font-size:1.1rem; margin-bottom:3px; }
+.equipment-panel .workshop-rider > div { flex:1; }
+.equipment-sound { flex:none; }
+.equipment-totals { gap:6px; margin:8px 0 10px; }
+.equipment-totals > div { gap:3px; padding:7px; }
+.equipment-totals small { font-size:.73rem; }
+.equipment-loadout { gap:5px; margin-bottom:10px; }
+.equipment-loadout > div { gap:3px; padding:7px 4px; }
+.equipment-loadout .equipment-icon { width:29px; height:29px; }
+.equipment-loadout strong { font-size:.79rem; }
+.equipment-loadout small,.equipment-loadout .text-button { font-size:.75rem; }
+.equipment-loadout .text-button { min-height:32px; }
+.equipment-filters { gap:8px 12px; padding:10px 0; }
+.equipment-filters label { font-size:.81rem; }
+.equipment-browser { grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:10px; }
+.equipment-browser:not(:has(.equipment-detail)) { grid-template-columns:1fr; }
+.equipment-items { grid-template-columns:1fr; gap:5px; }
+.equipment-browser:not(:has(.equipment-detail)) .equipment-items { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.equipment-choice {
+  grid-template-columns:34px minmax(0,1fr) auto;
+  gap:6px;
+  min-height:52px;
+  padding:7px 8px;
+}
+.equipment-choice .equipment-icon { width:31px; height:31px; grid-row:auto; }
+.equipment-choice .equipment-choice-name,.equipment-choice > .equipment-choice-status { display:grid; gap:2px; grid-column:auto; line-height:1.3; min-width:0; }
+.equipment-choice-name strong { font-size:.89rem; overflow-wrap:anywhere; }
+.equipment-choice-name small,.equipment-choice > .equipment-choice-status { font-size:.75rem; }
+.equipment-choice-status { text-align:right; color:#516557; }
+.equipment-choice-status[data-state="장착 중"] { color:#2d653d; }
+.equipment-choice-status[data-state="잠김"],.equipment-choice-status[data-state="보유금 부족"] { color:#775445; }
+.equipment-choice-status b { color:var(--game-ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.equipment-detail { padding:12px; }
+.equipment-back { margin-bottom:7px; min-height:36px; }
+.equipment-detail-overview { display:grid; grid-template-columns:76px minmax(0,1fr); align-items:center; gap:8px; margin:7px 0; }
+.equipment-detail-overview .pixel-rider { width:76px; height:92px; }
+.equipment-detail-overview p,.equipment-detail-overview ul { font-size:.84rem; line-height:1.55; }
+.equipment-detail-overview ul { margin:5px 0; }
+.equipment-comparison { padding:9px; }
+.equipment-comparison > strong { font-size:.85rem; }
+.equipment-comparison .game-facts:last-child { margin-bottom:0; }
+.equipment-actions { margin-top:10px; }
+.equipment-feedback:not(:empty) { padding:7px 10px; margin-bottom:7px; color:#325a40; background:var(--game-selected); border-radius:6px; font-weight:750; font-size:.84rem; }
+
+@media (min-width:1600px) { .game-console { --console-top-size:68px; --console-dock-size:78px; } }
+@media (max-width:760px) {
+  .game-console { --game-edge:12px; --console-top-size:58px; --console-dock-size:65px; }
+  .console-top-actions button { height:36px; width:36px; }
+  .console-top-actions .console-auto { padding-inline:7px; font-size:.67rem; }
+  .console-panel-standard,.console-panel-wide,.console-panel-create { top:7px; width:calc(100% - 14px); }
+  .console-panel-standard,.console-panel-wide { max-height:calc(100% - 14px); }
+  .console-panel-create { bottom:7px; }
+  .console-panel-menu { right:7px; bottom:7px; max-height:calc(100% - 14px); }
+  .console-status { top:59px; }
+  .console-status .console-vitals { gap:4px; }
+  .console-vitals > span { padding:5px 7px; font-size:.72rem; }
+  .status-gauge { padding:6px; font-size:.69rem; }
+  .status-gauge b { font-size:.74rem; }
+  .status-equipment { font-size:.61rem; }
+  .status-delta { font-size:.62rem; }
+  .game-console .game-hud:has(.spot-map-trigger) .scene-counter { position:absolute; top:0; left:0; right:auto; margin:0; max-width:42%; letter-spacing:0; }
+  .game-console .game-hud .spot-map-trigger { min-height:40px; font-size:.76rem; max-width:57%; }
+  .game-console .game-stage:not(.has-dialogue) .scene-media { height:min(100%,max(52svh,calc(100% - 245px))); }
+  .game-console .game-stage:not(.has-dialogue) .scene-media canvas { object-position:90% 50%; }
+  .console-training-area {
+    top:59px;
+    bottom:8px;
+    width:calc(100% - 2 * var(--game-edge));
+    max-height:none;
+    grid-template-rows:auto minmax(0,1fr) auto minmax(0,auto);
+    overflow:visible;
+    pointer-events:none;
+  }
+  .console-field-links { grid-row:3; pointer-events:auto; }
+  .console-training-area .weekly-choices { grid-row:4; padding:9px; overflow:auto; pointer-events:auto; }
+  .weekly-selection-note { font-size:.72rem; }
+  .weekly-action-grid strong { font-size:.81rem; }
+  .game-console .game-dialogue { bottom:8px; max-height:calc(100% - 160px); padding:11px; }
+  .game-console .game-dialogue p { font-size:.84rem; }
+  .skill-list,.skill-browser.has-detail,.meet-browser-grid { grid-template-columns:1fr; }
+  .skill-detail { grid-row:1; position:static; }
+  .meet-detail { position:static; }
+  .meet-browser .calendar-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .meet-list-row { grid-template-columns:minmax(0,1fr) auto; gap:4px; height:100%; }
+  .meet-list-row .date-block { justify-self:start; }
+  .meet-list-name { grid-column:1/-1; grid-row:2; }
+  .meet-list-row > .tag { grid-column:2; grid-row:1; }
+  .meet-detail .meet-result-grid { grid-template-columns:repeat(auto-fit,minmax(min(100%,82px),1fr)); }
+  .equipment-browser { display:flex; flex-direction:column-reverse; }
+  .equipment-detail { position:static; }
+  .equipment-browser .equipment-items,.equipment-browser:not(:has(.equipment-detail)) .equipment-items { grid-template-columns:1fr; }
+  .equipment-panel .workshop-rider { flex-wrap:wrap; }
+}
+
+@media (max-width:370px) {
+  .game-console { --game-edge:8px; }
+  .console-top { padding-inline:7px; gap:5px; }
+  .console-top-actions { gap:4px; }
+  .console-top-actions button { width:32px; height:34px; }
+  .console-rider > span { max-width:70px; }
+  .console-panel-body { padding:9px; }
+  .status-gauge { padding:5px; }
+  .status-gauge b { font-size:.69rem; }
+  .equipment-comparison .game-facts > div { flex-wrap:wrap; }
+  .console-next-meet { grid-template-columns:16px minmax(0,1fr) auto; gap:5px; padding-inline:7px; font-size:.81rem; }
+  .console-next-meet svg:last-child { display:none; }
+}
+@media (max-height:570px) {
+  .game-console { --console-top-size:49px; --console-dock-size:54px; }
+}
