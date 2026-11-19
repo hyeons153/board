@@ -125,20 +125,20 @@
 .console-training-area {
   position:absolute;
   z-index:4;
+  top:16px;
   left:var(--game-edge);
   bottom:16px;
   display:grid;
+  grid-template-rows:auto auto minmax(18px,1fr) minmax(0,auto);
   gap:6px;
   width:min(536px,calc(100% - 2 * var(--game-edge)));
-  max-height:calc(100% - 26px);
-  overflow:auto;
   padding:2px;
-  overscroll-behavior:contain;
-  scrollbar-color:#99b28c #203346;
+  pointer-events:none;
 }
 .console-training-area[hidden] { display:none; }
-.console-training-area .console-status { position:static; width:100%; }
-.console-field-links { display:flex; gap:6px; min-width:0; }
+.console-training-area .console-status,.console-field-links { width:min(466px,100%); }
+.console-training-area .console-status { position:static; }
+.console-field-links { display:flex; gap:6px; min-width:0; pointer-events:auto; }
 .console-next-meet {
   display:grid;
   grid-template-columns:18px minmax(0,1fr) auto 16px;
@@ -176,18 +176,21 @@
 .console-visitor:hover { background:#354f62; }
 .console-visitor svg { color:#dcecc0; flex:none; }
 .console-training-area .weekly-choices {
+  grid-row:4;
   position:static;
   width:auto;
   max-height:none;
-  overflow:visible;
-  padding:12px;
+  padding:14px;
   background:#f9f5e8;
   border-color:#c5cdb3;
   border-top:3px solid #88a56f;
   box-shadow:none;
   backdrop-filter:none;
+  overscroll-behavior:contain;
+  pointer-events:auto;
 }
-.weekly-action-grid > button { min-height:44px; }
+.weekly-action-grid { gap:8px; }
+.weekly-action-grid > button { min-height:46px; }
 .weekly-action-grid strong { font-size:.88rem; }
 .weekly-choices h2 { font-size:1.12rem; }
 .weekly-selection-note,.weekly-blocked,.weekly-inline-controls > label,.weekly-success { font-size:.78rem; }
@@ -196,7 +199,7 @@
 .weekly-summary { flex:1; min-width:0; display:grid; gap:2px; font-size:.8rem; line-height:1.3; }
 .weekly-summary > strong { font-size:.85rem; }
 .weekly-summary > span:not(.weekly-success) { color:#566254; }
-.weekly-confirm .weekly-execute { min-height:40px; flex:none; }
+.weekly-confirm .weekly-execute { min-width:72px; min-height:44px; flex:none; }
 .game-console .game-dialogue {
   left:var(--game-edge);
   bottom:16px;
@@ -364,13 +367,13 @@
     top:59px;
     bottom:8px;
     width:calc(100% - 2 * var(--game-edge));
-    max-height:none;
     grid-template-rows:auto minmax(0,1fr) auto minmax(0,auto);
-    overflow:visible;
-    pointer-events:none;
   }
-  .console-field-links { grid-row:3; pointer-events:auto; }
-  .console-training-area .weekly-choices { grid-row:4; padding:9px; overflow:auto; pointer-events:auto; }
+  .console-training-area .console-status,.console-field-links { width:100%; }
+  .console-field-links { grid-row:3; }
+  .console-training-area .weekly-choices { padding:9px; }
+  .weekly-action-grid { gap:6px; }
+  .weekly-action-grid > button { min-height:44px; }
   .weekly-selection-note { font-size:.72rem; }
   .weekly-action-grid strong { font-size:.81rem; }
   .game-console .game-dialogue { bottom:8px; max-height:calc(100% - 160px); padding:11px; }
@@ -405,4 +408,13 @@
 }
 @media (max-height:570px) {
   .game-console { --console-top-size:49px; --console-dock-size:54px; }
+}
+@media (max-height:570px) and (min-width:761px) {
+  .console-training-area { top:10px; bottom:10px; gap:4px; }
+  .console-field-links > button { min-height:34px; padding-block:5px; }
+  .console-training-area .weekly-choices { padding:8px 10px; }
+  .weekly-action-grid { gap:6px; }
+  .weekly-action-grid > button { min-height:38px; }
+  .weekly-confirm { min-height:47px; }
+  .weekly-confirm .weekly-execute { min-height:38px; }
 }
