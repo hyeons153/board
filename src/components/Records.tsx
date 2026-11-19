@@ -1,6 +1,5 @@
 import { ArrowUpRight, ChevronDown, Flag, Medal, Play, Shield, Star, Trophy, UserRound } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { readArchiveTicket } from '../browserSaves';
+import { useState } from 'react';
 import { formatCareerDate, formatMonthWeek, meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, RULES, SKILL, STAT_NAMES, STYLE_NAMES } from '../game/data';
 import { NAMES, competitor, learned } from '../game/competition';
 import { RIVALS, lineTerms, rivalCanJoinEvent } from '../game/content';
@@ -10,16 +9,15 @@ import { HAPPENING } from '../game/happenings';
 import { storyLog } from '../game/storyState';
 import { PixelRider } from './Appearance';
 import { divisionFor } from '../game/career';
-import { DISCIPLINES, STATS, type Archive, type Rider, type View } from '../game/types';
+import { DISCIPLINES, STATS, type Archive, type Rider } from '../game/types';
 import { chooseEnding, endingName, honors, summarize } from '../game/legacy';
 import { formatRP, peakSeasonRP, rankingPoints, validRP } from '../game/rp';
 import { RELATIONSHIP_NAMES, RELATIONSHIP_REWARDS, RELATIONSHIP_TITLES, relationshipHint, relationshipWith, representativeTitle } from '../game/relationships';
 import { RPDisciplines } from './RankingPoints';
-import type { Publication } from '../game/public';
 import { SectionTitle, Tag } from './Brand';
 import { RiderCard, StatCards, type Submit } from './Overview';
-import { service } from './Account';
 import { RelationshipEpilogues } from './RelationshipEpilogues';
+import { PublicationStatus, RegistrationError, type RegistrationActions } from './HallRegistration';
 
 export function Rankings({r}:{r:Rider}){
   const [year,setYear]=useState<number|null>(null);
@@ -156,47 +154,24 @@ function CareerLog({r}:{r:Rider}){
     </div></details>}
   </section>;
 }
-export function PrivateHall({hall,view,onEnding,onAccount,onPublic}:{hall:Archive[];view:View;onEnding:(id:string)=>void;onAccount:()=>void;onPublic:(id:string)=>void}){
-  const [publications,setPublications]=useState<Publication[]>([]);
-  const [pending,setPending]=useState('');
-  const [error,setError]=useState('');
-  const [available,setAvailable]=useState(false);
-  useEffect(()=>{
-    if(!view.username||!view.scope) return;
-    let active=true;
-    service<Publication[]>('public',{type:'mine'},view.scope).then(rows=>{
-      if(active){setPublications(rows);setAvailable(true);}
-    }).catch(error=>{if(active)setError(error instanceof Error?error.message:'공개 상태를 읽지 못했어요.');});
-    return ()=>{active=false;};
-  },[view.username,view.scope]);
-  const change=async(archiveId:string,active:boolean)=>{
-    setPending(archiveId);setError('');
-    try{
-      const ticket=view.storage==='browser'&&active?await readArchiveTicket(archiveId):undefined;
-      const publication=await service<Publication>('public',{type:'publish',archiveId,active,ticket},view.scope);
-      setPublications(rows=>[...rows.filter(row=>row.archiveId!==archiveId),publication]);
-    }catch(error){setError(error instanceof Error?error.message:'공개 상태를 저장하지 못했어요.');}
-    finally{setPending('');}
-  };
+export function PrivateHall({hall,onEnding,registration}:{hall:Archive[];onEnding:(id:string)=>void;registration:RegistrationActions}){
+  const disabled=!registration.ready||!!registration.working;
   return <section className="panel content-panel hall" aria-label="내 선수 기록">
-    {error&&<p className="form-error" role="alert">{error}</p>}
+    <RegistrationError registration={registration}/>
     {!hall.length?<div className="hall-empty"><Trophy size={40}/><h3>아직 보관된 선수가 없어요</h3><p>은퇴하면 성장 기록과 대회 성적이 이곳에 남습니다.</p></div>:<div className="stack">{[...hall].reverse().map(a=>{
-      const p=publications.find(row=>row.archiveId===a.id);
-      return <ArchiveCard key={a.id} archive={a} actions={<>
+      const p=registration.rows.find(row=>row.archiveId===a.id);
+      const error=registration.failure?.archiveId===a.id?registration.failure.message:undefined;
+      return <ArchiveCard key={a.id} archive={a} status={<PublicationStatus publication={p}/>} error={error} actions={<>
         <button className="button secondary small" onClick={()=>onEnding(a.id)}><Play size={15}/> 엔딩 다시 보기</button>
-        {!view.username?<button className="button quiet small" onClick={onAccount}>계정 연결</button>:
-          p?.moderated?<Tag kind="orange">운영 검토로 비공개</Tag>:
-          <button className={`button ${p?.active?'quiet':'primary'} small`} disabled={!available||!!pending}
-            onClick={()=>void change(a.id,!p?.active)}>{p?.active?'공개 취소':'온라인에 공개'}</button>}
-        {p?.active&&!p.moderated&&<a className="button quiet small" href={'?rider='+p.id} onClick={event=>{
-          if(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
-          event.preventDefault();onPublic(p.id);
-        }}>공개 프로필 보기 <ArrowUpRight size={14}/></a>}
+        {!p?.moderated&&(p?.active?<>
+          <button className="button quiet small" disabled={disabled} onClick={()=>registration.onWithdraw(a)}>{registration.working===a.id?'처리 중…':'랭킹 등록 취소'}</button>
+          <button className="button primary small" disabled={disabled} onClick={()=>registration.onRank(a,p)}>순위 확인</button>
+        </>:<button className="button primary small" disabled={disabled} onClick={()=>registration.onRegister(a)}>{registration.working===a.id?'등록 중…':'명예의 전당 등록'}</button>)}
       </>}/>;
     })}</div>}
   </section>;
 }
-function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNode}){
+function ArchiveCard({archive:a,status,error,actions}:{archive:Archive;status:React.ReactNode;error?:string;actions:React.ReactNode}){
   const summary=summarize(a);
   const rp=rankingPoints(a);
   const peak=peakSeasonRP(rp);
@@ -215,12 +190,13 @@ function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNod
   const relationships=RIVALS.filter(rival=>a.relations[rival.id]||ending.friends?.includes(rival.id));
   const achievements=[[Trophy,summary.wins+'회','우승'],[Star,summary.meets?Math.max(...Object.values(summary.best)).toFixed(1)+'점':'—','개인 최고점'],
     [Flag,summary.meets+'개','출전 대회'],[Shield,summary.learned.length+'개','습득 기술']] as const;
-  return <article className="archive-card">
+  return <article className="archive-card" id={'archive-'+a.id}>
     <div className="archive-cover">
       <PixelRider look={equippedLook(a)} label={a.name+' 은퇴 당시 외형'}/>
       <div><Tag kind={a.reason==='complete'?'lime':'muted'}>{a.reason==='complete'?'8년 완주':'조기 은퇴'}</Tag><h3>{a.name}</h3><p>{endingName(ending)}{title&&' · '+title}</p>
       <small>{formatCareerDate(a)} 은퇴 · 활동 {time}주 · 명성 {a.fame.toLocaleString('ko-KR')}</small></div>
     </div>
+    <div className="archive-registration-status">{status}</div>
     <div className="archive-achievements">
       {achievements.map(([Icon,value,label])=><div key={label}>
         <Icon size={16} aria-hidden="true"/><strong>{value}</strong><small>{label}</small>
@@ -258,6 +234,7 @@ function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNod
         </details>;
       })}</>}
     </div></details>
-    <div className="bottom-actions">{actions}</div>
+    {error&&<p className="form-error" role="alert">{error}</p>}
+    <div className="bottom-actions hall-registration-actions">{actions}</div>
   </article>;
 }

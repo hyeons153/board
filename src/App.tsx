@@ -13,18 +13,20 @@ import { Skills, Routines, type LineDraft } from './components/Skills';
 import { Meets, type MeetSelection } from './components/Meets';
 import { Profile, Rankings, Rivals } from './components/Records';
 import Workshop from './components/Workshop';
-import Account, { service } from './components/Account';
-import HallOfFame from './components/HallOfFame';
+import Account, { service, type AccountMode } from './components/Account';
+import HallOfFame, { type HallTarget } from './components/HallOfFame';
+import { PublicationStatus, RegistrationError, useHallPublications, type RegistrationActions } from './components/HallRegistration';
 import Ceremony from './components/Ceremony';
 import GameStage from './components/GameStage';
 import Scene from './components/Scene';
 import { SpotMap } from './components/SpotMap';
 import { AutoSettings, WeeklyChoices } from './components/WeeklyChoices';
 import { RiderHud } from './components/RiderHud';
-import type { Look, MeetRecord, Plan, View } from './game/types';
+import type { Publication } from './game/public';
+import type { Archive, Look, MeetRecord, Plan, View } from './game/types';
 
-type Screen='home'|'training'|'skills'|'routine'|'meets'|'rank'|'workshop'|'profile'|'rivals'|'hall'|'account'|'menu'|'new'|'ending'|'journal';
-const names:Record<Screen,string>={home:'육성',training:'자동 육성 설정',skills:'기술 도감',routine:'라인 편집',meets:'대회',rank:'시즌 랭킹',workshop:'장비·스폰서',profile:'선수 정보',rivals:'라이벌',hall:'명예의 전당',account:'계정',menu:'전체 메뉴',new:'라이더 등록',ending:'커리어 엔딩',journal:'라이더 일지'};
+type Screen='home'|'training'|'skills'|'routine'|'meets'|'rank'|'workshop'|'profile'|'rivals'|'hall'|'hall-registration'|'account'|'menu'|'new'|'ending'|'journal';
+const names:Record<Screen,string>={home:'육성',training:'자동 육성 설정',skills:'기술 도감',routine:'라인 편집',meets:'대회',rank:'시즌 랭킹',workshop:'장비·스폰서',profile:'선수 정보',rivals:'라이벌',hall:'명예의 전당','hall-registration':'명예의 전당 등록',account:'계정',menu:'전체 메뉴',new:'라이더 등록',ending:'커리어 엔딩',journal:'라이더 일지'};
 const dock=[['home','육성',Footprints],['skills','기술',BookOpen],['meets','대회',Flag],['workshop','상점',ShoppingBag],['menu','메뉴',Menu]] as const;
 const menuGroups=[
   {name:'커리어',items:[['routine',ListOrdered],['profile',UserRound],['rivals',UsersRound],['rank',Flag]]},
@@ -47,23 +49,36 @@ export default function App(){
   const [spotMap,setSpotMap]=useState(false);
   const [publicId,setPublicId]=useState(()=>new URLSearchParams(location.search).get('rider')??undefined);
   const [endingId,setEndingId]=useState<string>();
+  const [endingStep,setEndingStep]=useState(0);
+  const [hallTarget,setHallTarget]=useState<HallTarget>();
+  const [registrationTarget,setRegistrationTarget]=useState<{archiveId:string;form?:AccountMode}>();
+  const navigation=useRef(0);
   const [replay,setReplay]=useState<MeetRecord>();
   const [replayLoading,setReplayLoading]=useState(false);
   const replayRequest=useRef(0);
   const previous=useRef<{id:string;phase:string;held:boolean}|undefined>(undefined);
   const panel=useRef<HTMLDivElement>(null);
   const view=game.view,r=view?.career.rider;
-  const [hallSession,setHallSession]=useState<Pick<View,'username'|'scope'>>({});
+  const [hallSession,setHallSession]=useState<Pick<View,'username'|'scope'>>();
+  const [hallSessionError,setHallSessionError]=useState('');
   const sessionRequest=useRef(0);
   const loadHallSession=useCallback(async()=>{
     const id=++sessionRequest.current;
-    const session=await service<Pick<View,'username'|'scope'>>('account');
-    if(id===sessionRequest.current)setHallSession(session);
+    try{
+      const session=await service<Pick<View,'username'|'scope'>>('account');
+      if(id===sessionRequest.current){setHallSession(session);setHallSessionError('');}
+    }catch(error){
+      if(id===sessionRequest.current){setHallSession(undefined);setHallSessionError(error instanceof Error?error.message:'로그인 상태를 확인하지 못했어요.');}
+      throw error;
+    }
   },[]);
-  const hallOpen=view?.storage==='browser'&&(screen==='hall'||screen==='account');
+  const publicationScreen=screen==='hall'||screen==='ending'||screen==='hall-registration'?screen:undefined;
+  const hallOpen=view?.storage==='browser'&&(!!publicationScreen||screen==='account');
   useEffect(()=>{
     if(hallOpen)void loadHallSession().catch(()=>{});
-  },[hallOpen,loadHallSession]);
+  },[hallOpen,screen,loadHallSession]);
+  const account=view?.storage==='browser'?hallSession:view;
+  const publications=useHallPublications(account?.username?account.scope:undefined,publicationScreen);
   const weekKey=r?r.id+':'+r.year+':'+r.week:'';
   const pending=view?.pendingMeet;
   const trainingResult=view?.pendingTraining;
@@ -73,14 +88,15 @@ export default function App(){
   useEffect(()=>{
     const held=!!(pending||trainingResult||eventResult);
     if(r&&previous.current&&previous.current.id!==r.id){
-      replayRequest.current++;setReplayLoading(false);setScreen('home');setTrail([]);setReplay(undefined);
+      replayRequest.current++;setReplayLoading(false);setReplay(undefined);
+      if(screen!=='hall-registration'){navigation.current++;setScreen('home');setTrail([]);}
       setLineDraft(undefined);setMeetSelection(undefined);setLookDraft(undefined);
     }
     if(r?.phase==='retired'&&!held&&previous.current?.id===r.id&&(previous.current.phase!=='retired'||previous.current.held)){
-      setEndingId(r.id);setTrail([]);setScreen('ending');
+      navigation.current++;setEndingId(r.id);setEndingStep(0);setTrail([]);setScreen('ending');
     }
     previous.current=r?{id:r.id,phase:r.phase,held}:undefined;
-  },[r?.id,r?.phase,pending,trainingResult,eventResult?.key,autoChoice]);
+  },[r?.id,r?.phase,pending,trainingResult,eventResult?.key,autoChoice,screen]);
   useEffect(()=>{
     if(screen==='home')return;
     panel.current?.focus({preventScroll:true});
@@ -93,6 +109,9 @@ export default function App(){
   };
   const go=(next:Screen,child=false)=>{
     if(next===screen&&!replay&&!replayLoading&&!spotMap)return;
+    navigation.current++;
+    if(next==='hall')setHallTarget(undefined);
+    if(screen==='hall-registration')setRegistrationTarget(undefined);
     if(screen==='hall'&&next!=='hall'&&publicId)selectPublic(undefined);
     replayRequest.current++;setReplayLoading(false);setReplay(undefined);setSpotMap(false);
     setTrail(history=>child&&screen!=='home'?[...history,screen]:[]);
@@ -103,7 +122,9 @@ export default function App(){
     if(replay||replayLoading){
       replayRequest.current++;setReplay(undefined);setReplayLoading(false);setScreen(replayFrom);return;
     }
+    navigation.current++;
     if(screen==='hall'&&publicId)selectPublic(undefined);
+    if(screen==='hall-registration')setRegistrationTarget(undefined);
     setScreen(trail.at(-1)??'home');
     setTrail(trail.slice(0,-1));
   };
@@ -125,6 +146,8 @@ export default function App(){
   const dockPage=replay||replayLoading?replayFrom:
     dock.some(([id])=>id===screen)?screen:trail.findLast(route=>dock.some(([id])=>id===route));
   const archive=view.career.hall.find(a=>a.id===endingId);
+  const archiveToRegister=view.career.hall.find(a=>a.id===registrationTarget?.archiveId);
+  const pendingPublication=publications.rows.find(row=>row.archiveId===archiveToRegister?.id);
   const finishMeet=async()=>{
     if(replay){back();return;}
     if(pending)await game.send({type:'continue-meet',record:pending});
@@ -139,14 +162,65 @@ export default function App(){
   };
   const playHome=()=>{go('home');};
   const hallView=view.storage==='browser'?{...view,...hallSession}:view;
+  const changeSession=view.storage==='browser'?loadHallSession:game.load;
+  const showRanking=(rider:Archive,publication:Publication,registered=false)=>{
+    selectPublic(undefined);
+    go('hall');
+    setHallTarget({archiveId:rider.id,publicId:publication.id,name:rider.name,registered});
+  };
+  const registerRider=(rider:Archive)=>{
+    if(!hallView.username){
+      if(screen==='hall')setHallTarget({archiveId:rider.id});
+      setRegistrationTarget({archiveId:rider.id});
+      go('hall-registration',true);
+      return;
+    }
+    const current=publications.rows.find(row=>row.archiveId===rider.id);
+    if(current?.active&&!current.moderated){showRanking(rider,current);return;}
+    const origin=navigation.current;
+    void publications.change(rider.id,true,view.storage).then(publication=>{
+      if(publication?.active&&!publication.moderated&&origin===navigation.current)showRanking(rider,publication,true);
+    });
+  };
+  const registration:RegistrationActions={rows:publications.rows,
+    ready:!!account&&(!hallView.username||publications.ready),working:publications.working,
+    loadError:hallSessionError||publications.error,failure:publications.failure,
+    retry:()=>hallSessionError?void changeSession().catch(()=>{}):void publications.refresh(),
+    onRegister:registerRider,onRank:showRanking,onWithdraw:rider=>void publications.change(rider.id,false,view.storage),
+  };
   const status=r&&<RiderHud r={r} preview={preview} recentTraining={!!trainingResult&&!replay} interactive={screen==='home'&&!spotMap&&!replayLoading}/>;
   let content:ReactNode;
   if(screen==='new')content=<NewRider saving={game.saving} onCreate={async(name,look)=>{const ok=await game.send({type:'create',name,look});if(ok)go('home');return ok;}}/>;
   else if(screen==='account')content=<Account key={hallView.scope} view={hallView} send={game.send} onSwitch={playHome}
-    onSessionChange={view.storage==='browser'?loadHallSession:game.load} onRestore={game.restoreLegacy}/>;
-  else if(screen==='hall')content=<HallOfFame view={hallView} selectedId={publicId} onSelect={selectPublic}
-    onEnding={id=>{setEndingId(id);go('ending',true);}} onAccount={()=>go('account',true)}/>;
-  else if(screen==='ending'&&archive)content=<Ceremony key={archive.id} archive={archive} onHall={()=>go('hall')} onNew={()=>go('new')}/>;
+    onSessionChange={changeSession} onRestore={game.restoreLegacy}/>;
+  else if(screen==='hall')content=<HallOfFame view={hallView} selectedId={publicId} onSelect={selectPublic} target={hallTarget} registration={registration}
+    onEnding={id=>{setEndingId(id);setEndingStep(0);go('ending',true);}}/>;
+  else if(screen==='ending'&&archive)content=<Ceremony archive={archive} step={endingStep} onStep={setEndingStep} registration={registration}
+    onHall={()=>{go('hall',true);setHallTarget({archiveId:archive.id});}} onNew={()=>go('new')}/>;
+  else if(screen==='hall-registration'&&archiveToRegister)content=<div className="stack hall-registration">
+    <section className="panel content-panel">
+      <h2>{archiveToRegister.name}의 은퇴 기록</h2>
+      {hallView.username?<>
+        <p>등록하면 다른 라이더가 선수의 프로필을 볼 수 있어요. 글로벌 순위는 서버가 경기 기록을 검증한 뒤 표시됩니다.</p>
+        <PublicationStatus publication={pendingPublication}/>
+      </>:<>
+        <p>{archiveToRegister.reason==='complete'?'8년간 육성한 선수의 기록':'은퇴한 선수의 기록'}을 글로벌 랭킹에 등록하려면 로그인이 필요합니다.</p>
+        <p>로그인하지 않아도 개인 선수 기록은 보관됩니다.</p>
+      </>}
+      <RegistrationError registration={registration} archiveId={archiveToRegister.id}/>
+      <div className="bottom-actions hall-registration-actions">
+        {hallView.username?!pendingPublication?.moderated&&<button className="button primary" disabled={!registration.ready||!!registration.working}
+          onClick={()=>registerRider(archiveToRegister)}>{registration.working?'등록 중…':pendingPublication?.active?'내 글로벌 순위 확인':'명예의 전당 등록'}</button>:
+          !registrationTarget?.form&&<>
+            <button className="button primary" onClick={()=>setRegistrationTarget({archiveId:archiveToRegister.id,form:'login'})}>로그인</button>
+            <button className="button secondary" onClick={()=>setRegistrationTarget({archiveId:archiveToRegister.id,form:'register'})}>회원가입</button>
+          </>}
+        <button className="button quiet" onClick={back}>나중에 등록</button>
+      </div>
+    </section>
+    {!hallView.username&&registrationTarget?.form&&<Account key={registrationTarget.form} view={hallView} send={game.send} onSwitch={playHome}
+      registrationMode={registrationTarget.form} onSessionChange={changeSession}/>}
+  </div>;
   else if(screen==='menu')content=<div className="console-menu">
     {menuGroups.filter(group=>r||group.name==='기록').map(group=><section key={group.name}>
       <h2>{group.name}</h2>
@@ -189,7 +263,7 @@ export default function App(){
       </div>}
       </div>
       {screen==='home'&&!busyFlow&&!replay&&!replayLoading&&(r?<>
-        {r.phase==='retired'&&<div className="console-home-actions"><button className="console-primary" onClick={()=>{setEndingId(r.id);go('ending');}}>은퇴식 보기 <Trophy size={18}/></button><button onClick={()=>go('new')}>새 선수 육성</button></div>}
+        {r.phase==='retired'&&<div className="console-home-actions"><button className="console-primary" onClick={()=>{setEndingId(r.id);setEndingStep(0);go('ending');}}>은퇴식 보기 <Trophy size={18}/></button><button onClick={()=>go('new')}>새 선수 육성</button></div>}
       </>:<div className="console-welcome"><span>{ENGLISH_GAME_NAME}</span><h1>롱보더 <br/><em>키우기</em></h1><p>강변의 첫 푸시부터 마지막 국제대회까지.<br/>나만의 8년 커리어를 시작하세요.</p><button className="console-primary" onClick={()=>go('new')}>새 라이더 등록 <ArrowRight size={20}/></button></div>)}
       {spotMap&&r&&screen==='home'&&!busyFlow&&!r.plan&&<SpotMap r={r} send={game.send} saving={game.saving} onClose={()=>setSpotMap(false)}/>}
       {content&&screen!=='home'&&<section className={'console-panel console-panel-'+(panelStyle[screen]??'standard')} aria-label={names[screen]}>

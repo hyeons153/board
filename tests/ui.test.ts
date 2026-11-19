@@ -6,6 +6,9 @@ import {randomUUID,createHash} from 'node:crypto';
 import {JSDOM} from 'jsdom';
 import {createHandler} from '../server/http';
 import {localStore} from '../server/store';
+import {publicationFor} from '../server/ranking';
+import type { Publication, PublicCard } from '../src/game/public';
+import type { View } from '../src/game/types';
 
 test('one game frame previews choices on the existing HUD before confirmation, then handles results and automatic competition',{timeout:60000},async()=>{
   const directory=await mkdtemp(join(process.cwd(),'.longboard-test-'));
@@ -20,12 +23,34 @@ test('one game frame previews choices on the existing HUD before confirmation, t
   const handler=createHandler(localStore(directory),2000,false);
   const originalFetch=globalThis.fetch;
   let cookie='',injectClock=false,injectChoice=false,clockRaces=0;
+  let hallFlow=false,signedIn=false,hallPublication:Publication|undefined,publicCard:PublicCard|undefined;
+  let nextRankStatus:Publication['rankStatus']='eligible';
+  const hallActions:string[]=[];
   const pendingRequests=new Set<Promise<Response>>();
   const requestActions:string[]=[];
   const mockFetch:typeof fetch=async(input,init)=>{
     const url=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url,'http://127.0.0.1');
     const headers=new Headers(init?.headers);headers.set('origin',url.origin);if(cookie)headers.set('cookie',cookie);
     const body=typeof init?.body==='string'?JSON.parse(init.body):undefined;
+    if(hallFlow&&url.searchParams.has('area')){
+      const area=url.searchParams.get('area');
+      if(area==='account'&&['login','register','logout'].includes(body?.type)){
+        hallActions.push(body.type);signedIn=body.type!=='logout';return Response.json({ok:true});
+      }
+      if(area==='public'){
+        if(body?.type==='mine')return Response.json(hallPublication?[hallPublication]:[]);
+        if(body?.type==='publish'){
+          assert.ok(signedIn);assert.equal(headers.get('x-game-scope'),'test-hall-scope');
+          assert.equal(body.archiveId,hallPublication?.archiveId??(await (await handler(new Request(url.origin+'/api/game',{headers}))).json()).career.hall[0].id);
+          hallActions.push(body.active?'publish':'withdraw');
+          hallPublication={id:publicCard!.id,archiveId:body.archiveId,active:body.active,moderated:false,rankStatus:nextRankStatus};
+          return Response.json(hallPublication);
+        }
+        if(url.searchParams.has('id'))return Response.json(publicCard);
+        const mine=hallPublication?.active&&hallPublication.rankStatus==='eligible'?[{...publicCard,rank:17,mine:true}]:[];
+        return Response.json({rows:[],page:1,mine,hasMore:false});
+      }
+    }
     if(body?.action)requestActions.push(body.action.type);
     if(body?.action.type==='plan'&&(injectClock||injectChoice)){
       const action=injectChoice?{type:'fast-forward',enabled:true}:{type:'pulse'};
@@ -34,6 +59,9 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     }
     const response=await handler(new Request(url,{...init,headers}));
     const received=response.headers.get('set-cookie');if(received)cookie=received.split(';')[0];
+    if(hallFlow&&signedIn&&!body&&response.ok){
+      const view:View=await response.json();return Response.json({...view,username:'test_rider',scope:'test-hall-scope'});
+    }
     return response;
   };
   globalThis.fetch=((input,init)=>{const request=mockFetch(input,init);pendingRequests.add(request);void request.then(()=>pendingRequests.delete(request),()=>pendingRequests.delete(request));return request;}) as typeof fetch;
@@ -444,9 +472,56 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       await click('육성 계속');
       assert.ok(win.document.querySelector('[aria-label="커리어 엔딩"]'),'Final international acknowledgement must open the ending');
       assert.match(win.document.querySelector('.ceremony-stage')!.textContent!,/국제대회 · 로스앤젤레스/);
-      await click('성적 바로 보기');await click('개인 명예의 전당');
-      assert.ok(win.document.querySelector('[aria-label="명예의 전당"]'));
-      const persisted=await store.get(owner);assert.equal(persisted.snapshot.career.hall[0].records.at(-1)!.results.length,3);
+      await click('성적 바로 보기');
+      const persisted=await store.get(owner),archive=persisted.snapshot.career.hall[0];
+      assert.equal(archive.records.at(-1)!.results.length,3);
+      hallFlow=true;publicCard={id:randomUUID(),profile:publicationFor(archive).profile};
+      const button=(label:string)=>[...win.document.querySelectorAll('button')].find(button=>button.textContent?.trim()===label);
+      const guide=()=>win.document.querySelector('[aria-label="명예의 전당 등록"]');
+      const submitAccount=async()=>{
+        const set=Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype,'value')!.set!;
+        const form=win.document.querySelector('form.account-form')!;
+        await act(async()=>{
+          for(const [input,value] of [...form.querySelectorAll('input')].map((input,i)=>[input,i?'test-pass':'test_rider'] as const)){
+            set.call(input,value);input.dispatchEvent(new win.Event('input',{bubbles:true}));
+          }
+        });
+        await act(async()=>form.dispatchEvent(new win.Event('submit',{bubbles:true,cancelable:true})));
+        await settle(75);
+      };
+      assert.ok(button('명예의 전당 등록')?.classList.contains('primary'));
+      await click('명예의 전당 등록');
+      assert.match(guide()!.textContent!,/8년간 육성한 선수의 기록.*로그인이 필요/);
+      await click('회원가입');
+      assert.ok(guide()!.querySelector('[autocomplete="new-password"]'));
+      await click('나중에 등록');assert.ok(win.document.querySelector('.ceremony-registration'));
+      assert.deepEqual(hallActions,[]);
+      await click('명예의 전당 등록');await click('로그인');
+      assert.ok(guide()!.querySelector('[autocomplete="current-password"]'));
+      await submitAccount();
+      assert.deepEqual(hallActions,['login']);
+      assert.match(guide()!.textContent!,new RegExp(archive.name+'의 은퇴 기록'));
+      await click('명예의 전당 등록');
+      const ranking=()=>win.document.querySelector('[aria-label="글로벌 랭킹 기록"]');
+      assert.match(ranking()!.textContent!,/등록을 완료했어요/);
+      assert.match(ranking()!.textContent!,/종합 17위/);
+      await click('공개 프로필 보기');assert.equal(win.document.querySelector('.public-hero h2')?.textContent,archive.name);
+      await click('내 선수');
+      assert.match(win.document.querySelector('.archive-card')!.textContent!,/글로벌 등록 완료/);
+      await click('엔딩 다시 보기');await click('성적 바로 보기');await click('내 글로벌 순위 확인');
+      assert.equal(hallActions.filter(action=>action==='publish').length,1);
+      await click('내 선수');await click('랭킹 등록 취소');
+      assert.match(win.document.querySelector('.archive-card')!.textContent!,/랭킹 등록 취소됨/);
+      assert.equal((await store.get(owner)).snapshot.career.hall[0].id,archive.id);
+
+      await click('계정');await click('로그아웃');
+      await click('메뉴');await click('명예의 전당');await click('명예의 전당 등록');await click('회원가입');
+      await submitAccount();assert.equal(hallActions.at(-1),'register');
+      nextRankStatus='unverified';
+      await click('명예의 전당 등록');
+      assert.match(ranking()!.textContent!,/통산 RP 전체를 검증할 수 없어/);
+      assert.doesNotMatch(ranking()!.textContent!,/종합 \d+위/);
+      await click('내 선수');assert.match(win.document.querySelector('.archive-card')!.textContent!,/검증 불가/);
     }finally{await act(async()=>endingRoot.unmount());}
   }finally{
     await act(async()=>root.unmount());await Promise.allSettled([...pendingRequests]);globalThis.fetch=originalFetch;dom.window.close();

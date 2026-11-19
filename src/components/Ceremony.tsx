@@ -1,5 +1,4 @@
 import { ArrowRight, Flag, Medal, Trophy } from 'lucide-react';
-import { useState } from 'react';
 import { meetById, DISCIPLINE_NAMES, SKILL } from '../game/data';
 import { RIVAL } from '../game/content';
 import { equippedLook } from '../game/economy';
@@ -10,9 +9,10 @@ import { DISCIPLINES, type Archive } from '../game/types';
 import Scene from './Scene';
 import { Tag } from './Brand';
 import { RelationshipEpilogues } from './RelationshipEpilogues';
+import { PublicationStatus, RegistrationError, type RegistrationActions } from './HallRegistration';
 
-export default function Ceremony({archive,onHall,onNew}:{archive:Archive;onHall:()=>void;onNew:()=>void}){
-  const [step,setStep]=useState(0);
+export default function Ceremony({archive,step,onStep,onHall,onNew,registration}:{archive:Archive;step:number;onStep:(step:number)=>void;onHall:()=>void;onNew:()=>void;registration:RegistrationActions}){
+  const publication=registration.rows.find(row=>row.archiveId===archive.id);
   const ending=archive.ending??chooseEnding(archive);
   const summary=summarize(archive);
   const latest=archive.records.at(-1);
@@ -31,7 +31,7 @@ export default function Ceremony({archive,onHall,onNew}:{archive:Archive;onHall:
     archive.reason==='complete'?`${meetById(latest?.id)?.name??'마지막 대회'}가 끝났다. 마지막 시즌의 성적과 보상이 확정됐다.`:'보드를 내려놓기 전, 지나온 시즌을 돌아본다.',
     descriptor.line,
     best?`${best.meet.year}년차 ${meetById(best.meet.id)?.name} · ${DISCIPLINE_NAMES[best.result.discipline]} ${best.result.run.score.toFixed(1)}점`:'첫 푸시와 그때 만난 사람들이 선수 기록에 남았다.',
-    '개인 명예의 전당에 기록을 보관했습니다. 계정에서 공개 여부를 선택할 수 있습니다.',
+    '은퇴 기록을 개인 명예의 전당에 보관했어요.',
   ][step];
   return <section className={'panel ceremony ceremony-'+ending.kind}>
     <div className="ceremony-stage">
@@ -48,10 +48,20 @@ export default function Ceremony({archive,onHall,onNew}:{archive:Archive;onHall:
         <RelationshipEpilogues archive={archive}/>
         {!!legacyFriends.length&&<div className="epilogue"><strong>우정·라이벌 에필로그</strong>
           {legacyFriends.map(id=><p key={id}>{RIVAL.get(id)?.name}와 함께한 스팟과 대회 이야기는 은퇴식 뒤에도 이어졌다.</p>)}</div>}
-        <div className="bottom-actions"><button className="button secondary" onClick={onHall}>개인 명예의 전당</button><button className="button primary" onClick={onNew}>새 선수 육성 <ArrowRight size={17}/></button></div>
+        <div className="ceremony-registration">
+          <PublicationStatus publication={publication}/>
+          <RegistrationError registration={registration} archiveId={archive.id}/>
+          <div className="bottom-actions hall-registration-actions">
+            {!publication?.moderated&&<button className="button primary" disabled={!registration.ready||!!registration.working}
+              onClick={()=>publication?.active?registration.onRank(archive,publication):registration.onRegister(archive)}><Trophy size={17}/>
+              {registration.working===archive.id?'등록 중…':publication?.active?'내 글로벌 순위 확인':'명예의 전당 등록'}</button>}
+            <button className="button secondary" onClick={onHall}>개인 기록 보기</button>
+            <button className="button quiet" onClick={onNew}>새 선수 육성 <ArrowRight size={17}/></button>
+          </div>
+        </div>
       </>}
-      {step<3&&<div className="bottom-actions"><button className="button quiet" onClick={()=>setStep(3)}>성적 바로 보기</button>
-        <button className="button primary" onClick={()=>setStep(step+1)}>계속 <ArrowRight size={17}/></button></div>}
+      {step<3&&<div className="bottom-actions"><button className="button quiet" onClick={()=>onStep(3)}>성적 바로 보기</button>
+        <button className="button primary" onClick={()=>onStep(step+1)}>계속 <ArrowRight size={17}/></button></div>}
     </div>
   </section>;
 }

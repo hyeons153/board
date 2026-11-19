@@ -10,30 +10,34 @@ import { PixelRider } from './Appearance';
 import { Tag } from './Brand';
 import { PrivateHall } from './Records';
 import { RPDisciplines, RPPayouts } from './RankingPoints';
+import { rankStatusNote, type RegistrationActions } from './HallRegistration';
 
 const tabs=[['mine','내 선수'],['ranking','글로벌 랭킹'],['directory','선수 둘러보기']] as const;
 type Tab=typeof tabs[number][0];
+export type HallTarget={archiveId:string;publicId?:string;name?:string;registered?:boolean};
 const scoreText=(score:number)=>score.toLocaleString('ko-KR',{minimumFractionDigits:1,maximumFractionDigits:1});
 const meetName=(record:MeetHighlight)=>meetById(record.id)?.name??record.id;
 const resultText=(record:MeetHighlight)=>`${DISCIPLINE_NAMES[record.discipline]} ${record.place}위 · ${scoreText(record.score)}점`;
 
-export default function HallOfFame({view,selectedId,onSelect,onEnding,onAccount}:{view:View;selectedId?:string;onSelect:(id?:string)=>void;onEnding:(id:string)=>void;onAccount:()=>void}){
-  const [tab,setTab]=useState<Tab>(selectedId?'directory':'mine');
+export default function HallOfFame({view,selectedId,onSelect,onEnding,target,registration}:{view:View;selectedId?:string;onSelect:(id?:string)=>void;onEnding:(id:string)=>void;target?:HallTarget;registration:RegistrationActions}){
+  const [tab,setTab]=useState<Tab>(target?.publicId?'ranking':selectedId?'directory':'mine');
   const root=useRef<HTMLDivElement>(null);
+  useLayoutEffect(()=>{if(target)setTab(target.publicId?'ranking':'mine');},[target]);
   useLayoutEffect(()=>{
     root.current?.closest('.console-panel-body')?.scrollTo(0,0);
     if(selectedId)root.current?.querySelector<HTMLButtonElement>('.hall-back')?.focus({preventScroll:true});
-  },[tab,selectedId]);
+    else if(tab==='mine'&&target)document.getElementById('archive-'+target.archiveId)?.scrollIntoView({block:'nearest'});
+  },[tab,selectedId,target]);
   return <div className="hall-of-fame" ref={root}>
     <nav className="hall-tabs" aria-label="명예의 전당 메뉴">
       {tabs.map(([id,label])=><button className="pill" key={id} aria-pressed={id===tab} onClick={()=>{if(selectedId)onSelect();setTab(id);}}>{label}</button>)}
     </nav>
-    {tab==='mine'&&!selectedId?<PrivateHall key={view.scope} hall={view.career.hall} view={view} onEnding={onEnding} onAccount={onAccount} onPublic={onSelect}/>
-      :<OnlineRecords view={view} tab={tab} selectedId={selectedId} onSelect={onSelect}/>}
+    {tab==='mine'&&!selectedId?<PrivateHall key={view.scope} hall={view.career.hall} onEnding={onEnding} registration={registration}/>
+      :<OnlineRecords view={view} tab={tab} selectedId={selectedId} onSelect={onSelect} target={target} registration={registration}/>}
   </div>;
 }
 
-function OnlineRecords({view,tab,selectedId,onSelect}:{view:View;tab:Tab;selectedId?:string;onSelect:(id?:string)=>void}){
+function OnlineRecords({view,tab,selectedId,onSelect,target,registration}:{view:View;tab:Tab;selectedId?:string;onSelect:(id?:string)=>void;target?:HallTarget;registration:RegistrationActions}){
   const ranking=tab==='ranking';
   const [metric,setMetric]=useState<Metric>('career');
   const [division,setDivision]=useState<'all'|Division>('all');
@@ -63,7 +67,11 @@ function OnlineRecords({view,tab,selectedId,onSelect}:{view:View;tab:Tab;selecte
       else setDetail(value);
     }).catch(error=>{if(active)setError(error instanceof Error?error.message:'기록을 읽지 못했어요.');});
     return ()=>{active=false;};
-  },[selectedId,page,division,ranking,metric,term,ending,view.scope,retry]);
+  },[selectedId,page,division,ranking,metric,term,ending,view.scope,retry,target]);
+
+  const focused=ranking&&target?.publicId?registration.rows.find(row=>row.id===target.publicId&&row.active&&!row.moderated):undefined;
+  const actualRank=focused&&data?.mine.find(row=>row.id===focused.id)?.rank;
+  const unranked=focused&&rankStatusNote(focused.rankStatus);
 
   const failed=error&&<div className="form-error" role="alert"><p>{error}</p><button className="button quiet small" onClick={()=>setRetry(value=>value+1)}>다시 불러오기</button></div>;
   if(selectedId)return <section className="panel content-panel hall-online">
@@ -77,6 +85,13 @@ function OnlineRecords({view,tab,selectedId,onSelect}:{view:View;tab:Tab;selecte
         {METRICS.map(id=><button key={id} className="pill" aria-pressed={metric===id} onClick={()=>{setMetric(id);setPage(1);}}>{RANK_LABELS[id]}</button>)}
       </div>
       <RankingRules/>
+      {focused&&<div className="my-ranking hall-selected-rider">
+        <div>
+          <strong role="status">{target?.name}{target?.registered?' · 명예의 전당 등록을 완료했어요.':''}</strong>
+          {actualRank!==undefined?<p>{RANK_LABELS[metric]} {actualRank}위</p>:unranked?<p>{unranked}</p>:data&&<p>이 종목의 글로벌 순위에 표시되는 계정 대표 선수가 아니에요.</p>}
+        </div>
+        <button className="button secondary small" onClick={()=>onSelect(focused.id)}>공개 프로필 보기 <ChevronRight size={15}/></button>
+      </div>}
     </>:<div className="online-controls">
       <form className="search-form" onSubmit={event=>{event.preventDefault();setTerm(search.trim());setPage(1);}}>
         <label>선수 이름<input maxLength={40} value={search} onChange={event=>setSearch(event.target.value)} placeholder="이름 앞부분 검색"/></label>

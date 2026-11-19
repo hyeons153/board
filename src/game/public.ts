@@ -20,4 +20,4 @@ export type PublicProfile=PublicSummary&{
 };
 export type PublicCard<P=PublicProfile>={id:string;profile:P;rank?:number;score?:number;representative?:MeetHighlight;mine?:boolean};
 export type Directory={rows:PublicCard<PublicSummary>[];page:number;hasMore:boolean;mine:PublicCard<PublicSummary>[]};
-export type Publication={archiveId:string;id:string;active:boolean;moderated:boolean};
+export type Publication={archiveId:string;id:string;active:boolean;moderated:boolean;rankStatus:'eligible'|'no-points'|'unverified'};

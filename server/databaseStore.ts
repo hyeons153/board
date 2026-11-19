@@ -26,6 +26,10 @@ type PublicRow<P=PublicProfile>={id:string;profile:P;mine:boolean};
 type RankRow=PublicRow<PublicSummary>&{score:number;rank:number;representative:MeetHighlight;ownedRow:boolean};
 const summaryKeys=['name','look','title','representativeTitle','year','week','complete','division','wins','podiums','meets','best','ending','official','historic','honors'] as const satisfies readonly (keyof PublicSummary)[];
 const publicSummary=`jsonb_build_object(${summaryKeys.map(key=>`'${key}',p.profile->'${key}'`).join(',')})`;
+const publicationFields=`archive_id AS "archiveId",id,active,hidden AS moderated,
+  CASE WHEN profile->'official'='true'::jsonb AND profile->'rankingVersion'='${RANKING_VERSION}'::jsonb THEN 'eligible'
+    WHEN profile->'official'='true'::jsonb OR profile->'historic'='true'::jsonb OR NOT (profile ? 'rp') THEN 'unverified'
+    ELSE 'no-points' END AS "rankStatus"`;
 
 async function actorAt(db:Query,hash:string):Promise<Actor|undefined>{
   const [actor]=await db.query<Actor>(`
@@ -170,13 +174,13 @@ export function databaseStore(db:Database,kind:Store['kind'],legacy?:LocalLegacy
         await tx.query('DELETE FROM rider_accounts WHERE user_id=$1',[owner.id]);
       });
     },
-    publications:(owner:string)=>db.query<Publication>(`SELECT archive_id AS "archiveId",id,active,hidden AS moderated
+    publications:(owner:string)=>db.query<Publication>(`SELECT ${publicationFields}
       FROM public_riders WHERE owner_id=$1`,[owner]),
     async publish(owner:Actor,hash:string,archiveId:string,active:boolean,browser?:{archive?:Archive}):Promise<Publication>{
       return db.transaction(async tx=>{
         await lockUser(tx,owner.id);
         await requireActor(tx,owner,hash);
-        const [existing]=await tx.query<Publication>(`SELECT archive_id AS "archiveId",id,active,hidden AS moderated
+        const [existing]=await tx.query<Publication>(`SELECT ${publicationFields}
           FROM public_riders WHERE owner_id=$1 AND archive_id=$2`,[owner.id,archiveId]);
         if(!active){
           if(!existing) throw new AccessError('공개 기록이 없어요.',404);
@@ -202,7 +206,7 @@ export function databaseStore(db:Database,kind:Store['kind'],legacy?:LocalLegacy
             complete=EXCLUDED.complete,division=EXCLUDED.division,ending=EXCLUDED.ending`,
           [id,owner.id,archiveId,JSON.stringify(profile),normalized(profile.name),profile.complete,profile.division,profile.ending.kind]);
         await saveRankEntries(tx,id,entries);
-        return {id,archiveId,active:true,moderated:false};
+        return {id,archiveId,active:true,moderated:false,rankStatus:profile.official?'eligible':profile.historic?'unverified':'no-points'};
       });
     },
     async report(owner:Actor,hash:string,id:string,reason:string){

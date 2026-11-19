@@ -78,6 +78,9 @@ test('browser careers and replays stay outside PostgreSQL; the hall accepts only
     assert.equal((await request('public',{...publish,ticket:retired.ticket,archiveId:randomUUID()})).status,404);
     const publication=await request('public',{...publish,ticket:retired.ticket});
     assert.equal(publication.status,200,await publication.clone().text());
+    const saved=await publication.json() as Publication;
+    assert.equal(saved.rankStatus,'no-points');
+    assert.deepEqual(await (await request('public',{type:'mine'})).json(),[saved]);
     assert.equal((await (await request('public')).json()).rows[0].profile.name,'Retired rider');
     assert.equal((await request('public',{...publish,active:false})).status,200);
     assert.deepEqual((await (await request('public')).json()).rows,[]);
@@ -221,6 +224,7 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
 
     await status(owner.call('?area=public',{type:'publish',archiveId:archive.id,active:true,score:1000}),400);
     const publish=await (await status(owner.call('?area=public',{type:'publish',archiveId:archive.id,active:true}),200)).json() as Publication;
+    assert.equal(publish.rankStatus,'eligible');
     const profile=await (await status(viewer.call('?area=public&id='+publish.id),200)).json() as PublicCard;
     assert.equal(profile.profile.name,archive.name);
     assert.ok(profile.profile.official);
