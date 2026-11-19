@@ -18,6 +18,7 @@ const palettes={
   night:{sky:['#141936','#262456','#444276','#65396a','#734a77'],sun:'#a0c4f5',far:'#535d8d',mid:'#41406b',deep:'#292946',water:'#33475d',edge:'#222436',road:'#3c4365',light:'#75f2e5'},
   arena:{sky:['#374f81','#66579d','#b478a1','#dc8e91','#ffd2a1'],sun:'#ffdba0',far:'#7d6f99',mid:'#596386',deep:'#35425f',water:'#6c7391',edge:'#353853',road:'#516385',light:'#ffe08e'},
 };
+export const landscapeEdge=(spot:Spot)=>palettes[spot].edge;
 export function paintLandscape(c:Ctx,spot:Spot,competition=false){
   const p=palettes[spot], rng=seeded(938,spot);
   const random=(a:number,b:number)=>Math.floor(a+rng()*(b-a));

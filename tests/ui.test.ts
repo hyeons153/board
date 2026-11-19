@@ -125,6 +125,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
         assert.doesNotMatch(win.document.querySelector('.skill-library')!.textContent!,/동작 참고|보드를 타보자/);
         await click('피터팬 상세');
         assert.match(win.document.querySelector('.skill-detail')!.textContent!,/선행 기술|대회 성공률/);
+        assert.deepEqual([...win.document.querySelectorAll('.skill-detail-actions button')].map(button=>button.textContent?.trim()),['동작 보기']);
         await click('피터팬 미리보기');
         assert.ok(win.document.querySelector('.technique-preview'));
       }
@@ -142,18 +143,31 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       }
       await click('메뉴 닫기');
     }
+    assert.ok(!win.document.querySelector('.console-field-links .console-visitor'));
+    await click('한유리 · 라이벌 보기');
+    assert.equal(win.document.querySelectorAll('.console-panel[aria-label="라이벌"] .rival-grid .rival').length,6);
+    await click('메뉴 닫기');
+    for(const name of ['선수 정보','라이벌','시즌 랭킹','명예의 전당','온라인 명예의 전당']){
+      await click('메뉴');await click(name);
+      const opened=win.document.querySelector('.console-panel[aria-label="'+name+'"]')!;
+      assert.ok(opened);
+      if(name==='선수 정보')assert.equal(opened.querySelector('.rival-grid'),null);
+      if(name==='라이벌')assert.equal(opened.querySelectorAll('.rival-grid .rival').length,6);
+      await click('메뉴 닫기');
+      assert.equal(win.document.querySelector('.console-panel'),null);
+    }
     await click('메뉴');await click('라인 편집');
     assert.match(win.document.querySelector('.console-panel')!.textContent!,/라인 편집/);
     assert.doesNotMatch(win.document.querySelector('.console-panel')!.textContent!,/루틴/);
     assert.ok(win.document.querySelector('.routine-save-actions')!.compareDocumentPosition(win.document.querySelector('.auto-routine')!)&win.Node.DOCUMENT_POSITION_FOLLOWING);
     await click('피터팬 추가');
-    await click('뒤로 가기');
-    assert.ok(win.document.querySelector('.console-panel-menu'));
-    await click('라인 편집');
+    await click('메뉴 닫기');
+    assert.equal(win.document.querySelector('.console-panel'),null);
+    await click('메뉴');await click('라인 편집');
     assert.match(win.document.querySelector('.routine-order')!.parentElement!.textContent!,/피터팬/);
     await click('라인 저장');
     assert.ok([...win.document.querySelectorAll('button')].some(button=>button.textContent?.includes('저장된 구성')&&button.disabled));
-    await click('뒤로 가기');await click('메뉴 닫기');
+    await click('메뉴 닫기');
     const speedGauge=win.document.querySelector('.stat-speed');
     const statusHud=win.document.querySelector('.console-status');
     const hudCard=(metric:string)=>win.document.querySelector<HTMLButtonElement>('[data-hud-metric="'+metric+'"]')!;

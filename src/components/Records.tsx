@@ -46,27 +46,6 @@ export function Profile({r,send,saving,onHall,onNew}:{r:Rider;send:Submit;saving
       {r.mentor&&<div className="account-identity"><PixelRider look={r.mentor.look}/><div><strong>이전 회차의 선배 {r.mentor.name}</strong>
         <p>{r.mentor.title} · {r.mentor.wins}승 {r.mentor.skill&&' · '+SKILL[r.mentor.skill]?.name}</p></div></div>}
     </section>
-    <section className="panel content-panel" id="rider-rivals" tabIndex={-1}>
-      <SectionTitle code="THE LOCAL CREW" title="라이벌" detail="연습 스팟과 대회에서 만나며 관계가 바뀝니다."/>
-      <div className="rival-grid">{RIVALS.map(n=>{
-        const progress=competitor(n,r.year,r.week);
-        const met=EVENTS.filter(e=>e.npc===n.id&&r.events[e.id]);
-        const newest=met.sort((a,b)=>{
-          const choices=extras(r).choices;
-          const when=(id:string)=>(choices[id]?.year??0)*52+(choices[id]?.week??0);
-          return when(b.id)-when(a.id);
-        })[0];
-        return <article className="inner-card rival" key={n.id}>
-          <PixelRider look={n.look}/><strong>{n.name}</strong><Tag>{n.style} · {STYLE_NAMES[n.tactic]}</Tag>
-          <p>{n.personality}</p><p>{n.line}</p>
-          <p>{n.spots.map(spot=>LOCATIONS[spot].name).join(' · ')}</p>
-          <p>주력 기술 {SKILL[n.signature]?.name} · 습득 {Object.keys(progress.skills).length}개</p>
-          <div className="skill-track"><span>관계 · {newest?.kind??'아직 대화 기록 없음'}</span><b>{r.relations[n.id]??0}</b></div>
-          <div className="bar"><span style={{width:(r.relations[n.id]??0)+'%',background:n.color}}/></div>
-          {newest&&<small>{newest.title}</small>}
-        </article>;
-      })}</div>
-    </section>
     <section className="panel content-panel">
       <SectionTitle code="CAREER ARCHIVE" title={r.phase==='retired'?'커리어 종료':'은퇴'}/>
       <p>{r.phase==='retired'?'이 선수의 커리어가 명예의 전당에 보존되었습니다.':'은퇴한 선수는 훈련에 복귀할 수 없으며 모든 성적은 개인 명예의 전당에 보관됩니다.'}</p>
@@ -74,6 +53,27 @@ export function Profile({r,send,saving,onHall,onNew}:{r:Rider;send:Submit;saving
       <div className="bottom-actions">{r.phase==='retired'?<><button className="button secondary" onClick={onHall}><Trophy size={16}/> 명예의 전당</button><button className="button primary" onClick={onNew}>새 선수 만들기 <ArrowUpRight size={16}/></button></>:confirm?<><button className="button quiet" onClick={()=>setConfirm(false)}>계속 육성</button><button className="button danger" onClick={()=>void send({type:'retire'})} disabled={saving}>은퇴하고 기록 보관</button></>:<button className="button quiet" onClick={()=>setConfirm(true)}>조기 은퇴 선택</button>}</div>
     </section>
   </div>;
+}
+export function Rivals({r}:{r:Rider}){
+  const choices=extras(r).choices;
+  const when=(id:string)=>(choices[id]?.year??0)*52+(choices[id]?.week??0);
+  return <section className="panel content-panel">
+    <p className="game-section-note">연습 스팟과 대회에서 만나며 관계가 바뀝니다.</p>
+    <div className="rival-grid">{RIVALS.map(n=>{
+      const progress=competitor(n,r.year,r.week);
+      const newest=EVENTS.filter(e=>e.npc===n.id&&r.events[e.id]).sort((a,b)=>when(b.id)-when(a.id))[0];
+      const relation=r.relations[n.id]??0;
+      return <article className="inner-card rival" key={n.id}>
+        <PixelRider look={n.look}/><strong>{n.name}</strong><Tag>{n.style} · {STYLE_NAMES[n.tactic]}</Tag>
+        <p>{n.personality}</p><p>{n.line}</p>
+        <p>{n.spots.map(spot=>LOCATIONS[spot].name).join(' · ')}</p>
+        <p>주력 기술 {SKILL[n.signature]?.name} · 습득 {Object.keys(progress.skills).length}개</p>
+        <div className="skill-track"><span>관계 · {newest?.kind??'아직 대화 기록 없음'}</span><b>{relation}</b></div>
+        <div className="bar"><span style={{width:relation+'%',background:n.color}}/></div>
+        {newest&&<small>{newest.title}</small>}
+      </article>;
+    })}</div>
+  </section>;
 }
 function RetirementSummary({r}:{r:Rider}){
   const stats=summarize(r);

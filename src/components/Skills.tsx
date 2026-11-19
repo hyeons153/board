@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ArrowUpRight, Check, ChevronRight, CirclePlay, Clock3, LockKeyhole, Plus, Trash2, WandSparkles, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronRight, CirclePlay, Clock3, LockKeyhole, Plus, Trash2, WandSparkles, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { DISCIPLINE_NAMES, DIFFICULTY_NAMES, KIND_NAMES, RULES, SKILLS, SKILL, STYLE_NAMES } from '../game/data';
 import { allowed, chance, generateRoutine, learned, routineTime } from '../game/competition';
@@ -9,7 +9,7 @@ import { DISCIPLINES, STYLES, type Discipline, type Rider, type Skill } from '..
 import { Tag } from './Brand';
 import type { Submit } from './Overview';
 
-export function Skills({r,onTrain}:{r:Rider;onTrain:(id:string)=>void}){
+export function Skills({r}:{r:Rider}){
   const [family,setFamily]=useState<'all'|'dance'|'trick'>('all');
   const [status,setStatus]=useState<'all'|'learned'|'unlearned'>('all');
   const [selected,setSelected]=useState<string>();
@@ -55,15 +55,15 @@ export function Skills({r,onTrain}:{r:Rider;onTrain:(id:string)=>void}){
         </button>;
       })}</div>
       {skill&&<section className="skill-detail" id="skill-detail" key={skill.id} ref={detail} tabIndex={-1} aria-label={skill.name+' 기술 정보'}>
-        <SkillDetail r={r} skill={skill} preview={preview===skill.id} onPreview={()=>setPreview(preview===skill.id?null:skill.id)} onTrain={onTrain} onClose={()=>select(undefined)}/>
+        <SkillDetail r={r} skill={skill} preview={preview===skill.id} onPreview={()=>setPreview(preview===skill.id?null:skill.id)} onClose={()=>select(undefined)}/>
       </section>}
     </div>
   </section>;
 }
 
-function SkillDetail({r,skill:s,preview,onPreview,onTrain,onClose}:{r:Rider;skill:Skill;preview:boolean;onPreview:()=>void;onTrain:(id:string)=>void;onClose:()=>void}){
+function SkillDetail({r,skill:s,preview,onPreview,onClose}:{r:Rider;skill:Skill;preview:boolean;onPreview:()=>void;onClose:()=>void}){
   const {id}=s;
-  const known=learned(r.skills,id),available=canStudy(r,id);
+  const known=learned(r.skills,id);
   const estimate=chance(known?r:{...r,skills:{...r.skills,[id]:{study:100,mastery:17}}},s);
   return <>
     <header><h2>{s.name}</h2><button className="icon-button" aria-label="기술 상세 닫기" onClick={onClose}><X size={17}/></button></header>
@@ -75,7 +75,6 @@ function SkillDetail({r,skill:s,preview,onPreview,onTrain,onClose}:{r:Rider;skil
     </dl>
     <div className="skill-detail-actions">
       <button className="button secondary small" aria-expanded={preview} aria-label={s.name+' 미리보기'} onClick={onPreview}><CirclePlay size={16}/> {preview?'동작 닫기':'동작 보기'}</button>
-      {available&&r.phase==='plan'&&!r.plan&&r.settings.mode==='manual'&&<button className="button primary small" onClick={()=>onTrain(s.id)}>연마 <ArrowUpRight size={15}/></button>}
     </div>
     {preview&&<TechniquePreview r={r} id={id}/>}
   </>;

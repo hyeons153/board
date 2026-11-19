@@ -18,7 +18,7 @@ const disciplines=z.array(z.enum(DISCIPLINES)).max(3).refine(ds=>new Set(ds).siz
 // Older open clients can still submit this retired field; it is discarded.
 const legacyIntensity=z.enum(['safe','normal','focus']).optional();
 const actionSchema=z.discriminatedUnion('type',[
-  z.strictObject({type:z.literal('pulse')}),
+  z.strictObject({type:z.literal('pulse'),background:z.enum(['hidden','visible']).optional()}),
   z.strictObject({type:z.literal('continue-training'),record:z.string().max(140)}),
   z.strictObject({type:z.literal('continue-event'),record:z.string().max(180)}),
   z.strictObject({type:z.literal('start-training'),record:z.string().max(140)}),
@@ -67,7 +67,7 @@ async function limitedBody(request:Request){
 
 export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecret?:string){
   const online='actor' in store ? store as OnlineStore : undefined;
-  const view=(row:Row,username?:string,scope?:string,compact=false):View=>{
+  const view=(row:Row,username?:string,scope?:string,compact=false,tab?:string):View=>{
     const career=row.snapshot.career;
     const records=(meets:typeof career.hall[number]['records'],opponents:boolean)=>meets.map(meet=>{
       const summary=compact&&(!opponents||career.rider?.id+':'+meet.year+':'+meet.id!==row.snapshot.clock.pendingMeet);
@@ -76,7 +76,9 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
     const hall=career.hall.map(archive=>({...archive,records:records(archive.records,false)}));
     const rider=career.rider?{...career.rider,settings:{...career.rider.settings,entries:singleEntry(career.rider.settings.entries)},extras:extras(career.rider),seed:0,season:{...career.rider.season,division:divisionFor(career.rider.year)},records:records(career.rider.records,true)}:null;
     const parked=career.parked?.map(item=>({...item,seed:0,records:records(item.records,false)}));
-    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,stateVersion:row.snapshot.clock.stateVersion??0,remainingMs:remaining(row.snapshot,weekMs),weekMs,fastForward:false,pendingMeet:row.snapshot.clock.pendingMeet,pendingTraining:row.snapshot.clock.pendingTraining,pendingChoice:row.snapshot.clock.pendingChoice,pendingEvent:row.snapshot.clock.pendingEvent,storage:store.kind,username,scope};
+    const background=row.snapshot.clock.background;
+    const backgroundMs=background&&background.tab===tab?Math.max(0,background.at-Date.now()):undefined;
+    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,stateVersion:row.snapshot.clock.stateVersion??0,remainingMs:remaining(row.snapshot,weekMs),weekMs,fastForward:false,pendingMeet:row.snapshot.clock.pendingMeet,pendingTraining:row.snapshot.clock.pendingTraining,pendingChoice:row.snapshot.clock.pendingChoice,pendingEvent:row.snapshot.clock.pendingEvent,backgroundMs,storage:store.kind,username,scope};
   };
   return async (request:Request):Promise<Response>=>{
     try{
@@ -131,10 +133,10 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
         const next=advance(row.snapshot,action,tab,Date.now(),versionedWeek,identity,secure&&store.kind==='neon',!!username);
         if(next===row.snapshot){
           if(action.type==='pulse'&&version===row.version&&request.headers.get('x-game-pulse')==='minimal')return new Response(null,{status:204,headers:{'Cache-Control':'no-store'}});
-          return respond(view(row,username,scope(),compact));
+          return respond(view(row,username,scope(),compact,tab));
         }
         const saved=await store.replace(id,row.version,next,tokenHash);
-        if(saved) return respond(view(saved,username,scope(),compact));
+        if(saved) return respond(view(saved,username,scope(),compact,tab));
         if(online&&tokenHash&&!(await online.actor(tokenHash))) return respond({error:'세션이 만료됐어요. 다시 연결해 주세요.'},401);
       }
       return respond({conflict:true,view:view(await store.get(id),username,scope(),compact)},409);

@@ -44,9 +44,9 @@ export type Archive = { id:string; name:string; look:Look; year:number; week:num
 export type Career = { rider:Rider|null; hall:Archive[]; parked?:Rider[] };
 export type EventOutcome = { key:string; eventId:string; title:string; kind:string; choice:string; details:string[]; year:number; week:number; npc?:string };
 export type TrainingSetup = { gear:Pick<CareerExtras,'inventory'|'equipped'|'accessories'|'equipmentVersion'>; routines:Rider['routines'] };
-export type View = { career:Career; version:number; stateVersion:number; remainingMs:number; weekMs:number; fastForward:boolean; pendingMeet?:string; pendingTraining?:string; pendingChoice?:string; pendingEvent?:EventOutcome; storage:'local'|'neon'; username?:string; scope?:string };
+export type View = { career:Career; version:number; stateVersion:number; remainingMs:number; weekMs:number; fastForward:boolean; pendingMeet?:string; pendingTraining?:string; pendingChoice?:string; pendingEvent?:EventOutcome; backgroundMs?:number; storage:'local'|'neon'; username?:string; scope?:string };
 export type GameAction =
-  | { type:'pulse' }
+  | { type:'pulse'; background?:'hidden'|'visible' }
   | { type:'continue-training'; record:string }
   | { type:'continue-event'; record:string }
   | { type:'start-training'; record:string }

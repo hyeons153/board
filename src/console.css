@@ -12,7 +12,8 @@
 .console-save { color:#bed3b4; font-size:.7rem; margin-right:8px; white-space:nowrap; }
 .console-top-actions .console-auto { width:auto; padding:0 10px; color:#d9e1d7; font:750 .7rem var(--mono); }.console-top-actions .console-auto.is-on { color:#263d32; background:#d9efa2; border-color:#d9efa2; }
 .console-world { min-height:0; position:relative; isolation:isolate; overflow:hidden; }
-.console-world > .console-stage { height:100%; }
+.console-field { position:relative; height:100%; }
+.console-stage { height:100%; }
 .game-console .game-stage { height:100%; min-height:0; border:0; border-radius:0; box-shadow:none; }
 .game-console .game-stage .scene-media { height:100%; inset:0; }
 .game-console .game-stage .scene-media canvas { object-position:60% 50%; }

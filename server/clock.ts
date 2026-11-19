@@ -1,12 +1,60 @@
 import { command, currentMeet, divisionFor, GameError, prepareWeek, processWeek, singleEntry, validateAutoEntries } from '../src/game/career.js';
 import { extras } from '../src/game/economy.js';
+import { AUTO_FLOW, RULES } from '../src/game/data.js';
 import type { Career, EventOutcome, GameAction, TrainingSetup } from '../src/game/types.js';
 
-export type Save = { format:1; career:Career; clock:{credit:number; stamp:number; tabs:Record<string,number>; readyAt?:number; fastForward?:boolean; pendingChoice?:string; pendingMeet?:string; pendingTraining?:string; pendingEvent?:EventOutcome; trainingSetup?:TrainingSetup; stateVersion?:number} };
+export type Save = { format:1; career:Career; clock:{credit:number; stamp:number; tabs:Record<string,number>; readyAt?:number; fastForward?:boolean; pendingChoice?:string; pendingMeet?:string; pendingTraining?:string; pendingEvent?:EventOutcome; trainingSetup?:TrainingSetup; stateVersion?:number; background?:{tab:string;at:number}} };
 export const blankSave=():Save=>({format:1,career:{rider:null,hall:[]},clock:{credit:0,stamp:0,tabs:{}}});
 export const remaining=(save:Save,weekMs:number,now=Date.now())=>!save.clock.pendingChoice&&!save.clock.pendingEvent&&!save.clock.pendingMeet&&!save.clock.pendingTraining&&save.career.rider?.phase==='plan'&&!!save.career.rider.plan?Math.max(0,(save.clock.readyAt??now+weekMs)-now):0;
 
 export function advance(prev:Save,a:GameAction,tab:string,now:number,weekMs:number,identity:()=>{id:string;seed:number},official=false,account=false):Save {
+  const run=(save:Save,action:GameAction,time:number)=>advanceOne(save,action,tab,time,weekMs,identity,official,account);
+  const cursor=prev.clock.background;
+  if(a.type!=='pulse'||!a.background||prev.career.rider?.settings.mode!=='auto'){
+    const next=run(prev,a,now);
+    if(next!==prev)delete next.clock.background;
+    return next;
+  }
+  const visible=a.background==='visible';
+  if(visible&&cursor?.tab!==tab)return run(prev,{type:'pulse'},now);
+  // Keep one background clock per career. An abandoned tab's lease can be replaced without passing its elapsed time to a new tab.
+  if(!visible&&cursor&&cursor.tab!==tab&&cursor.at>now-90_000)return prev;
+
+  let next=prev;
+  let at=cursor?.tab===tab?cursor.at:backgroundDeadline(next,now);
+  for(let count=0;at!==undefined&&at<=now&&count<24;count++){
+    const step=run(next,backgroundAction(next),at);
+    if(step===next){at=undefined;break;}
+    next=step;
+    at=backgroundDeadline(next,at);
+  }
+  const background=at!==undefined&&(!visible||at<=now)?{tab,at}:undefined;
+  if(next===prev&&cursor?.tab===background?.tab&&cursor?.at===background?.at)return prev;
+  return {...next,clock:{...next.clock,background}};
+}
+
+function backgroundAction({clock}:Save):GameAction{
+  if(clock.pendingTraining)return {type:'continue-training',record:clock.pendingTraining};
+  if(clock.pendingEvent)return {type:'continue-event',record:clock.pendingEvent.key};
+  if(clock.pendingMeet)return {type:'continue-meet',record:clock.pendingMeet};
+  if(clock.pendingChoice)return {type:'start-training',record:clock.pendingChoice};
+  return {type:'pulse'};
+}
+
+function backgroundDeadline(save:Save,now:number){
+  const {clock,career:{rider}}=save;
+  if(clock.pendingTraining||clock.pendingEvent)return now+AUTO_FLOW.resultMs;
+  if(clock.pendingMeet){
+    const runs=rider?.records.findLast(record=>rider.id+':'+record.year+':'+record.id===clock.pendingMeet)?.results.length??0;
+    const runMs=AUTO_FLOW.entryMs+RULES.runSeconds*1000+AUTO_FLOW.exitMs+AUTO_FLOW.ceremonyMs;
+    return now+(runs?runs*runMs:AUTO_FLOW.resultMs);
+  }
+  if(!rider||rider.phase==='retired')return undefined;
+  if(clock.pendingChoice)return now+AUTO_FLOW.choiceMs;
+  return Math.max(now,clock.readyAt??now);
+}
+
+function advanceOne(prev:Save,a:GameAction,tab:string,now:number,weekMs:number,identity:()=>{id:string;seed:number},official:boolean,account:boolean):Save {
   if(a.type==='settings')validateAutoEntries(a.settings);
   if(a.type==='pulse'&&(prev.clock.pendingTraining||prev.clock.pendingEvent||prev.clock.pendingMeet||prev.clock.pendingChoice||prev.career.rider?.phase==='retired'||(prev.clock.readyAt!==undefined&&prev.clock.readyAt>now)||(prev.career.rider?.phase==='plan'&&!prev.career.rider.plan&&prev.career.rider.settings.mode==='manual')))return prev;
   const next=structuredClone(prev),r=next.career.rider,clock=next.clock;

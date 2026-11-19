@@ -22,7 +22,18 @@ const fields=[
 const selectFields=new Set(['hair','outfit','bottom','footwear','deckDesign']);
 
 export function LookFields({look,onChange,children}:{look:Look;onChange:(look:Look)=>void;children?:ReactNode}){
-  return <div className="swatch-grid">
+  const fieldsRoot=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(!matchMedia('(max-width:760px)').matches)return;
+    fieldsRoot.current?.querySelectorAll<HTMLElement>('.swatch-palette').forEach(row=>{
+      const button=row.querySelector<HTMLElement>('button[aria-pressed=true]');
+      if(!button||row.scrollWidth<=row.clientWidth)return;
+      const left=button.offsetLeft-4,right=button.offsetLeft+button.offsetWidth+4;
+      if(left<row.scrollLeft)row.scrollLeft=left;
+      else if(right>row.scrollLeft+row.clientWidth)row.scrollLeft=right-row.clientWidth;
+    });
+  },[look]);
+  return <div className="swatch-grid" ref={fieldsRoot}>
     {children}
     <fieldset className="look-gender"><legend>성별</legend><div className="gender-options" aria-label="성별">
       {(['male','female'] as const).map(gender=><button key={gender} type="button" aria-pressed={(look.gender??'male')===gender} onClick={()=>onChange({...look,gender})}>{gender==='male'?'남성':'여성'}</button>)}
@@ -39,7 +50,7 @@ export function LookFields({look,onChange,children}:{look:Look;onChange:(look:Lo
           ? <select aria-label={label} value={look[field]??0} onChange={event=>onChange({...look,...(field==='hair'?{hairColor:look.hairColor??(look.hair<4?look.hair:0)}:{}),[field]:Number(event.target.value)})}>
               {values.map((name,index)=><option value={index} key={name}>{name}</option>)}
             </select>
-          : <div>{values.map((color,index)=>{
+          : <div className="swatch-palette">{values.map((color,index)=>{
               const picked=(look[field]??(field==='hairColor'&&look.hair<4?look.hair:0))===index;
               const name=label+' '+(field==='board'?BOARD_COLOR_NAMES[index]:index+1);
               return <button key={color} type="button" className={'swatch'+(picked?' picked':'')} style={{backgroundColor:color}} title={name}

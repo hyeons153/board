@@ -13,11 +13,10 @@ const choiceLabels={...STAT_NAMES,dance:DISCIPLINE_NAMES.dance,trick:DISCIPLINE_
 const signed=(n:number)=>(n>0?'+':'')+n.toFixed(1).replace('.0','');
 const range=(min:number,max:number)=>min===max?signed(min):signed(min)+' ~ '+signed(max);
 
-export function WeeklyChoices({r,send,saving,target,onPreview,pendingChoice,active=true,hidden=false}:{r:Rider;send:Submit;saving:boolean;target?:string;onPreview?:(plan:Plan|undefined)=>void;pendingChoice?:string;active?:boolean;hidden?:boolean}){
-  const initial=SKILL[target??''];
-  const [action,setAction]=useState<typeof ACTIONS[number]|undefined>(initial?.family);
+export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true,hidden=false}:{r:Rider;send:Submit;saving:boolean;onPreview?:(plan:Plan|undefined)=>void;pendingChoice?:string;active?:boolean;hidden?:boolean}){
+  const [action,setAction]=useState<typeof ACTIONS[number]>();
   const spot=r.spot;
-  const [skill,setSkill]=useState(target??''),[lesson,setLesson]=useState(false);
+  const [skill,setSkill]=useState(''),[lesson,setLesson]=useState(false);
   useEffect(()=>setLesson(false),[spot]);
   const choose=(next:typeof ACTIONS[number])=>{setAction(current=>current===next?undefined:next);setSkill('');setLesson(false);};
   const plan=useMemo<Plan|undefined>(()=>action?{action,spot,...(skill?{skill}:{}),...(lesson?{lesson:true}:{})}:undefined,[action,spot,skill,lesson]);

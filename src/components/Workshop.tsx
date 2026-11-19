@@ -39,13 +39,15 @@ export default function Workshop({r,send,saving,lookDraft,onLookDraft}:{r:Rider;
         </article>;
       })}</div>
     </section>}
-    {tab==='style'&&<section className="panel content-panel">
+    {tab==='style'&&<section className="panel content-panel makeover-panel">
       <SectionTitle code="RIDER STYLE" title="외형 변경"/>
       <div className="makeover-grid">
         <div className="makeover-rider"><LookPreview look={equippedLook({...r,look})} label="외형 변경 미리보기"/></div>
-        <LookFields look={look} onChange={onLookDraft}/>
+        <div className="makeover-options">
+          <LookFields look={look} onChange={onLookDraft}/>
+          {progress.equipped.deck&&<p className="subtle"><Settings2 size={14}/> 장착한 데크의 디자인이 기본 데크 디자인보다 먼저 표시됩니다.</p>}
+        </div>
       </div>
-      {progress.equipped.deck&&<p className="subtle"><Settings2 size={14}/> 장착한 데크의 디자인이 기본 데크 디자인보다 먼저 표시됩니다.</p>}
       <div className="bottom-actions"><button className="button primary" disabled={disabled||!changed||available<ECONOMY.makeover}
         onClick={async()=>{if(await send({type:'makeover',look}))onLookDraft(undefined);}}><Sparkles size={15}/> 적용 {money(ECONOMY.makeover)}</button></div>
     </section>}

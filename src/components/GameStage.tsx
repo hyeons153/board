@@ -35,7 +35,7 @@ export default function GameStage({r,send,saving,remaining,weekMs,fastForward,sp
   const dialogue=useDialogueFocus(r.id+':'+r.phase+':'+r.event,active&&(r.phase==='event'||r.phase==='injury'));
   useEffect(()=>{
     if(!active||pendingEvent||pendingTraining||record||saving||r.settings.mode!=='auto'||!['event','meet','injury'].includes(r.phase))return;
-    const timer=window.setTimeout(()=>void send(r.phase==='injury'?{type:'resume'}:{type:'settings',settings:{...r.settings,pauseStory:false,pauseMeet:false,pauseInjury:false}}),800);
+    const timer=window.setTimeout(()=>{if(!document.hidden)void send(r.phase==='injury'?{type:'resume'}:{type:'settings',settings:{...r.settings,pauseStory:false,pauseMeet:false,pauseInjury:false}});},800);
     return ()=>window.clearTimeout(timer);
   },[r.phase,r.settings.mode,pendingTraining,pendingEvent?.key,record?.id,saving,send,active]);
   if(pendingTraining)return <TrainingOutcome r={r} saving={saving||!active} active={active} onDone={()=>void send({type:'continue-training',record:pendingTraining})}/>;
@@ -101,7 +101,7 @@ function Playback({record,index,r,saving,active,playbackRate,onSpeed,onNext,done
   useEffect(()=>{
     if(mode!=='full'||!active)return;
     clock.current.stamp=performance.now();
-    const end=68;
+    const end=RULES.runSeconds+(AUTO_FLOW.entryMs+AUTO_FLOW.exitMs)/1000;
     const timer=window.setInterval(()=>{
       const now=advanceClock(clock.current,performance.now(),playbackRate)/1000;
       setElapsed(Math.min(end,now));
@@ -109,9 +109,10 @@ function Playback({record,index,r,saving,active,playbackRate,onSpeed,onNext,done
     },85);
     return ()=>{window.clearInterval(timer);advanceClock(clock.current,performance.now(),playbackRate);};
   },[mode,active,playbackRate]);
-  const seconds=Math.max(0,Math.min(60,elapsed-5));
-  const waiting=mode==='full'&&elapsed<5;
-  const ending=mode==='full'&&elapsed>=65;
+  const entrySeconds=AUTO_FLOW.entryMs/1000;
+  const seconds=Math.max(0,Math.min(RULES.runSeconds,elapsed-entrySeconds));
+  const waiting=mode==='full'&&elapsed<entrySeconds;
+  const ending=mode==='full'&&elapsed>=entrySeconds+RULES.runSeconds;
   const frame=mode==='full'&&!waiting&&!ending?run.log.find(log=>log.at<=seconds&&seconds<log.end+(log.outcome==='miss'?RULES.recovery:0)):undefined;
   const progress=frame?Math.min(1,(seconds-frame.at)/(frame.end-frame.at)):0;
   const motion:Motion=mode==='result'?(standing.place===1?'win':standing.place<=3?'great':'lose'):waiting?'mount':ending?'brake':mode==='pick'?'rest':'ride';
@@ -141,7 +142,7 @@ function Playback({record,index,r,saving,active,playbackRate,onSpeed,onNext,done
   return <section className={'spot-stage game-stage has-dialogue competition-stage '+(mode==='result'?'showing-podium':'')} aria-label="인게임 대회">
     <Scene spot={meet.spot} look={avatar} motion={motion} technique={technique} variant="race" playbackRate={active?playbackRate:0}/><div className="scene-shade"/>
     <div className="game-hud"><span>{record.year}년차 · {meet.name}</span><div className="scene-counter"><Timer size={14}/><span>{String(Math.floor(timer)).padStart(2,'0')} / 60초</span></div></div>
-    {waiting&&elapsed>=2&&<div className="game-countdown" aria-label={Math.ceil(5-elapsed)+'초 뒤 출발'}>{Math.ceil(5-elapsed)}</div>}
+    {waiting&&elapsed>=2&&<div className="game-countdown" aria-label={Math.ceil(entrySeconds-elapsed)+'초 뒤 출발'}>{Math.ceil(entrySeconds-elapsed)}</div>}
     <div className={'game-dialogue '+(mode==='full'?'game-commentary':'')} role="region" aria-label={mode==='result'?'대회 시상식':'경기 진행'} ref={dialogue} tabIndex={-1}>{panel}</div>
   </section>;
 }

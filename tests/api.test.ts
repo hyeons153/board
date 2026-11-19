@@ -4,10 +4,43 @@ import { randomUUID, createHash } from 'node:crypto';
 import { mkdtemp, readdir, rmdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHandler } from '../server/http';
+import { advance, blankSave } from '../server/clock';
 import { localStore } from '../server/store';
 import { BOARDS, BOTTOMS, DEFAULT_LOOK, EYE_COLORS, FOOTWEAR, HAIR_COLORS, HAIR_STYLES, OUTFITS, PANTS, SHIRTS, SHOES, SKINS } from '../src/game/data';
 import { ECONOMY, playerPlace } from '../src/game/economy';
 import type { View } from '../src/game/types';
+
+test('hidden auto mode follows server deadlines, keeps full competition records and resumes the visible flow',()=>{
+  const identity=()=>({id:'background-rider',seed:73}),tab=randomUUID();
+  const start=1_000_000,step=(save:ReturnType<typeof blankSave>,action:Parameters<typeof advance>[1],elapsed:number,by=tab)=>advance(save,action,by,start+elapsed,2000,identity);
+  const created=step(blankSave(),{type:'create',name:'Background',look:DEFAULT_LOOK},0);
+  assert.equal(step(created,{type:'pulse',background:'hidden'},100_000),created);
+  const automatic=step(created,{type:'settings',settings:{mode:'auto',strategy:'balanced',entries:['dance']}},0);
+  const hidden=step(automatic,{type:'pulse',background:'hidden'},0);
+  assert.equal(hidden.clock.background?.at,start+2000);
+  assert.equal(step(hidden,{type:'pulse',background:'hidden'},1999),hidden);
+  assert.equal(step(hidden,{type:'pulse',background:'hidden'},2000,randomUUID()),hidden);
+  const running=step(hidden,{type:'pulse',background:'hidden'},2000);
+  assert.equal(running.clock.pendingChoice,undefined);
+  assert.equal(running.clock.readyAt,start+4000);
+  const result=step(running,{type:'pulse',background:'hidden'},4000);
+  assert.ok(result.clock.pendingTraining);
+  const meet=step(result,{type:'pulse',background:'hidden'},60_000);
+  assert.ok(meet.clock.pendingMeet);
+  assert.equal(meet.career.rider!.records.length,1);
+  assert.ok(meet.career.rider!.records[0].results[0].run.log.length);
+  assert.equal(step(meet,{type:'pulse',background:'hidden'},60_000),meet);
+  const resumed=step(meet,{type:'pulse',background:'visible'},meet.clock.background!.at-start+8000);
+  assert.equal(resumed.clock.background,undefined);
+  assert.equal(resumed.clock.pendingMeet,undefined);
+  assert.equal(resumed.career.rider!.records.length,1);
+  assert.ok(resumed.career.rider!.week>=8);
+  const later=step(hidden,{type:'pulse',background:'visible'},600_000);
+  assert.ok(later.clock.background&&later.clock.background.at<=start+600_000,'A long sleep is caught up in bounded batches');
+  const stopped=step(later,{type:'settings',settings:{mode:'manual',strategy:'balanced',entries:['dance']}},600_000);
+  assert.equal(stopped.clock.background,undefined);
+  assert.equal(stopped.career.rider!.settings.mode,'manual');
+});
 
 test('guest snapshots survive reopening storage; concurrent tournament submissions pay exactly once',async()=>{
   const path=await mkdtemp(join(process.cwd(),'.longboard-test-'));
