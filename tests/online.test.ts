@@ -6,6 +6,7 @@ import { readMigrationFiles } from 'drizzle-orm/migrator';
 import { connectLocal } from '../server/localDatabase';
 import { databaseStore } from '../server/databaseStore';
 import { createHandler } from '../server/http';
+import { createBrowserGame } from '../server/browserGame';
 import { blankSave } from '../server/clock';
 import { sessionHash } from '../server/online';
 import { publicationFor, verifiedResult } from '../server/ranking';
@@ -17,13 +18,79 @@ import { RULES } from '../src/game/data';
 import { calendarFor, DEFAULT_LOOK, SKILLS } from '../src/game/data';
 import { freshExtras } from '../src/game/economy';
 import { chooseEnding } from '../src/game/legacy';
-import { DISCIPLINES, type Career, type GameAction, type View } from '../src/game/types';
+import { DISCIPLINES, type BrowserSaveResponse, type Career, type GameAction, type View } from '../src/game/types';
 import type { Directory, Publication, PublicCard } from '../src/game/public';
 import { RANKING_VERSION } from '../src/game/public';
 import { rankingPoints } from '../src/game/rp';
 
 const pw='test-account-passphrase-42';
 const base='https://longboard.test/api/game';
+test('browser careers and replays stay outside PostgreSQL; the hall accepts only server-issued retirement records',async()=>{
+  const {db,close}=await connectLocal();
+  try{
+    let hallCalls=0;
+    const store=databaseStore(db,'neon');
+    const config={secret:'browser integration test encryption key',rateSecret:'browser integration test auth rate key',
+      secure:true,weekMs:2000,hall:()=>{hallCalls++;return store;}};
+    let handler=createBrowserGame(config);
+    const tab=randomUUID();
+    let cookie='',scope='',checkpoint:string|undefined;
+    const request=(area?:string,body?:unknown)=>handler(new Request(base+(area?'?area='+area:''),{
+      method:body===undefined?'GET':'POST',
+      headers:{origin:new URL(base).origin,cookie,'X-Game-Scope':scope,'Content-Type':'application/json'},
+      body:body===undefined?undefined:JSON.stringify(body),
+    }));
+    const play=async(action?:GameAction)=>{
+      const response=await request('save',{tab,checkpoint,action});
+      assert.equal(response.status,200,await response.clone().text());
+      const data:BrowserSaveResponse=await response.json();
+      checkpoint=data.checkpoint??checkpoint;
+      return data;
+    };
+    assert.equal((await (await request()).json()).storage,'browser');
+    assert.equal((await play()).view.career.rider,null);
+    const rider=(await play({type:'create',name:'Local rider',look:DEFAULT_LOOK})).view.career.rider!;
+    assert.equal(rider.seed,0);
+    await play({type:'plan',plan:{action:'rest',spot:'river'}});
+    handler=createBrowserGame(config);
+    assert.equal((await play()).view.career.rider?.plan?.action,'rest');
+    assert.equal((await request('save',{tab,checkpoint,replay:'1:regular-1'})).status,404);
+    assert.equal(hallCalls,0);
+    const replacement=(checkpoint![0]==='A'?'B':'A')+checkpoint!.slice(1);
+    assert.equal((await request('save',{tab,checkpoint:replacement})).status,422);
+
+    // Start another independent save and retire it to get the publication ticket.
+    checkpoint=undefined;
+    await play({type:'create',name:'Retired rider',look:DEFAULT_LOOK});
+    const retired=(await play({type:'retire'})).archives![0];
+    assert.equal(hallCalls,0);
+    assert.deepEqual(await db.query('SELECT user_id FROM rider_careers'),[]);
+    const registered=await request('account',{type:'register',username:'hall-rider',password:pw});
+    assert.equal(registered.status,200,await registered.clone().text());
+    cookie=registered.headers.get('set-cookie')!.split(';')[0];
+    assert.match(cookie,/^lbl_hall=/);
+    const account=await (await request('account')).json();
+    scope=account.scope;
+    assert.equal(account.username,'hall-rider');
+    const publish={type:'publish',archiveId:retired.archive.id,active:true};
+    assert.equal((await request('public',publish)).status,422);
+    assert.equal((await request('public',{...publish,ticket:checkpoint})).status,422);
+    assert.equal((await request('public',{...publish,ticket:retired.ticket,archiveId:randomUUID()})).status,404);
+    const publication=await request('public',{...publish,ticket:retired.ticket});
+    assert.equal(publication.status,200,await publication.clone().text());
+    assert.equal((await (await request('public')).json()).rows[0].profile.name,'Retired rider');
+    assert.equal((await request('public',{...publish,active:false})).status,200);
+    assert.deepEqual((await (await request('public')).json()).rows,[]);
+    cookie='';scope='';
+    const second=await request('account',{type:'register',username:'other-rider',password:pw});
+    assert.equal(second.status,200,await second.clone().text());
+    cookie=second.headers.get('set-cookie')!.split(';')[0];
+    scope=(await (await request('account')).json()).scope;
+    assert.equal((await request('public',{...publish,ticket:retired.ticket})).status,409);
+    assert.deepEqual(await db.query('SELECT user_id FROM rider_careers'),[]);
+  }finally{await close();}
+});
+
 function browser(handler:ReturnType<typeof createHandler>){
   let cookie='',scope='';
   let view:View;

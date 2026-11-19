@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { AccessError, ACCOUNT_SECONDS, type Actor, type OnlineStore } from './databaseStore.js';
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../src/game/accountPolicy.js';
 import { METRICS } from '../src/game/public.js';
-import { DIVISIONS } from '../src/game/types.js';
+import { DIVISIONS, type Archive } from '../src/game/types.js';
+import { MAX_SAVE_REQUEST } from './saveSeal.js';
 
 const username=z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{2,23}$/);
 const password=z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH).refine(value=>Buffer.byteLength(value,'utf8')<=256);
@@ -14,7 +15,7 @@ const authAction=z.discriminatedUnion('type',[
   z.strictObject({type:z.literal('delete'),username,password}),
 ]);
 const publicAction=z.discriminatedUnion('type',[
-  z.strictObject({type:z.literal('publish'),archiveId:z.uuid(),active:z.boolean()}),
+  z.strictObject({type:z.literal('publish'),archiveId:z.uuid(),active:z.boolean(),ticket:z.string().min(1).max(MAX_SAVE_REQUEST-4096).optional()}),
   z.strictObject({type:z.literal('report'),id:z.uuid(),reason:z.enum(['name','impersonation','other'])}),
 ]);
 const list=z.object({
@@ -43,9 +44,11 @@ async function verifyPassword(password:string,hash=dummy){
 }
 export const sessionHash=(token:string)=>createHash('sha256').update(token).digest('hex');
 export const sessionScope=(hash:string)=>sessionHash('browser-scope:'+hash);
-export const sessionCookie=(value:string,seconds:number,secure:boolean)=>
-  'lbl_guest='+value+'; Path=/; HttpOnly; SameSite=Strict; Max-Age='+seconds+(secure?'; Secure':'');
-export const rawSession=(request:Request)=>request.headers.get('cookie')?.match(/(?:^|;\s*)lbl_guest=([A-Za-z0-9_-]{43})(?:;|$)/)?.[1];
+type SessionName='lbl_guest'|'lbl_hall';
+export const sessionCookie=(value:string,seconds:number,secure:boolean,name:SessionName='lbl_guest')=>
+  name+'='+value+'; Path=/; HttpOnly; SameSite=Strict; Max-Age='+seconds+(secure?'; Secure':'');
+export const rawSession=(request:Request,name:SessionName='lbl_guest')=>
+  request.headers.get('cookie')?.match(new RegExp('(?:^|;\\s*)'+name+'=([A-Za-z0-9_-]{43})(?:;|$)'))?.[1];
 
 const json=(payload:unknown,status=200,cookie?:string)=>Response.json(payload,{status,headers:{
   'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...(cookie?{'Set-Cookie':cookie}:{}),
@@ -60,10 +63,14 @@ function passwordKey(request:Request,secure:boolean,secret:string|undefined){
   return createHmac('sha256',secret??'local-longboard-rate-limit').update(address).digest('hex');
 }
 
-export async function onlineRequest(request:Request,store:OnlineStore,secure:boolean,secret:string|undefined,actor:Actor|undefined,hash:string|undefined,body:unknown){
+export async function onlineRequest(request:Request,store:OnlineStore,secure:boolean,secret:string|undefined,actor:Actor|undefined,hash:string|undefined,body:unknown,
+  browser?:{archive:(ticket:string)=>Archive}){
   const params=new URL(request.url).searchParams;
   const area=params.get('area');
+  const cookie=(value:string,seconds:number)=>sessionCookie(value,seconds,secure,browser?'lbl_hall':'lbl_guest');
   if(area==='account'){
+    if(browser&&request.method==='GET')
+      return json(actor?.username&&hash?{username:actor.username,scope:sessionScope(hash)}:{});
     if(request.method!=='POST') throw new AccessError('지원하지 않는 요청입니다.',405);
     const parsed=authAction.safeParse(body);
     if(!parsed.success) throw new AccessError(`아이디는 영문·숫자 등 3~24자, 비밀번호는 ${PASSWORD_MIN_LENGTH}자 이상으로 입력해 주세요.`);
@@ -71,7 +78,7 @@ export async function onlineRequest(request:Request,store:OnlineStore,secure:boo
     if(action.type==='logout'){
       const logged=needsAccount(actor,hash);
       await store.logout(logged.actor,logged.hash);
-      return json({ok:true},200,sessionCookie('',0,secure));
+      return json({ok:true},200,cookie('',0));
     }
     const client=passwordKey(request,secure,secret);
     const accepted=await store.rate('ip:'+client,40,600);
@@ -81,16 +88,20 @@ export async function onlineRequest(request:Request,store:OnlineStore,secure:boo
       const record=await store.credential(action.username);
       if(logged.actor.username!==action.username||!record||record.id!==logged.actor.id||!await verifyPassword(action.password,record.passwordHash))
         throw new AccessError('계정과 비밀번호를 확인해 주세요.',403);
-      await store.erase(logged.actor,logged.hash);
-      return json({ok:true},200,sessionCookie('',0,secure));
+      if(browser)await store.eraseHall(logged.actor,logged.hash);
+      else await store.erase(logged.actor,logged.hash);
+      return json({ok:true},200,cookie('',0));
     }
     const token=randomBytes(32).toString('base64url');
     const next=sessionHash(token);
     if(action.type==='register'){
-      if(!actor||!hash) throw new AccessError('게임 화면을 새로 열고 다시 시도해 주세요.',401);
-      if(actor.username) throw new AccessError('이미 로그인되어 있어요.',409);
+      if(actor?.username) throw new AccessError('이미 로그인되어 있어요.',409);
       try{
-        await store.register(actor,hash,next,action.username,await makePassword(action.password));
+        if(browser)await store.registerHall(next,action.username,await makePassword(action.password));
+        else{
+          if(!actor||!hash) throw new AccessError('게임 화면을 새로 열고 다시 시도해 주세요.',401);
+          await store.register(actor,hash,next,action.username,await makePassword(action.password));
+        }
       }catch(error){
         if((error as {code?:string}).code==='23505') throw new AccessError('사용할 수 없는 아이디예요.',409);
         throw error;
@@ -100,9 +111,9 @@ export async function onlineRequest(request:Request,store:OnlineStore,secure:boo
       const account=await store.credential(action.username);
       const matches=await verifyPassword(action.password,account?.passwordHash);
       if(!account||!matches) throw new AccessError('아이디 또는 비밀번호를 확인해 주세요.',401);
-      await store.login(account.id,actor,hash,next);
+      await store.login(account.id,browser?undefined:actor,browser?undefined:hash,next);
     }
-    return json({ok:true},200,sessionCookie(token,ACCOUNT_SECONDS,secure));
+    return json({ok:true},200,cookie(token,ACCOUNT_SECONDS));
   }
   if(area==='public'){
     if(request.method==='GET'){
@@ -122,7 +133,11 @@ export async function onlineRequest(request:Request,store:OnlineStore,secure:boo
     const parsed=publicAction.safeParse(body);
     if(!parsed.success) throw new AccessError('공개 요청을 확인해 주세요.');
     const action=parsed.data;
-    if(action.type==='publish') return json(await store.publish(logged.actor,logged.hash,action.archiveId,action.active));
+    if(action.type==='publish'){
+      if(browser&&action.active&&!action.ticket)throw new AccessError('공개할 은퇴 선수 기록이 없어요.',422);
+      const local=browser?{archive:action.active?browser.archive(action.ticket!):undefined}:undefined;
+      return json(await store.publish(logged.actor,logged.hash,action.archiveId,action.active,local));
+    }
     if(!await store.rate('report:'+logged.actor.id,20,3600)) throw new AccessError('신고 요청이 많아요. 잠시 뒤 다시 시도해 주세요.',429);
     await store.report(logged.actor,logged.hash,action.id,action.reason);
     return json({ok:true});

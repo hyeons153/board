@@ -1,11 +1,11 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { ACTIONS, DISCIPLINES, SPOTS, STRATEGIES, type View } from '../src/game/types.js';
+import { ACTIONS, DISCIPLINES, SPOTS, STRATEGIES } from '../src/game/types.js';
 import { BOARDS, BOTTOMS, EYE_COLORS, FOOTWEAR, HAIR_COLORS, HAIR_STYLES, OUTFITS, PANTS, RULES, SHIRTS, SHOES, SKINS } from '../src/game/data.js';
-import { extras, GEAR_SLOTS } from '../src/game/economy.js';
-import { divisionFor, GameError, singleEntry } from '../src/game/career.js';
-import { randomSpecialTraining } from '../src/game/training.js';
-import { advance, remaining } from './clock.js';
+import { GEAR_SLOTS } from '../src/game/economy.js';
+import { GameError } from '../src/game/career.js';
+import { advance } from './clock.js';
+import { gameView } from './gameView.js';
 import { GUEST_SECONDS, type Row, type Store } from './store.js';
 import { AccessError, type OnlineStore } from './databaseStore.js';
 import { onlineRequest, rawSession, sessionCookie, sessionScope } from './online.js';
@@ -18,7 +18,7 @@ const itemId=z.string().max(60).regex(/^[a-z0-9_-]+$/);
 const disciplines=z.array(z.enum(DISCIPLINES)).max(3).refine(ds=>new Set(ds).size===ds.length);
 // Older open clients can still submit this retired field; it is discarded.
 const legacyIntensity=z.enum(['safe','normal','focus']).optional();
-const actionSchema=z.discriminatedUnion('type',[
+export const actionSchema=z.discriminatedUnion('type',[
   z.strictObject({type:z.literal('pulse'),background:z.enum(['hidden','visible']).optional()}),
   z.strictObject({type:z.literal('continue-training'),record:z.string().max(140)}),
   z.strictObject({type:z.literal('continue-event'),record:z.string().max(180)}),
@@ -44,15 +44,15 @@ const actionSchema=z.discriminatedUnion('type',[
 ]);
 const input=z.strictObject({version:z.number().int().nonnegative(),stateVersion:z.number().int().nonnegative().optional(),tab:z.uuid(),scope:z.string().regex(/^[a-f0-9]{64}$/).optional(),action:actionSchema});
 const hash=(token:string)=>createHash('sha256').update(token).digest('hex');
-const identity=()=>({id:randomUUID(),seed:randomBytes(4).readUInt32LE()});
-const respond=(data:unknown,status=200,cookie?:string)=>Response.json(data,{status,headers:{
+export const identity=()=>({id:randomUUID(),seed:randomBytes(4).readUInt32LE()});
+export const respond=(data:unknown,status=200,cookie?:string)=>Response.json(data,{status,headers:{
   'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...(cookie?{'Set-Cookie':cookie}:{}),
 }});
 export const readWeekMs=(env:string|undefined)=>{
   const n=Number(env);
   return Number.isSafeInteger(n)&&n>=1000&&n<=86_400_000?n:RULES.weekMs;
 };
-async function limitedBody(request:Request){
+export async function limitedBody(request:Request,limit=4096){
   const reader=request.body?.getReader();
   if(!reader) return null;
   const chunks:Uint8Array[]=[];
@@ -61,37 +61,26 @@ async function limitedBody(request:Request){
     const {done,value}=await reader.read();
     if(done) break;
     bytes+=value.length;
-    if(bytes>4096){await reader.cancel(); return null;}
+    if(bytes>limit){await reader.cancel(); return null;}
     chunks.push(value);
   }
   try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return null;}
 }
 
+export function sameOrigin(request:Request){
+  const site=request.headers.get('sec-fetch-site'),origin=request.headers.get('origin');
+  return site!=='cross-site'&&(!origin||origin===new URL(request.url).origin);
+}
+
 export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecret?:string){
   const online='actor' in store ? store as OnlineStore : undefined;
-  const view=(row:Row,username?:string,scope?:string,compact=false,tab?:string):View=>{
-    const career=row.snapshot.career;
-    const records=(meets:typeof career.hall[number]['records'],opponents:boolean)=>meets.map(meet=>{
-      const summary=compact&&(!opponents||career.rider?.id+':'+meet.year+':'+meet.id!==row.snapshot.clock.pendingMeet);
-      return {...meet,...(compact?{detail:summary?'summary' as const:'full' as const}:{}),results:meet.results.map(({proof,opponents:replays,...result})=>summary?{...result,run:{...result.run,log:[],highlight:result.run.log.find(move=>move.outcome==='great')??result.run.log.find(move=>move.outcome==='clean')}}:opponents?{...result,opponents:replays}:result)};
-    });
-    const hall=career.hall.map(archive=>({...archive,records:records(archive.records,false)}));
-    const active=career.rider;
-    const rider=active?{...active,settings:{...active.settings,entries:singleEntry(active.settings.entries)},extras:extras(active),seed:0,
-      trainingOffer:active.phase==='plan'?randomSpecialTraining(active)??null:null,
-      season:{...active.season,division:divisionFor(active.year)},records:records(active.records,true)}:null;
-    const parked=career.parked?.map(item=>({...item,seed:0,records:records(item.records,false)}));
-    const background=row.snapshot.clock.background;
-    const backgroundMs=background&&background.tab===tab?Math.max(0,background.at-Date.now()):undefined;
-    return {career:{rider,hall,...(parked?.length?{parked}:{})},version:row.version,stateVersion:row.snapshot.clock.stateVersion??0,remainingMs:remaining(row.snapshot,weekMs),weekMs,fastForward:false,pendingMeet:row.snapshot.clock.pendingMeet,pendingTraining:row.snapshot.clock.pendingTraining,pendingChoice:row.snapshot.clock.pendingChoice,pendingEvent:row.snapshot.clock.pendingEvent,backgroundMs,storage:store.kind,username,scope};
-  };
+  const view=(row:Row,username?:string,scope?:string,compact=false,tab?:string)=>
+    gameView(row,weekMs,store.kind,username,scope,compact,tab);
   return async (request:Request):Promise<Response>=>{
     try{
       const compact=request.headers.get('x-game-view')==='compact';
       if(request.method!=='GET'&&request.method!=='POST') return respond({error:'지원하지 않는 요청입니다.'},405);
-      const fetchSite=request.headers.get('sec-fetch-site');
-      const origin=request.headers.get('origin');
-      if(fetchSite==='cross-site'||(origin&&origin!==new URL(request.url).origin)) return respond({error:'동일한 사이트에서 요청해 주세요.'},403);
+      if(!sameOrigin(request)) return respond({error:'동일한 사이트에서 요청해 주세요.'},403);
       const raw=rawSession(request);
       let tokenHash=raw?hash(raw):undefined;
       const actor=tokenHash&&online?await online.actor(tokenHash):undefined;

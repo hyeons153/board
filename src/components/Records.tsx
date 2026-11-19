@@ -1,5 +1,6 @@
 import { ArrowUpRight, ChevronDown, Flag, Medal, Play, Shield, Star, Trophy, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { readArchiveTicket } from '../browserSaves';
 import { formatCareerDate, formatMonthWeek, meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, RULES, SKILL, STAT_NAMES, STYLE_NAMES } from '../game/data';
 import { NAMES, competitor, learned } from '../game/competition';
 import { RIVALS, lineTerms } from '../game/content';
@@ -171,7 +172,8 @@ export function PrivateHall({hall,view,onEnding,onAccount,onPublic}:{hall:Archiv
   const change=async(archiveId:string,active:boolean)=>{
     setPending(archiveId);setError('');
     try{
-      const publication=await service<Publication>('public',{type:'publish',archiveId,active},view.scope);
+      const ticket=view.storage==='browser'&&active?await readArchiveTicket(archiveId):undefined;
+      const publication=await service<Publication>('public',{type:'publish',archiveId,active,ticket},view.scope);
       setPublications(rows=>[...rows.filter(row=>row.archiveId!==archiveId),publication]);
     }catch(error){setError(error instanceof Error?error.message:'공개 상태를 저장하지 못했어요.');}
     finally{setPending('');}

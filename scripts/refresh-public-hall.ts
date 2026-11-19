@@ -4,7 +4,7 @@ import { refreshPublicHall } from '../server/hallIndex.js';
 
 config({path:'.env.local',quiet:true});
 config({quiet:true});
-const url=process.env.DATABASE_DIRECT_URL||process.env.DATABASE_URL_UNPOOLED||process.env.DATABASE_URL;
+const url=process.env.HALL_DATABASE_DIRECT_URL||process.env.HALL_DATABASE_URL;
 if(!url)throw new Error('A database connection is required.');
 const db=productionDatabase(url);
 const apply=process.argv.includes('--apply');

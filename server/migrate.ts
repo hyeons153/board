@@ -5,8 +5,8 @@ import { migrate } from 'drizzle-orm/neon-http/migrator';
 
 config({path:'.env.local',quiet:true});
 config({quiet:true});
-const url=process.env.DATABASE_DIRECT_URL||process.env.DATABASE_URL_UNPOOLED||process.env.DATABASE_URL;
-if(!url) throw new Error('DATABASE_URL or DATABASE_DIRECT_URL is required.');
+const url=process.env.HALL_DATABASE_DIRECT_URL||process.env.HALL_DATABASE_URL;
+if(!url) throw new Error('HALL_DATABASE_DIRECT_URL or HALL_DATABASE_URL is required.');
 try {
   await migrate(drizzle(neon(url)),{migrationsFolder:'./drizzle'});
   console.log('Database migrations applied.');

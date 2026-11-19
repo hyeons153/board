@@ -3,7 +3,7 @@ import { blankSave, type Save } from './clock.js';
 import type { Database, Query } from './database.js';
 import { mergeCareers } from '../src/game/legacy.js';
 import { RANKING_VERSION, type Directory, type MeetHighlight, type Metric, type Publication, type PublicCard, type PublicProfile, type PublicSummary } from '../src/game/public.js';
-import type { Division } from '../src/game/types.js';
+import type { Archive, Division } from '../src/game/types.js';
 import type { Row, Store } from './store.js';
 import { publicationFor } from './ranking.js';
 import { saveRankEntries } from './hallIndex.js';
@@ -106,6 +106,14 @@ export function databaseStore(db:Database,kind:Store['kind'],legacy?:LocalLegacy
     async credential(username:string){
       return (await db.query<LoginRecord>('SELECT user_id AS id,password_hash AS "passwordHash" FROM rider_accounts WHERE username=$1',[username]))[0];
     },
+    async registerHall(hash:string,username:string,passwordHash:string){
+      const id=randomUUID();
+      await db.transaction(async tx=>{
+        await tx.query('INSERT INTO rider_users(id) VALUES($1)',[id]);
+        await tx.query('INSERT INTO rider_accounts(user_id,username,password_hash) VALUES($1,$2,$3)',[id,username,passwordHash]);
+        await setSession(tx,id,hash,ACCOUNT_SECONDS);
+      });
+    },
     async register(owner:Actor,oldHash:string,newHash:string,username:string,passwordHash:string){
       await db.transaction(async tx=>{
         await lockUser(tx,owner.id);
@@ -154,15 +162,20 @@ export function databaseStore(db:Database,kind:Store['kind'],legacy?:LocalLegacy
         await tx.query('DELETE FROM rider_users WHERE id=$1',[owner.id]);
       });
     },
+    async eraseHall(owner:Actor,hash:string){
+      await db.transaction(async tx=>{
+        await lockUser(tx,owner.id);
+        await requireActor(tx,owner,hash);
+        await tx.query('DELETE FROM guest_sessions WHERE user_id=$1',[owner.id]);
+        await tx.query('DELETE FROM rider_accounts WHERE user_id=$1',[owner.id]);
+      });
+    },
     publications:(owner:string)=>db.query<Publication>(`SELECT archive_id AS "archiveId",id,active,hidden AS moderated
       FROM public_riders WHERE owner_id=$1`,[owner]),
-    async publish(owner:Actor,hash:string,archiveId:string,active:boolean):Promise<Publication>{
+    async publish(owner:Actor,hash:string,archiveId:string,active:boolean,browser?:{archive?:Archive}):Promise<Publication>{
       return db.transaction(async tx=>{
         await lockUser(tx,owner.id);
         await requireActor(tx,owner,hash);
-        const saved=await readCareer(tx,owner.id,true);
-        const archive=saved.snapshot.career.hall.find(item=>item.id===archiveId);
-        if(!archive) throw new AccessError('이 계정에 보관된 은퇴 선수가 아니에요.',404);
         const [existing]=await tx.query<Publication>(`SELECT archive_id AS "archiveId",id,active,hidden AS moderated
           FROM public_riders WHERE owner_id=$1 AND archive_id=$2`,[owner.id,archiveId]);
         if(!active){
@@ -171,7 +184,14 @@ export function databaseStore(db:Database,kind:Store['kind'],legacy?:LocalLegacy
           return {...existing,active:false};
         }
         if(existing?.moderated) throw new AccessError('운영 검토로 비공개 처리된 기록이에요.',409);
+        const archive=browser?browser.archive:(await readCareer(tx,owner.id,true)).snapshot.career.hall.find(item=>item.id===archiveId);
+        if(!archive||archive.id!==archiveId) throw new AccessError('보관된 은퇴 선수 기록을 확인해 주세요.',404);
         if(existing?.active) return existing;
+        if(browser){
+          await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1::text,0))',[archiveId]);
+          const [claimed]=await tx.query('SELECT id FROM public_riders WHERE archive_id=$1 AND owner_id<>$2 LIMIT 1',[archiveId,owner.id]);
+          if(claimed)throw new AccessError('이 선수는 이미 다른 명예의 전당 계정에 등록됐어요.',409);
+        }
         assertName(archive.name);
         const {profile,entries}=publicationFor(archive);
         const id=existing?.id??randomUUID();

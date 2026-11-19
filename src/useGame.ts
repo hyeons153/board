@@ -1,9 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { GameAction, MeetRecord, View } from './game/types';
+import { commitSave, readArchives, readCheckpoint } from './browserSaves';
+import type { Archive, BrowserSaveResponse, GameAction, MeetRecord, View } from './game/types';
+
+function sendBrowser(tab:string,body:{checkpoint?:string;action?:GameAction;replay?:string}){
+  return fetch('/api/game?area=save',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tab,...body}),cache:'no-store'});
+}
+async function readResponse<T>(response:Response):Promise<T>{
+  const data=await response.json();
+  if(!response.ok)throw new Error(data.error);
+  return data as T;
+}
 
 export function useGame(){
   const [view,setView]=useState<View|null>(null);
   const current=useRef<View|null>(null);
+  const browser=useRef<{checkpoint?:string;archives:Archive[];legacySave:boolean}|undefined>(undefined);
   const tab=useRef(crypto.randomUUID());
   const time=useRef(0);
   const inFlight=useRef<Promise<boolean>|null>(null);
@@ -18,6 +30,16 @@ export function useGame(){
     if(current.current&&update.version<current.current.version) return;
     current.current=update; time.current=performance.now(); setNow(time.current); setView(update);
   },[]);
+  const applyBrowser=useCallback((response:BrowserSaveResponse)=>{
+    const local=browser.current!;
+    apply({...response.view,legacySave:local.legacySave,career:{...response.view.career,hall:local.archives}});
+  },[apply]);
+  const loadBrowser=useCallback(async(legacySave:boolean)=>{
+    const [checkpoint,archives]=await Promise.all([readCheckpoint(),readArchives()]);
+    const data=await readResponse<BrowserSaveResponse>(await sendBrowser(tab.current,{checkpoint}));
+    browser.current={checkpoint,archives,legacySave};
+    applyBrowser(data);
+  },[applyBrowser]);
   const load=useCallback(async()=>{
     if(initial.current)return;
     initial.current=true;
@@ -27,13 +49,17 @@ export function useGame(){
       const response=await fetch('/api/game',{cache:'no-store',headers:{'X-Game-View':'compact'}});
       const data=await response.json();
       if(!response.ok)throw new Error(data.error);
+      if(data.storage==='browser'){
+        await loadBrowser(data.legacySave===true);
+        return;
+      }
       if(current.current?.scope!==data.scope){
         current.current=null;tab.current=crypto.randomUUID();hiddenAuto.current=false;
       }
       apply(data);
     }catch(e){setError(e instanceof Error?e.message:'저장 기록을 불러오지 못했어요.');}
     finally{initial.current=false;}
-  },[apply]);
+  },[apply,loadBrowser]);
   const send=useCallback(async(action:GameAction)=>{
     const pulse=action.type==='pulse';
     if(!current.current||initial.current||mutating.current||(pulse&&inFlight.current)) return false;
@@ -44,6 +70,23 @@ export function useGame(){
     }
     const request=(async()=>{
       try{
+        const local=browser.current;
+        if(local){
+          const refresh=async()=>{
+            await loadBrowser(local.legacySave);
+            if(!pulse)setSyncNote('다른 화면의 변경을 반영했어요. 선택을 다시 확인해 주세요.');
+            return false;
+          };
+          if(await readCheckpoint()!==local.checkpoint)return refresh();
+          const response=await sendBrowser(tab.current,{checkpoint:local.checkpoint,action});
+          if(response.status===204&&pulse)return true;
+          const data=await readResponse<BrowserSaveResponse>(response);
+          if(!await commitSave(local.checkpoint,data))return refresh();
+          local.checkpoint=data.checkpoint;
+          if(data.archives?.length)local.archives=await readArchives();
+          applyBrowser(data);
+          return true;
+        }
         const response=await fetch('/api/game',{method:'POST',keepalive:pulse&&!!action.background,headers:{'Content-Type':'application/json','X-Game-View':'compact',...(pulse?{'X-Game-Pulse':'minimal'}:{})},body:JSON.stringify({tab:tab.current,version:current.current!.version,stateVersion:current.current!.stateVersion,scope:current.current!.scope,action})});
         if(response.status===204&&pulse)return true;
         const data=await response.json();
@@ -68,12 +111,20 @@ export function useGame(){
       if(inFlight.current===request) inFlight.current=null;
       if(!pulse){mutating.current=false;setSaving(false);}
     }
-  },[apply]);
+  },[apply,applyBrowser,loadBrowser]);
+  const restoreLegacy=useCallback(async()=>{
+    if(!browser.current?.legacySave||await readCheckpoint())throw new Error('기존 브라우저 기록이 먼저 저장되어 있어요.');
+    const data=await readResponse<BrowserSaveResponse>(await fetch('/api/game?area=legacy-save',{method:'POST',cache:'no-store'}));
+    if(!await commitSave(undefined,data))throw new Error('다른 탭에서 이미 저장했어요.');
+    await loadBrowser(true);
+  },[loadBrowser]);
   const loadReplay=useCallback(async(record:MeetRecord)=>{
     if(record.detail!=='summary')return record;
     const scope=current.current?.scope,riderId=current.current?.career.rider?.id;
     try{
-      const response=await fetch('/api/game?replay='+encodeURIComponent(record.year+':'+record.id),{cache:'no-store'});
+      const replay=record.year+':'+record.id;
+      const response=browser.current?await sendBrowser(tab.current,{checkpoint:browser.current.checkpoint,replay})
+        :await fetch('/api/game?replay='+encodeURIComponent(replay),{cache:'no-store'});
       const data=await response.json();
       if(!response.ok)throw new Error(data.error);
       if(current.current?.scope!==scope||current.current?.career.rider?.id!==riderId)return;
@@ -119,6 +170,7 @@ export function useGame(){
     const leave=()=>{
       const latest=current.current;
       if(!latest)return;
+      if(browser.current)return;
       if(auto)hiddenAuto.current=true;
       void fetch('/api/game',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json','X-Game-View':'compact','X-Game-Pulse':'minimal'},body:JSON.stringify({tab:tab.current,version:latest.version,scope:latest.scope,action:{type:'pulse',...(auto?{background:'hidden'}:{})}})}).catch(()=>{});
     };
@@ -130,5 +182,5 @@ export function useGame(){
     return ()=>{stopped=true;window.clearTimeout(timer);window.clearInterval(ticker);document.removeEventListener('visibilitychange',wake);window.removeEventListener('pagehide',leave);};
   },[active,auto,training,view?.remainingMs,view?.pendingTraining,view?.pendingEvent?.key,view?.pendingMeet,view?.pendingChoice,view?.backgroundMs,view?.fastForward,send]);
   const remaining=view?Math.max(0,view.remainingMs-(now-time.current)):0;
-  return {view,send,saving:saving||view?.backgroundMs!==undefined,error,syncNote,load,loadReplay,remaining,dismiss:()=>setError('')};
+  return {view,send,saving:saving||view?.backgroundMs!==undefined,error,syncNote,load,loadReplay,restoreLegacy,remaining,dismiss:()=>setError('')};
 }

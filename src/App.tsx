@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Flag, Footprints, ListOrdered, Menu, NotebookText, Settings, ShoppingBag, Trophy, UserRound, UsersRound, X } from 'lucide-react';
 import { useGame } from './useGame';
 import { ACTION_NAMES, DEFAULT_LOOK, DIVISION_NAMES, formatCareerDate, LOCATIONS } from './game/data';
@@ -13,7 +13,7 @@ import { Skills, Routines, type LineDraft } from './components/Skills';
 import { Meets, type MeetSelection } from './components/Meets';
 import { Profile, Rankings, Rivals } from './components/Records';
 import Workshop from './components/Workshop';
-import Account from './components/Account';
+import Account, { service } from './components/Account';
 import HallOfFame from './components/HallOfFame';
 import Ceremony from './components/Ceremony';
 import GameStage from './components/GameStage';
@@ -21,7 +21,7 @@ import Scene from './components/Scene';
 import { SpotMap } from './components/SpotMap';
 import { AutoSettings, WeeklyChoices } from './components/WeeklyChoices';
 import { RiderHud } from './components/RiderHud';
-import type { Look, MeetRecord, Plan } from './game/types';
+import type { Look, MeetRecord, Plan, View } from './game/types';
 
 type Screen='home'|'training'|'skills'|'routine'|'meets'|'rank'|'workshop'|'profile'|'rivals'|'hall'|'account'|'menu'|'new'|'ending'|'journal';
 const names:Record<Screen,string>={home:'육성',training:'자동 육성 설정',skills:'기술 도감',routine:'라인 편집',meets:'대회',rank:'시즌 랭킹',workshop:'장비·스폰서',profile:'선수 정보',rivals:'라이벌',hall:'명예의 전당',account:'계정',menu:'전체 메뉴',new:'라이더 등록',ending:'커리어 엔딩',journal:'라이더 일지'};
@@ -53,6 +53,17 @@ export default function App(){
   const previous=useRef<{id:string;phase:string;held:boolean}|undefined>(undefined);
   const panel=useRef<HTMLDivElement>(null);
   const view=game.view,r=view?.career.rider;
+  const [hallSession,setHallSession]=useState<Pick<View,'username'|'scope'>>({});
+  const sessionRequest=useRef(0);
+  const loadHallSession=useCallback(async()=>{
+    const id=++sessionRequest.current;
+    const session=await service<Pick<View,'username'|'scope'>>('account');
+    if(id===sessionRequest.current)setHallSession(session);
+  },[]);
+  const hallOpen=view?.storage==='browser'&&(screen==='hall'||screen==='account');
+  useEffect(()=>{
+    if(hallOpen)void loadHallSession().catch(()=>{});
+  },[hallOpen,loadHallSession]);
   const weekKey=r?r.id+':'+r.year+':'+r.week:'';
   const pending=view?.pendingMeet;
   const trainingResult=view?.pendingTraining;
@@ -127,11 +138,13 @@ export default function App(){
     setReplayLoading(false);if(full)setReplay(full);else setScreen(screen);
   };
   const playHome=()=>{go('home');};
+  const hallView=view.storage==='browser'?{...view,...hallSession}:view;
   const status=r&&<RiderHud r={r} preview={preview} recentTraining={!!trainingResult&&!replay} interactive={screen==='home'&&!spotMap&&!replayLoading}/>;
   let content:ReactNode;
   if(screen==='new')content=<NewRider saving={game.saving} onCreate={async(name,look)=>{const ok=await game.send({type:'create',name,look});if(ok)go('home');return ok;}}/>;
-  else if(screen==='account')content=<Account key={view.scope} view={view} send={game.send} onSwitch={playHome} onSessionChange={game.load}/>;
-  else if(screen==='hall')content=<HallOfFame view={view} selectedId={publicId} onSelect={selectPublic}
+  else if(screen==='account')content=<Account key={hallView.scope} view={hallView} send={game.send} onSwitch={playHome}
+    onSessionChange={view.storage==='browser'?loadHallSession:game.load} onRestore={game.restoreLegacy}/>;
+  else if(screen==='hall')content=<HallOfFame view={hallView} selectedId={publicId} onSelect={selectPublic}
     onEnding={id=>{setEndingId(id);go('ending',true);}} onAccount={()=>go('account',true)}/>;
   else if(screen==='ending'&&archive)content=<Ceremony key={archive.id} archive={archive} onHall={()=>go('hall')} onNew={()=>go('new')}/>;
   else if(screen==='menu')content=<div className="console-menu">
