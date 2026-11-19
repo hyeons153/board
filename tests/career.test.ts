@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { CALENDAR, calendarFor, INTERNATIONAL_MEETS, DEFAULT_LOOK, RULES, SKILL, SKILLS } from '../src/game/data';
 import { command, divisionFor, GameError, newRider, processWeek } from '../src/game/career';
 import { chance, generateRoutine, learned, routineTime, simulateMeet, simulateRun, validRoutine } from '../src/game/competition';
-import { ECONOMY, equippedLook, extras, playerPlace, SPONSOR } from '../src/game/economy';
+import { ECONOMY, equippedLook, extras, gearBonuses, playerPlace, SPONSOR } from '../src/game/economy';
 import { previewTraining, statAfter, trainingSuccess } from '../src/game/training';
-import { pickEvent } from '../src/game/events';
+import { EVENTS, eventBody, eventChoiceAvailable, eventFor, pickEvent } from '../src/game/events';
+import { RIVALS, spotUnlocked } from '../src/game/content';
+import { RELATIONSHIP_REWARDS, relationshipEpilogues, relationshipWith, representativeTitle } from '../src/game/relationships';
 import { seeded } from '../src/game/random';
 import { meetRP, rankingPoints } from '../src/game/rp';
 import { advance, blankSave, remaining } from '../server/clock';
@@ -189,6 +191,7 @@ test('eight consecutive seasons yield 48 distinct meets, promotion, resets, and 
   enterAuto(c);
   for(let i=0;i<52*8;i++){
     assert.equal(processWeek(c),true);
+    if(r.phase==='event'&&r.event)command(c,{type:'event',eventId:r.event,index:0},identity);
     if(i===51){
       assert.equal(r.year,2);assert.equal(r.week,1);assert.equal(r.season.division,'rookie');
       assert.deepEqual(r.records.map(m=>m.id),CALENDAR.map(m=>m.id));
@@ -249,6 +252,7 @@ test('equipment, lesson fees, and locked spots are enforced by the career comman
 test('specific story choices pause auto mode and unlock follow-up dialogue',()=>{
   const c=career(),r=c.rider!;
   r.week=11;
+  r.events.first=1;r.events.registration=1;
   r.relations.yu=8;
   r.settings={mode:'auto',strategy:'dance',entries:[],pauseStory:true};
   assert.ok(processWeek(c));
@@ -264,6 +268,113 @@ test('specific story choices pause auto mode and unlock follow-up dialogue',()=>
   assert.throws(()=>command(c,{type:'event',index:0},identity),GameError);
   r.spot='river';r.week=17;
   assert.equal(pickEvent(r,()=>.99)?.id,'yu-film');
+});
+
+test('all six relationship routes grant an exclusive gift and a selectable title independent of player gender',()=>{
+  assert.equal(RIVALS.filter(rival=>rival.look.gender==='female').length,3);
+  assert.equal(RIVALS.filter(rival=>rival.look.gender==='male').length,3);
+  assert.ok(RIVALS.every(rival=>rival.age>=19));
+  for(const npc of ['yu','jun'] as const){
+    for(const [index,route] of (['friend','rival','partner'] as const).entries()){
+      const c=career(),r=c.rider!;
+      r.year=4;r.week=2;r.look.gender=npc==='yu'?'female':'male';
+      r.relations[npc]=100;
+      assert.equal(relationshipWith(r,npc),undefined,'Legacy affinity does not choose a route');
+      assert.equal(spotUnlocked(r,'rooftop'),false);
+      const choose=(episode:string,index:number)=>{
+        const eventId='relationship-'+npc+'-'+episode;
+        assert.ok(eventFor(r,eventId)?.when(r),eventId);
+        r.phase='event';r.event=eventId;
+        command(c,{type:'event',eventId,index},identity);
+      };
+      const trust=eventFor(r,'relationship-'+npc+'-trust')!;
+      assert.match(eventBody(r,trust),npc==='yu'?/고른 스텝/:/오늘 내 첫 시도/);
+      choose('trust',1);
+      r.week=4;choose('fork',index);
+      if(route==='partner'){
+        assert.equal(relationshipWith(r,npc)?.state,'interested');
+        r.week=6;choose('confession',0);
+      }
+      r.week=10;choose(route,0);
+      assert.equal(relationshipWith(r,npc)?.state,route);
+      assert.ok(relationshipWith(r,npc)?.flags.includes('finished-'+route));
+      const reward=RELATIONSHIP_REWARDS[npc][route];
+      assert.deepEqual(extras(r).relationships?.titles,[reward.titleId]);
+      assert.deepEqual(extras(r).inventory.filter(id=>id===reward.item),[reward.item]);
+      assert.throws(()=>command(c,{type:'event',eventId:'relationship-'+npc+'-'+route,index:0},identity),GameError);
+      assert.throws(()=>command(c,{type:'representative-title',id:'unearned'},identity),GameError);
+      command(c,{type:'representative-title',id:reward.titleId},identity);
+      assert.equal(representativeTitle(r),reward.title);
+      command(c,{type:'trade',operation:'equip',item:reward.item},identity);
+      assert.equal(gearBonuses(r)[npc==='yu'?'danceMastery':'trickMastery'],.04);
+      assert.equal(spotUnlocked(r,'rooftop'),true);
+      command(c,{type:'spot',spot:'rooftop'},identity);
+      assert.ok(eventFor(r,'rooftop-jam')?.when(r));
+      assert.equal(rankingPoints(r).total,0);
+      command(c,{type:'retire'},identity);
+      const saved=JSON.parse(JSON.stringify(c.hall[0])) as typeof c.hall[number];
+      assert.equal(relationshipEpilogues(saved)[0].state,route);
+      assert.equal(representativeTitle(saved),reward.title);
+    }
+  }
+});
+
+test('one confirmed romance per career, explicit rejection leads to friendship, and breakup has its own ending',()=>{
+  const c=career(),r=c.rider!;
+  r.year=4;r.week=11;
+  const history=r.extras!.relationships={npcs:{yu:{state:'partner',flags:['confession-accepted']},jun:{state:'interested',flags:['romance-route']}},titles:[]};
+  r.extras!.choices['relationship-jun-fork']={index:2,year:4,week:4};
+  r.extras!.choices['relationship-yu-confession']={index:0,year:4,week:8};
+  const confession=eventFor(r,'relationship-jun-confession')!;
+  assert.equal(confession.when(r),true);
+  assert.equal(eventChoiceAvailable(r,confession,0),false);
+  r.phase='event';r.event=confession.id;
+  assert.throws(()=>command(c,{type:'event',eventId:confession.id,index:0},identity),/이미 연애 상대/);
+  assert.equal(relationshipWith(r,'jun')?.state,'interested');
+  command(c,{type:'event',eventId:confession.id,index:1},identity);
+  assert.equal(relationshipWith(r,'jun')?.state,'friend');
+  assert.equal(eventFor(r,'relationship-jun-friend')?.when(r),true);
+
+  r.phase='event';r.event='relationship-yu-partner';
+  command(c,{type:'event',eventId:r.event,index:1},identity);
+  assert.equal(relationshipWith(r,'yu')?.state,'ended');
+  assert.equal(eventChoiceAvailable(r,confession,0),false);
+  assert.ok(relationshipEpilogues(r).some(ending=>ending.state==='ended'));
+  assert.deepEqual(history.titles,[]);
+});
+
+test('overlapping story opportunities survive to the next week and auto stops at a saved decision in background',()=>{
+  const r=career().rider!;
+  r.year=6;r.week=25;
+  r.events=Object.fromEntries(EVENTS.filter(e=>!e.id.startsWith('relationship-')&&e.id!=='yu-open-final').map(e=>[e.id,1]));
+  const first=pickEvent(r,()=>.99)!;
+  assert.equal(first.id,'yu-open-final');
+  r.events[first.id]=1;r.week++;
+  assert.equal(pickEvent(r,()=>.99)?.id,'relationship-yu-trust');
+  r.events['relationship-yu-trust']=1;
+  r.extras!.choices['relationship-yu-trust']={index:0,year:6,week:26};
+  r.week=28;
+  assert.equal(pickEvent(r,()=>.99)?.id,'relationship-jun-trust','The waiting NPC precedes the newly eligible fork');
+  r.events['relationship-jun-trust']=1;
+  r.settings={mode:'auto',strategy:'freestyle',entries:['trick']};
+  const start=1_000_000,tab='relationship-tab';
+  const save=blankSave();save.career.rider=r;
+  const step=(prev:typeof save,action:Parameters<typeof advance>[1],ms:number)=>advance(prev,action,tab,start+ms,2000,identity);
+  const started=step(save,{type:'pulse',background:'hidden'},0);
+  const auto=step(started,{type:'pulse',background:'hidden'},30_000);
+  assert.equal(auto.career.rider?.event,'relationship-yu-fork');
+  assert.equal(auto.career.rider?.week,28);
+  assert.equal(auto.clock.pendingTraining,undefined);
+  assert.equal(auto.clock.background,undefined);
+  const loaded=JSON.parse(JSON.stringify(auto)) as typeof save;
+  assert.equal(step(loaded,{type:'pulse',background:'visible'},120_000),loaded);
+  const settings=step(loaded,{type:'settings',settings:{...r.settings,strategy:'dance'}},120_001);
+  assert.equal(settings.career.rider?.event,'relationship-yu-fork');
+  assert.throws(()=>step(settings,{type:'event',eventId:first.id,index:0},120_002),/이미 넘어간/);
+  const chosen=step(settings,{type:'event',eventId:'relationship-yu-fork',index:1},120_002);
+  assert.equal(chosen.clock.pendingEvent?.eventId,'relationship-yu-fork');
+  assert.match(chosen.clock.pendingEvent?.dialogue??'',/곡만 같게/);
+  assert.equal(relationshipWith(chosen.career.rider!,'yu')?.state,'rival');
 });
 
 test('sponsors pay once per season, award equipment and pay a recorded podium bonus',()=>{

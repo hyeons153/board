@@ -17,6 +17,7 @@ const palettes={
   studio:{sky:['#2a2538','#3a314a','#564455','#745064','#865968'],sun:'#efaa90',far:'#705970',mid:'#514156',deep:'#3b2f47',water:'#4c3b50',edge:'#292637',road:'#4c4355',light:'#ffac82'},
   night:{sky:['#141936','#262456','#444276','#65396a','#734a77'],sun:'#a0c4f5',far:'#535d8d',mid:'#41406b',deep:'#292946',water:'#33475d',edge:'#222436',road:'#3c4365',light:'#75f2e5'},
   arena:{sky:['#374f81','#66579d','#b478a1','#dc8e91','#ffd2a1'],sun:'#ffdba0',far:'#7d6f99',mid:'#596386',deep:'#35425f',water:'#6c7391',edge:'#353853',road:'#516385',light:'#ffe08e'},
+  rooftop:{sky:['#39365b','#665782','#bd7e89','#f6a789','#ffc68f'],sun:'#fff4c1',far:'#a17e91',mid:'#71647d',deep:'#4c405b',water:'#786075',edge:'#342c49',road:'#65546c',light:'#ffce88'},
 };
 export const landscapeEdge=(spot:Spot)=>palettes[spot].edge;
 export function paintLandscape(c:Ctx,spot:Spot,competition=false){
@@ -108,7 +109,14 @@ export function paintLandscape(c:Ctx,spot:Spot,competition=false){
   }
   c.globalAlpha=1;
   for(let x=-20;x<456;x+=52){rect(c,p.far,x,177,25,1);rect(c,p.mid,x,178,25,1);}
-  if(spot!=='studio'){
+  if(spot==='rooftop'){
+    rect(c,p.deep,0,115,WIDTH,26);rect(c,p.far,0,115,WIDTH,2);
+    rect(c,p.edge,0,131,WIDTH,5);rect(c,p.mid,0,138,WIDTH,4);
+    for(let x=9;x<WIDTH;x+=29){
+      rect(c,p.edge,x,111,2,24);rect(c,p.mid,x+2,118,23,8);
+    }
+    for(let x=22;x<WIDTH;x+=35)rect(c,p.light,x,132,3,2);
+  }else if(spot!=='studio'){
     rect(c,p.edge,0,132,WIDTH,3);rect(c,p.far,0,131,WIDTH,1);
     rect(c,p.deep,0,138,WIDTH,1);
     for(let x=10;x<456;x+=18){rect(c,p.deep,x,133,2,11);rect(c,p.mid,x+2,135,1,8);}

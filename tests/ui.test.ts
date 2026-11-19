@@ -43,6 +43,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
   const {default:GameStage}=await import('../src/components/GameStage');
   const {WeeklyChoices}=await import('../src/components/WeeklyChoices');
   const {Meets}=await import('../src/components/Meets');
+  const {Rivals}=await import('../src/components/Records');
   const {newRider,command}=await import('../src/game/career');
   const {simulateMeet}=await import('../src/game/competition');
   const {DEFAULT_LOOK,SKILL}=await import('../src/game/data');
@@ -97,9 +98,10 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.equal(win.document.querySelector('.weekly-settings'),null);
     await click('스팟 지도 열기');
     const map=win.document.querySelector('[aria-label="스팟 지도"]')!;
-    assert.equal(map.querySelectorAll('.spot-map-card').length,6);
+    assert.equal(map.querySelectorAll('.spot-map-card').length,7);
     assert.match(map.textContent!,/성장 \+|자주 오는 라이더|한유리|강준/);
     assert.equal(map.querySelector<HTMLButtonElement>('[aria-label="야간 광장 이동"]')!.disabled,true);
+    assert.equal(map.querySelector<HTMLButtonElement>('[aria-label="노을 옥상 이동"]')!.disabled,true);
     await click('도심 광장 이동');
     assert.equal(win.document.querySelector('[aria-label="스팟 지도"]'),null);
     assert.match(win.document.querySelector('.spot-map-trigger')!.textContent!,/도심 광장/);
@@ -132,7 +134,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       if(menu==='상점'){
         assert.equal(win.document.querySelectorAll('.equipment-choice').length,8);
         assert.equal(win.document.querySelectorAll('.equipment-loadout > div').length,6);
-        await click('액세서리');assert.equal(win.document.querySelectorAll('.equipment-choice').length,30);
+        await click('액세서리');assert.equal(win.document.querySelectorAll('.equipment-choice').length,36);
         await click('튼튼한 헬멧 상세');assert.ok(win.document.querySelector('[aria-label="튼튼한 헬멧 착용 미리보기"]'));
         await click('구매 ₩12,000');await click('장착');
         assert.match(win.document.querySelector('.equipment-panel .workshop-rider')!.textContent!,/액세서리 1\/3/);
@@ -276,6 +278,24 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       assert.equal(win.document.querySelector('#training-outcome-title')?.textContent,title);
       assert.equal(win.document.querySelector('.game-reward')?.textContent,'체력 -23');
     }
+    const story=newRider('story-ui',991,'Story rider',DEFAULT_LOOK);
+    story.year=3;story.week=9;story.phase='event';story.event='relationship-yu-fork';story.settings.mode='auto';
+    let submitted:unknown;
+    const sendStory=async(action:unknown)=>{submitted=action;return true;};
+    const storyProps={r:story,send:sendStory,saving:false,remaining:0,weekMs:2000,fastForward:false,spot:'river' as const,motion:'rest' as const,onDone:()=>{}};
+    await act(async()=>root.render(createElement(GameStage,storyProps)));
+    assert.match(win.document.querySelector('[aria-label="이벤트 선택"]')!.textContent!,/자동 육성 일시 정지/);
+    await settle(900);
+    assert.equal(submitted,undefined,'The client must not skip a relationship decision');
+    await click('앞으로도 함께 춤추는 친구로 지내자');
+    assert.deepEqual(submitted,{type:'event',eventId:'relationship-yu-fork',index:0});
+    command({rider:story,hall:[]},{type:'event',eventId:'relationship-yu-fork',index:0},()=>({id:story.id,seed:991}));
+    await act(async()=>root.render(createElement(GameStage,{...storyProps,pendingEvent:story.extras?.lastEvent})));
+    assert.match(win.document.querySelector('[aria-label="이벤트 결과"]')!.textContent!,/감독은 둘이야/);
+    await act(async()=>root.render(createElement(Rivals,{r:story,send:sendStory,saving:false})));
+    assert.equal(win.document.querySelectorAll('.rival').length,6);
+    assert.match(win.document.querySelector('.relationship-episodes')!.textContent!,/영상에 남지 않은 말|함께 춤추는 친구/);
+
     rider.week=7;rider.phase='meet';rider.settings={mode:'auto',strategy:'balanced',entries:['dance','trick']};
     const career={rider,hall:[]};
     assert.throws(()=>command(career,{type:'entry',disciplines:['dance','trick']},()=>({id:'automatic-ui',seed:71})),/1종목/);

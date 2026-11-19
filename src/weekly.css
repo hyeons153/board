@@ -91,4 +91,5 @@
 .spot-map-studio .spot-map-scene { background:linear-gradient(#808eae 0 55%,#45516d 55% 78%,#9b8264 78%); }
 .spot-map-night .spot-map-scene { background:linear-gradient(#3f416c 0 55%,#43394e 55% 78%,#30283f 78%); }
 .spot-map-arena .spot-map-scene { background:linear-gradient(#95c6d8 0 55%,#526b71 55% 78%,#a58e6c 78%); }
+.spot-map-rooftop .spot-map-scene { background:linear-gradient(#bd7e89 0 55%,#71647d 55% 78%,#4c405b 78%); }
 @media(max-width:700px){ .spot-map { top:8px; right:8px; width:calc(100% - 16px); max-height:calc(100% - 16px); padding:12px; }.spot-map-grid { gap:7px; }.spot-map-bonus { font-size:.65rem; }.game-console .game-hud .spot-map-trigger { min-height:32px; padding:7px 9px; font-size:.67rem; }.game-console .game-hud:has(.spot-map-trigger) .scene-counter { margin-top:39px; } }

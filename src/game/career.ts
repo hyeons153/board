@@ -1,12 +1,13 @@
 import { ACTION_NAMES, ACTION_STORIES, calendarFor, DISCIPLINE_NAMES, LOCATIONS, RULES, SKILL, SKILLS, START_SKILLS, STAT_NAMES } from './data.js';
 import { generateRoutine, learned, simulateMeet, validRoutine } from './competition.js';
-import { autoChoice, canStudy, eventFor, eventPaused, pickEvent } from './events.js';
+import { autoChoice, canStudy, eventChoiceAvailable, eventFor, eventPaused, pickEvent } from './events.js';
 import { chooseEnding, honors, mentorFrom } from './legacy.js';
 import { RUN_PROOF_VERSION } from './public.js';
 import { meetRP } from './rp.js';
 import { RIVALS, SPOT_GATE, spotUnlocked } from './content.js';
 import { ECONOMY, effectiveStats, eligibleSponsor, equipmentReaction, equipmentUnlocked, extras, freshExtras, gearBonuses, ITEM, maintainedSponsor, milestone, playerPlace, resaleValue, SPONSOR, STARTER_IDS, supply, unlockEquipment, upgradeEquipment } from './economy.js';
 import { clamp, round, seeded } from './random.js';
+import { RELATIONSHIP_NAMES, RELATIONSHIP_TITLES, rooftopUnlocked } from './relationships.js';
 import { statAfter, trainingCost, trainingFactor, trainingStatGains, trainingSuccess } from './training.js';
 import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family, type Settings } from './types.js';
 
@@ -208,8 +209,10 @@ function applyEvent(r:Rider,index:number){
   const e=eventFor(r,r.event??'');
   const choice=e?.choices[index];
   if(!e||!choice) throw new GameError('선택할 수 없는 이벤트예요.');
+  if(!eventChoiceAvailable(r,e,index))throw new GameError('이 커리어에서 이미 연애 상대를 선택했어요. 다른 선택지를 골라 주세요.');
   const fx=choice.effect;
   const details:string[]=[];
+  const progress=r.extras??=freshExtras();
   const energyBefore=r.energy,moneyBefore=r.money;
   r.energy=round(clamp(r.energy+(fx.energy??0)));
   r.money=Math.max(0,r.money+(fx.money??0));
@@ -234,14 +237,36 @@ function applyEvent(r:Rider,index:number){
     if(changes.length)details.push(`${SKILL[fx.skill]!.name} ${changes.join(' · ')}`);
   }
   if(fx.item&&ITEM.has(fx.item)){
-    const items=(r.extras??=freshExtras()).inventory;
+    const items=progress.inventory;
     if(!items.includes(fx.item)){items.push(fx.item);details.push(ITEM.get(fx.item)!.name+' 획득');}
     else details.push(ITEM.get(fx.item)!.name+' 이미 보유');
   }
+  const branch=choice.relationship;
+  if(branch&&e.npc){
+    const spotWasOpen=rooftopUnlocked(r);
+    const history=progress.relationships??={npcs:{},titles:[]};
+    const story=history.npcs[e.npc]??={state:'undecided',flags:[]};
+    if(branch.state){
+      story.state=branch.state;
+      details.push('관계 · '+RELATIONSHIP_NAMES[branch.state]);
+    }
+    if(!story.flags.includes(branch.flag))story.flags.push(branch.flag);
+    const reward=branch.reward;
+    if(reward&&!history.titles.includes(reward.titleId)){
+      history.titles.push(reward.titleId);
+      details.push('칭호 획득 · '+RELATIONSHIP_TITLES.get(reward.titleId));
+      if(!progress.inventory.includes(reward.item)){
+        progress.inventory.push(reward.item);
+        details.push('선물 획득 · '+ITEM.get(reward.item)!.name);
+      }
+      if(!spotWasOpen&&rooftopUnlocked(r))details.push('스팟 해금 · '+LOCATIONS.rooftop.name);
+    }
+  }
   if(r.money!==moneyBefore)details.push(`보유금 ${r.money>moneyBefore?'+':''}${(r.money-moneyBefore).toLocaleString('ko-KR')}원`);
   r.events[e.id]=(r.events[e.id]??0)+1;
-  (r.extras ??= freshExtras()).choices[e.id]={index,year:r.year,week:r.week};
-  (r.extras ??= freshExtras()).lastEvent={key:`${r.id}:${r.year}:${r.week}:${e.id}`,eventId:e.id,title:e.title,kind:e.kind,choice:choice.label,details:[...details],year:r.year,week:r.week,npc:e.npc};
+  progress.choices[e.id]={index,year:r.year,week:r.week};
+  if(progress.storyReadyAt)delete progress.storyReadyAt[e.id];
+  progress.lastEvent={key:`${r.id}:${r.year}:${r.week}:${e.id}`,eventId:e.id,title:e.title,kind:e.kind,choice:choice.label,details:[...details],year:r.year,week:r.week,npc:e.npc,dialogue:choice.dialogue};
   r.event=null;
   const description=`${choice.label}${details.length?' · '+details.join(' / '):''}`;
   note(r,'event',`${e.title} · ${description}`);
@@ -401,7 +426,15 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
   }
   if(a.type==='event'){
     if(r.phase!=='event') throw new GameError('응답할 이벤트가 없어요.');
+    const event=eventFor(r,r.event??'');
+    if((a.eventId!==undefined||event?.decision)&&a.eventId!==r.event)throw new GameError('이미 넘어간 이벤트예요. 현재 선택지를 확인해 주세요.');
     applyEvent(r,a.index); afterTraining(c,r,official);
+  }
+  if(a.type==='representative-title'){
+    const history=r.extras.relationships;
+    if(!history||a.id!==null&&(!history.titles.includes(a.id)||!RELATIONSHIP_TITLES.has(a.id)))
+      throw new GameError('획득한 칭호만 선택할 수 있어요.');
+    if(a.id===null)delete history.representative;else history.representative=a.id;
   }
   if(a.type==='entry'){
     const meet=currentMeet(r);

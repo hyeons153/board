@@ -1,7 +1,7 @@
 export const STATS = ['speed', 'carve', 'link', 'balance'] as const;
 export const DIVISIONS = ['rookie','regular','open','master'] as const;
 export const DISCIPLINES = ['dance','trick','freestyle'] as const;
-export const SPOTS = ['river','plaza','park','studio','night','arena'] as const;
+export const SPOTS = ['river','plaza','park','studio','night','arena','rooftop'] as const;
 export const STRATEGIES = ['balanced','dance','trick','freestyle'] as const;
 export const STYLES = ['stable','flow','score'] as const;
 export const ACTIONS = [...STATS,'dance','trick','rest','hospital'] as const;
@@ -20,6 +20,13 @@ export type Plan = { action: Action; spot: Spot; skill?: string; lesson?:boolean
 export type Settings = { mode: 'manual'|'auto'; strategy: Strategy; entries: Discipline[]; pauseStory?:boolean; pauseMeet?:boolean; pauseInjury?:boolean };
 export type Skill = { id:string; name:string; family:Family; kind:'step'|'technique'|'spin'|'pop'|'flip'; difficulty:number; points:number; seconds:number; requires:string[]; risk:number; tags:readonly string[] };
 export type Progress = { study:number; mastery:number };
+export type RelationshipState = 'undecided'|'friend'|'rival'|'interested'|'partner'|'ended';
+export type RelationshipProgress = { state:RelationshipState; flags:string[] };
+export type RelationshipHistory = {
+  npcs:Partial<Record<string, RelationshipProgress>>;
+  titles:string[];
+  representative?:string;
+};
 export type Injury = { severity:'minor'|'major'; weeks:number; treated:boolean; taped?:boolean };
 export type Meet = { id:string; month:number; week:number; name:string; major:boolean; spot:Spot; international?:boolean; host?:string };
 export type Outcome = 'miss'|'rough'|'clean'|'great';
@@ -42,7 +49,7 @@ export type Ending = { kind:'legend'|'champion'|'technician'|'veteran'|'early'; 
 export type Mentor = { id:string; name:string; look:Look; skill?:string; title:string; wins:number };
 export type Archive = { id:string; name:string; look:Look; year:number; week:number; reason:'early'|'complete'; stats:Stats; skills:Record<string,Progress>; records:MeetRecord[]; seasons:Season[]; relations:Record<string,number>; fame:number; extras?:CareerExtras; events?:Rider['events']; ending?:Ending; honors?:string[]; rankedStart?:number; calendarVersion?:2 };
 export type Career = { rider:Rider|null; hall:Archive[]; parked?:Rider[] };
-export type EventOutcome = { key:string; eventId:string; title:string; kind:string; choice:string; details:string[]; year:number; week:number; npc?:string };
+export type EventOutcome = { key:string; eventId:string; title:string; kind:string; choice:string; details:string[]; year:number; week:number; npc?:string; dialogue?:string };
 export type TrainingSetup = { gear:Pick<CareerExtras,'inventory'|'equipped'|'accessories'|'equipmentVersion'>; routines:Rider['routines'] };
 export type View = { career:Career; version:number; stateVersion:number; remainingMs:number; weekMs:number; fastForward:boolean; pendingMeet?:string; pendingTraining?:string; pendingChoice?:string; pendingEvent?:EventOutcome; backgroundMs?:number; storage:'local'|'neon'; username?:string; scope?:string };
 export type GameAction =
@@ -57,7 +64,8 @@ export type GameAction =
   | { type:'spot'; spot:Spot }
   | { type:'settings'; settings:Settings }
   | { type:'entry'; disciplines:Discipline[] }
-  | { type:'event'; index:number }
+  | { type:'event'; index:number; eventId?:string }
+  | { type:'representative-title'; id:string|null }
   | { type:'routine'; discipline:Discipline; skills:string[] }
   | { type:'trade'; operation:'buy'|'sell'|'equip'; item:string }
   | { type:'claim-gear' }

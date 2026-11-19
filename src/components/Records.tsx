@@ -3,18 +3,20 @@ import { useEffect, useState } from 'react';
 import { meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, RULES, SKILL, STAT_NAMES, STYLE_NAMES } from '../game/data';
 import { NAMES, competitor, learned } from '../game/competition';
 import { RIVALS, lineTerms } from '../game/content';
-import { equippedLook, extras, playerPlace } from '../game/economy';
+import { equippedLook, extras, ITEM, playerPlace } from '../game/economy';
 import { EVENTS } from '../game/events';
 import { PixelRider } from './Appearance';
 import { divisionFor } from '../game/career';
 import { DISCIPLINES, STATS, type Archive, type Rider, type View } from '../game/types';
 import { chooseEnding, endingName, honors, summarize } from '../game/legacy';
 import { formatRP, peakSeasonRP, rankingPoints, validRP } from '../game/rp';
+import { RELATIONSHIP_NAMES, RELATIONSHIP_REWARDS, RELATIONSHIP_TITLES, relationshipHint, relationshipWith, representativeTitle } from '../game/relationships';
 import { RPDisciplines } from './RankingPoints';
 import type { Publication } from '../game/public';
 import { SectionTitle, Tag } from './Brand';
 import { RiderCard, StatCards, type Submit } from './Overview';
 import { service } from './Account';
+import { RelationshipEpilogues } from './RelationshipEpilogues';
 
 export function Rankings({r}:{r:Rider}){
   const [year,setYear]=useState<number|null>(null);
@@ -43,6 +45,7 @@ export function Profile({r,send,saving,onHall,onNew}:{r:Rider;send:Submit;saving
   return <div className="stack">
     <section className="panel content-panel">
       <SectionTitle code="RIDER PROFILE" title={r.name} detail={`${r.year}년차 ${r.week}주 · ${DIVISION_NAMES[divisionFor(r.year)]}`}/>
+      {representativeTitle(r)&&<Tag kind="lime"><Medal size={14}/> {representativeTitle(r)}</Tag>}
       <div className="profile-avatar"><PixelRider look={equippedLook(r)} label={r.name+' 외형'}/></div>
       <StatCards r={r}/><RiderCard r={r}/>
     </section>
@@ -60,23 +63,45 @@ export function Profile({r,send,saving,onHall,onNew}:{r:Rider;send:Submit;saving
     </section>
   </div>;
 }
-export function Rivals({r}:{r:Rider}){
-  const choices=extras(r).choices;
-  const when=(id:string)=>(choices[id]?.year??0)*52+(choices[id]?.week??0);
+export function Rivals({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
+  const {choices,relationships}=extras(r);
+  const when=(id:string)=>(choices[id]?.year??0)*RULES.weeks+(choices[id]?.week??0);
   return <section className="panel content-panel">
-    <p className="game-section-note">연습 스팟과 대회에서 만나며 관계가 바뀝니다.</p>
+    {!!relationships?.titles.length&&<label className="relationship-title">
+      대표 칭호
+      <select value={relationships.representative??''} disabled={saving||r.phase==='retired'} onChange={e=>void send({type:'representative-title',id:e.currentTarget.value||null})}>
+        <option value="">선택 안 함</option>
+        {relationships.titles.map(id=><option key={id} value={id}>{RELATIONSHIP_TITLES.get(id)}</option>)}
+      </select>
+    </label>}
     <div className="rival-grid">{RIVALS.map(n=>{
       const progress=competitor(n,r.year,r.week);
-      const newest=EVENTS.filter(e=>e.npc===n.id&&r.events[e.id]).sort((a,b)=>when(b.id)-when(a.id))[0];
+      const episodes=EVENTS.filter(e=>e.npc===n.id&&(r.events[e.id]||choices[e.id])).sort((a,b)=>when(b.id)-when(a.id));
+      const rewards=(n.id==='yu'||n.id==='jun'?Object.values(RELATIONSHIP_REWARDS[n.id]):[]).filter(reward=>relationships?.titles.includes(reward.titleId));
       const relation=r.relations[n.id]??0;
+      const phase=relationshipWith(r,n.id)?.state??'undecided';
+      const hint=r.phase!=='retired'&&relationshipHint(r,n.id);
       return <article className="inner-card rival" key={n.id}>
-        <PixelRider look={n.look}/><strong>{n.name}</strong><Tag>{n.style} · {STYLE_NAMES[n.tactic]}</Tag>
+        <PixelRider look={n.look}/><strong>{n.name} <small>· {n.age}세</small></strong><Tag>{n.style} · {STYLE_NAMES[n.tactic]}</Tag>
         <p>{n.personality}</p><p>{n.line}</p>
         <p>{n.spots.map(spot=>LOCATIONS[spot].name).join(' · ')}</p>
         <p>주력 기술 {SKILL[n.signature]?.name} · 습득 {Object.keys(progress.skills).length}개</p>
-        <div className="skill-track"><span>관계 · {newest?.kind??'아직 대화 기록 없음'}</span><b>{relation}</b></div>
+        <div className="skill-track"><span>{RELATIONSHIP_NAMES[phase]}</span><b>관계도 {relation}</b></div>
         <div className="bar"><span style={{width:relation+'%',background:n.color}}/></div>
-        {newest&&<small>{newest.title}</small>}
+        {hint&&<p className="relationship-hint">{hint}</p>}
+        {rewards.map(reward=><div className="relationship-reward" key={reward.titleId}>
+          <Tag kind="lime"><Medal size={13}/> {reward.title}</Tag><small>{ITEM.get(reward.item)?.name}</small>
+        </div>)}
+        {!!episodes.length&&<details className="past-meets relationship-episodes">
+          <summary>개인 에피소드 {episodes.length}개 <ChevronDown size={14}/></summary>
+          <ul className="hall-history">{episodes.map(episode=>{
+            const choice=choices[episode.id],outcome=choice&&episode.choices[choice.index];
+            return <li key={episode.id}>
+              <b>{choice&&<>{choice.year}년차 {choice.week}주 · </>}{episode.title}</b>
+              {outcome&&<span>{outcome.label}</span>}{outcome?.dialogue&&<span>{outcome.dialogue}</span>}
+            </li>;
+          })}</ul>
+        </details>}
       </article>;
     })}</div>
   </section>;
@@ -157,6 +182,7 @@ function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNod
   const peak=peakSeasonRP(rp);
   const earned=a.honors??honors(a);
   const ending=a.ending??chooseEnding(a);
+  const title=representativeTitle(a);
   const time=(a.year-1)*RULES.weeks+a.week;
   const history=a.extras?.timeline??[];
   const choices=EVENTS.flatMap(event=>{
@@ -172,7 +198,7 @@ function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNod
   return <article className="archive-card">
     <div className="archive-cover">
       <PixelRider look={equippedLook(a)} label={a.name+' 은퇴 당시 외형'}/>
-      <div><Tag kind={a.reason==='complete'?'lime':'muted'}>{a.reason==='complete'?'8년 완주':'조기 은퇴'}</Tag><h3>{a.name}</h3><p>{endingName(ending)}</p>
+      <div><Tag kind={a.reason==='complete'?'lime':'muted'}>{a.reason==='complete'?'8년 완주':'조기 은퇴'}</Tag><h3>{a.name}</h3><p>{endingName(ending)}{title&&' · '+title}</p>
       <small>{a.year}년차 {a.week}주 은퇴 · 활동 {time}주 · 명성 {a.fame.toLocaleString('ko-KR')}</small></div>
     </div>
     <div className="archive-achievements">
@@ -192,6 +218,8 @@ function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNod
       <h4>기술과 숙련도</h4>
       <div className="pill-row">{summary.learned.map(skill=><Tag key={skill.id}>{skill.name} {a.skills[skill.id].mastery}%</Tag>)}</div>
       {relationships.length>0&&<><h4>라이벌</h4><div className="pill-row">{relationships.map(rival=><Tag key={rival.id}>{rival.name} 관계 {a.relations[rival.id]??0}</Tag>)}</div></>}
+      <RelationshipEpilogues archive={a}/>
+      {!!a.extras?.relationships?.titles.length&&<><h4>관계 칭호</h4><div className="pill-row">{a.extras.relationships.titles.map(id=><Tag key={id}>{RELATIONSHIP_TITLES.get(id)}</Tag>)}</div></>}
       <h4>통산 종목별 RP</h4><RPDisciplines points={rp.disciplines}/>
       {years.length>0&&<><h4>연차별 성장과 대회</h4>{years.map(year=>{
         const season=a.seasons.find(item=>item.year===year);

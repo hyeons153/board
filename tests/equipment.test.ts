@@ -17,9 +17,10 @@ function give(c:Career,ids:string[]){for(const id of ids){const r=c.rider!;r.ext
 function equip(c:Career,id:string){command(c,{type:'trade',operation:'equip',item:id},identity);}
 const week=(c:Career,plan:Plan)=>{c.rider!.week=3;c.rider!.phase='plan';command(c,{type:'plan',plan},identity);assert.ok(processWeek(c));};
 
-test('catalog seeds exactly 22 base items and 30 accessories with stable IDs and slot-specific stats',()=>{
+test('catalog preserves the 22 base items, 30 original accessories and six additional relationship gifts',()=>{
   assert.equal(NEW_GEAR.filter(item=>item.slot!=='accessory').length,22);
-  assert.equal(NEW_GEAR.filter(item=>item.slot==='accessory').length,30);
+  assert.equal(NEW_GEAR.filter(item=>item.slot==='accessory'&&item.unlock!=='relationship').length,30);
+  assert.equal(NEW_GEAR.filter(item=>item.slot==='accessory'&&item.unlock==='relationship').length,6);
   assert.equal(new Set(GEAR.map(item=>item.id)).size,GEAR.length);
   assert.equal(ITEM.get('deck_008')!.price,3200000);assert.equal(ITEM.get('truck_007')!.stats.carve,7);assert.equal(ITEM.get('wheel_007')!.stats.speed,7);
   for(const item of NEW_GEAR){
@@ -88,11 +89,13 @@ test('training previews and real actions share cost, growth, mastery, recovery a
   assert.ok(mr.skills.cross.mastery-20>=estimate.skill!.min-.0001);assert.ok(mr.skills.cross.mastery-20<=estimate.skill!.max+.0001);
 });
 
-test('current competitions use base+gear once; cosmetic accessories do not affect scores; proofs retain base inputs',()=>{
+test('competition scores use stat gear once and ignore cosmetic and relationship mastery accessories',()=>{
   const c=career(),r=c.rider!;for(const skill of SKILLS)r.skills[skill.id]={study:100,mastery:55};
   const ids=['peter-pan','cross','step-180','peter-pan','cross','step-180'];
   const original=simulateRun(r,'dance',ids,()=>.1);
   give(c,['acc_014']);equip(c,'acc_014');assert.deepEqual(simulateRun(r,'dance',ids,()=>.1),original);
+  give(c,['acc_yu_friend','acc_jun_rival']);equip(c,'acc_yu_friend');equip(c,'acc_jun_rival');
+  assert.deepEqual(simulateRun(r,'dance',ids,()=>.1),original);
   give(c,['truck_007','wheel_007','deck_008']);equip(c,'truck_007');equip(c,'wheel_007');equip(c,'deck_008');
   const improved=simulateRun(r,'dance',ids,()=>.1);assert.ok(improved.parts.carve!>original.parts.carve!);assert.ok(improved.parts.speed!>original.parts.speed!);
   const meet=simulateMeet(r,CALENDAR[0],['dance'],true).results[0];assert.equal(meet.proof!.rules,3);assert.deepEqual(meet.proof!.stats,r.stats);

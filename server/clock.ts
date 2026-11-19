@@ -1,11 +1,13 @@
 import { command, currentMeet, divisionFor, GameError, prepareWeek, processWeek, singleEntry, validateAutoEntries } from '../src/game/career.js';
 import { extras } from '../src/game/economy.js';
 import { AUTO_FLOW, RULES } from '../src/game/data.js';
+import { eventFor } from '../src/game/events.js';
 import type { Career, EventOutcome, GameAction, TrainingSetup } from '../src/game/types.js';
 
 export type Save = { format:1; career:Career; clock:{credit:number; stamp:number; tabs:Record<string,number>; readyAt?:number; fastForward?:boolean; pendingChoice?:string; pendingMeet?:string; pendingTraining?:string; pendingEvent?:EventOutcome; trainingSetup?:TrainingSetup; stateVersion?:number; background?:{tab:string;at:number}} };
 export const blankSave=():Save=>({format:1,career:{rider:null,hall:[]},clock:{credit:0,stamp:0,tabs:{}}});
 export const remaining=(save:Save,weekMs:number,now=Date.now())=>!save.clock.pendingChoice&&!save.clock.pendingEvent&&!save.clock.pendingMeet&&!save.clock.pendingTraining&&save.career.rider?.phase==='plan'&&!!save.career.rider.plan?Math.max(0,(save.clock.readyAt??now+weekMs)-now):0;
+const awaitingDecision=(rider:Save['career']['rider'])=>rider?.phase==='event'&&eventFor(rider,rider.event??'')?.decision;
 
 export function advance(prev:Save,a:GameAction,tab:string,now:number,weekMs:number,identity:()=>{id:string;seed:number},official=false,account=false):Save {
   const run=(save:Save,action:GameAction,time:number)=>advanceOne(save,action,tab,time,weekMs,identity,official,account);
@@ -49,13 +51,14 @@ function backgroundDeadline(save:Save,now:number){
     const runMs=AUTO_FLOW.entryMs+RULES.runSeconds*1000+AUTO_FLOW.exitMs+AUTO_FLOW.ceremonyMs;
     return now+(runs?runs*runMs:AUTO_FLOW.resultMs);
   }
-  if(!rider||rider.phase==='retired')return undefined;
+  if(!rider||rider.phase==='retired'||awaitingDecision(rider))return undefined;
   if(clock.pendingChoice)return now+AUTO_FLOW.choiceMs;
   return Math.max(now,clock.readyAt??now);
 }
 
 function advanceOne(prev:Save,a:GameAction,tab:string,now:number,weekMs:number,identity:()=>{id:string;seed:number},official:boolean,account:boolean):Save {
   if(a.type==='settings')validateAutoEntries(a.settings);
+  if(a.type==='pulse'&&awaitingDecision(prev.career.rider))return prev;
   if(a.type==='pulse'&&(prev.clock.pendingTraining||prev.clock.pendingEvent||prev.clock.pendingMeet||prev.clock.pendingChoice||prev.career.rider?.phase==='retired'||(prev.clock.readyAt!==undefined&&prev.clock.readyAt>now)||(prev.career.rider?.phase==='plan'&&!prev.career.rider.plan&&prev.career.rider.settings.mode==='manual')))return prev;
   const next=structuredClone(prev),r=next.career.rider,clock=next.clock;
   if(r){r.settings.entries=singleEntry(r.settings.entries);if(r.entries&&!currentMeet(r)?.international)r.entries=singleEntry(r.entries);}
@@ -73,7 +76,7 @@ function advanceOne(prev:Save,a:GameAction,tab:string,now:number,weekMs:number,i
     }else {clock.readyAt=now+weekMs;snapshotTraining();}
   };
   // Management updates do not acknowledge a story or advance the weekly clock.
-  if(['trade','unequip','sponsor','makeover','claim-gear','routine'].includes(a.type)){
+  if(['trade','unequip','sponsor','makeover','claim-gear','routine','representative-title'].includes(a.type)){
     if(r?.plan&&!clock.pendingChoice&&!clock.trainingSetup)snapshotTraining();
     command(next.career,a,identity,official,account);return revise();
   }
@@ -121,7 +124,7 @@ function advanceOne(prev:Save,a:GameAction,tab:string,now:number,weekMs:number,i
   if(rider?.settings.mode==='auto'){
     Object.assign(rider.settings,{pauseStory:false,pauseMeet:false,pauseInjury:false});
     if(rider.phase==='injury')command(next.career,{type:'resume'},identity,official,account);
-    else if(rider.phase==='event'||rider.phase==='meet')command(next.career,{type:'settings',settings:rider.settings},identity,official,account);
+    else if(rider.phase==='event'&&!awaitingDecision(rider)||rider.phase==='meet')command(next.career,{type:'settings',settings:rider.settings},identity,official,account);
   }
   const newMeet=holdMeet();holdEvent();
   if(clock.pendingEvent){delete clock.readyAt;return revise();}

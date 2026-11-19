@@ -150,7 +150,7 @@ export default function App(){
     else if(screen==='workshop')content=<Workshop r={r} send={game.send} saving={game.saving}
       lookDraft={lookDraft?.rider===r.id?lookDraft.value:undefined} onLookDraft={value=>setLookDraft({rider:r.id,value})}/>;
     else if(screen==='profile')content=<Profile r={r} send={game.send} saving={game.saving||busyFlow} onNew={()=>go('new',true)} onHall={()=>go('hall',true)}/>;
-    else if(screen==='rivals')content=<Rivals r={r}/>;
+    else if(screen==='rivals')content=<Rivals r={r} send={game.send} saving={game.saving}/>;
     else if(screen==='journal')content=<div className="console-journal"><NewsCard r={{...r,news:r.news.slice(0,100)}}/>{r.news.slice(5).map((note,i)=><p key={i}><b>{note.year}년차 {note.week}주</b> {lineTerms(note.text)}</p>)}</div>;
   }
   return <div className="console-page"><main className="game-console" aria-label="롱보더 키우기">

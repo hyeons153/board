@@ -11,11 +11,11 @@ const choice = (label:EventDef['choices'][number]['label'],effect:EventDef['choi
 
 export const EXTRA_EVENTS: EventDef[] = [
   {id:'yu-open-final',kind:'라이벌 결말',npc:'yu',title:'바퀴 소리로 남은 박자',body:'유리가 예전 합동 영상의 소리를 재생했다. 오픈부 관중석 뒤에서도 둘은 같은 타이밍에 웃었다.',
-    story:true,important:true,when:r=>r.year>=6&&r.week===25&&!!r.events['yu-rematch'],choices:[
+    story:true,important:true,when:r=>(r.year>6||r.year===6&&r.week>=25)&&!!r.events['yu-rematch'],choices:[
       choice('마지막 연계를 함께 맞춘다',{relation:12,stat:'link',gain:2},'dance','freestyle'),
       choice('각자의 라인으로 답한다',{relation:9,fame:6},'balanced','trick')]},
   {id:'jun-open-final',kind:'라이벌 결말',npc:'jun',title:'편집 없이 남긴 영상',body:'준이 오늘 영상은 앞뒤를 하나도 자르지 않겠다고 했다. 그동안의 실패가 없었다면 첫 장면도 없었다고.',
-    story:true,important:true,when:r=>r.year>=7&&r.week===46&&!!r.events['jun-jam'],choices:[
+    story:true,important:true,when:r=>(r.year>7||r.year===7&&r.week>=46)&&!!r.events['jun-jam'],choices:[
       choice('다음 세대에게 영상부터 건넨다',{relation:13,fame:5},'trick','freestyle'),
       choice('카메라를 내려놓고 함께 탄다',{relation:9,energy:14},'balanced','dance')]},
   {id:'harin-lap',kind:'첫 만남',npc:'ha',title:'강변의 메트로놈',body:'하린은 보이지 않는 박자에 발을 맞춘다. 손목시계에서는 러닝 알림이 울린다.',when:r=>r.week>=3&&r.spot==='river',choices:[
@@ -48,7 +48,7 @@ export const EXTRA_EVENTS: EventDef[] = [
   {id:'yu-film',kind:'라이벌',npc:'yu',title:'박자가 다른 두 사람',body:'유리는 안무를 맞췄지만 네가 고른 박자를 다시 듣고 싶어 한다.',story:true,important:true,when:r=>r.week>=17&&!!r.events['mango-lesson']&&r.spot==='river',choices:[
     choice('다른 템포로 대결하자고 한다',{relation:11,fame:4,stat:'link',gain:2},'dance','freestyle'),
     choice('두 가지 버전으로 합동 영상을 찍는다',{relation:8,money:18_000},'balanced','trick')]},
-  {id:'yu-rematch',kind:'대회 재회',npc:'yu',title:'그때와 다른 박자',body:'유리는 예전의 대결 영상을 휴대폰에 남겨 두었다. 다음 시합에서는 네 템포에 먼저 맞춰 보겠다고 한다.',story:true,important:true,when:r=>r.year>=2&&weekOfMeet(r)&&chosen(r,'yu-film',0),choices:[
+  {id:'yu-rematch',kind:'대회 재회',npc:'yu',title:'그때와 다른 박자',body:'유리는 예전의 대결 영상을 휴대폰에 남겨 두었다. 다음 시합에서는 네 템포에 먼저 맞춰 보겠다고 한다.',story:true,important:true,when:r=>r.year>=2&&(weekOfMeet(r)||r.records.some(meet=>meet.year===r.year))&&chosen(r,'yu-film',0),choices:[
     choice('같은 스텝으로 결승에서 만난다',{relation:14,fame:6},'dance','freestyle'),
     choice('서로 다른 첫 기술을 약속한다',{relation:9,energy:15},'balanced','trick')]},
   {id:'jun-jam',kind:'라이벌 선언',npc:'jun',title:'일곱 번째 착지',body:'준은 폴더 이름을 실패에서 라이벌전으로 바꿨다. 다음 파일은 네가 먼저 찍어 달라고 한다.',story:true,important:true,when:r=>r.week>=16&&r.spot==='night'&&!!r.events['juns-clip'],choices:[
@@ -60,7 +60,7 @@ export const EXTRA_EVENTS: EventDef[] = [
   {id:'sol-arena',kind:'대회 전',npc:'sol',title:'결승까지 남은 60초',body:'솔이 시작선을 턱으로 가리킨다. 오늘은 네가 라인의 첫 기술을 고를 차례다.',when:r=>r.spot==='arena'&&placed(r),choices:[
     choice('첫 기술 이후 전환을 연습한다',{stat:'link',gain:4,energy:-4,relation:8},'freestyle','dance'),
     choice('호흡부터 고르고 출발한다',{energy:15,relation:5},'balanced','trick')]},
-  {id:'sol-veteran',kind:'경력',npc:'sol',title:'새 번호표, 낡은 보드',body:'솔은 새 선수 이름을 네게 먼저 물어본다. 이제 네가 그들을 처음 맞이할 차례인지도 모른다.',story:true,when:r=>r.year>=3&&r.week<=3,choices:[
+  {id:'sol-veteran',kind:'경력',npc:'sol',title:'새 번호표, 낡은 보드',body:'솔은 새 선수 이름을 네게 먼저 물어본다. 이제 네가 그들을 처음 맞이할 차례인지도 모른다.',story:true,when:r=>r.year>=3,choices:[
     choice('처음 타는 선수와 연습한다',{relation:9,fame:5,stat:'balance',gain:2},'balanced','dance'),
     choice('오픈부 라인을 보여 준다',{relation:7,fame:7,energy:-4},'freestyle','trick')]},
   {id:'snack-run',kind:'일상',title:'편의점 봉지의 무게',body:'두 손 가득 간식을 샀더니 보드를 잡을 손이 사라졌다. 보드보다 새우깡이 먼저 출발한다.',when:r=>r.spot==='plaza'||r.spot==='night',choices:[

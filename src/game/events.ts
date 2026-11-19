@@ -1,12 +1,13 @@
-import { SKILL } from './data.js';
+import { RULES, SKILL } from './data.js';
 import { RIVAL } from './content.js';
-import { equipmentEvents as itemEvents, extras, gearBonuses } from './economy.js';
+import { equipmentEvents as itemEvents, extras, freshExtras, gearBonuses } from './economy.js';
 import { EXTRA_EVENTS } from './extraEvents.js';
+import { RELATIONSHIP_EVENTS, relationshipChoiceAvailable, type RelationshipChoice } from './relationships.js';
 import type { Family, Rider, Stat, Strategy } from './types.js';
 
 type Effect = { energy?:number; money?:number; fame?:number; relation?:number; skill?:string; study?:number; stat?:Stat; gain?:number; item?:string };
-type Choice = { label:string; effect:Effect; tags:Strategy[] };
-export type EventDef = { id:string; kind:string; title:string; body:string; npc?:string; story?:boolean; important?:boolean; repeat?:boolean; special?:boolean; when:(r:Rider)=>boolean; choices:Choice[] };
+type Choice = { label:string; effect:Effect; tags:Strategy[]; dialogue?:string; relationship?:RelationshipChoice };
+export type EventDef = { id:string; kind:string; title:string; body:string|((r:Rider)=>string); npc?:string; story?:boolean; important?:boolean; decision?:boolean; repeat?:boolean; special?:boolean; when:(r:Rider)=>boolean; choices:Choice[] };
 const option=(label:string,effect:Effect,...tags:Strategy[]):Choice=>({label,effect,tags});
 export const EVENTS:EventDef[] = [
   {id:'crew-sticker',kind:'장비 선물',npc:'sol',title:'떼어도 남는 응원',body:'선배가 낡은 스티커를 건넸다. 접힌 귀퉁이마다 함께 탄 날의 흔적이 남아 있다.',story:true,when:r=>r.week>=8&&Math.max(0,...Object.values(r.relations))>=15,choices:[
@@ -17,13 +18,13 @@ export const EVENTS:EventDef[] = [
   {id:'cactus-groove',kind:'선인장 잼',title:'박자가 조금 달라도',body:'내 스텝은 엇박인데 선인장은 당당하게 춤춘다. 누구도 음악을 끄지 않았다.',repeat:true,special:true,when:r=>itemEvents(r).includes('cactus-groove'),choices:[option('같이 스텝을 밟는다',{stat:'carve',gain:2,energy:4},'dance','freestyle'),option('작은 무대의 관객이 된다',{energy:10,fame:1},'balanced','trick')]},
   {id:'snail-day',kind:'느긋한 오후',title:'빠르지 않아도 한 바퀴',body:'달팽이는 한 바퀴를 다 돌 때까지 풍경을 놓치지 않았다. 오늘만큼은 기록계도 쉬어 간다.',repeat:true,special:true,when:r=>itemEvents(r).includes('snail-day'),choices:[option('달팽이 속도로 스팟을 돈다',{energy:10},'balanced','dance'),option('가장 좋아하는 코너를 알려 준다',{stat:'carve',gain:2},'trick','freestyle')]},
   {id:'scarf-epilogue',kind:'라이벌 후속 이야기',npc:'yu',title:'빨간 선을 따라',body:'새 라이더가 머플러를 보고 길을 물었다. 유리는 오늘은 네가 먼저 설명해 보라고 눈짓했다.',story:true,important:true,when:r=>r.year>=6&&itemEvents(r).includes('scarf-epilogue'),choices:[option('첫 발부터 함께 연습한다',{relation:10,fame:4},'dance','balanced'),option('서로 다른 라인을 하나로 잇는다',{relation:8,stat:'link',gain:3},'trick','freestyle')]},
-  {id:'first',kind:'성장',title:'강바람의 첫인사',body:'유리가 네 보드에 붙은 가격표를 떼 주었다. “첫 연습이지? 넘어지면 강물 탓 하면 돼.”',npc:'yu',story:true,when:r=>r.year===1&&r.week===1,choices:[
+  {id:'first',kind:'성장',title:'강바람의 첫인사',body:'유리가 네 보드에 붙은 가격표를 떼 주었다. “첫 연습이지? 넘어지면 강물 탓 하면 돼.”',npc:'yu',story:true,when:r=>r.year===1,choices:[
     option('함께 스텝을 맞춰 본다',{skill:'mango',study:42,energy:-4,relation:8},'dance','freestyle'),
     option('균형 잡는 요령을 묻는다',{stat:'balance',gain:3,relation:4},'balanced','trick')]},
   {id:'juns-clip',kind:'기술 습득',title:'강준의 3초 영상',body:'준이 착지 장면만 슬로모션으로 반복한다. 화면 밖에서 들리는 비명은 못 들은 척해 주자.',npc:'jun',story:true,when:r=>r.week>=3&&r.spot==='plaza',choices:[
     option('프론트 팝의 자세를 따라 한다',{skill:'front-pop',study:100,energy:-7,relation:8},'trick','freestyle'),
     option('링크만 받아 저장한다',{relation:3,stat:'link',gain:2},'balanced','dance')]},
-  {id:'registration',kind:'대회',title:'처음 받아 본 번호표',body:'첫 대회 접수처에서 담당자가 이름을 세 번 확인했다. 손이 떨리는 건 커피 때문일 거다.',npc:'sol',story:true,when:r=>r.year===1&&r.week===7,choices:[
+  {id:'registration',kind:'대회',title:'처음 받아 본 번호표',body:'첫 대회 번호표를 쥐니 접수처에서 이름을 세 번 확인하던 일이 떠오른다. 손이 떨리는 건 커피 때문일 거다.',npc:'sol',story:true,when:r=>r.year===1&&r.week>=7,choices:[
     option('솔과 스트레칭을 한다',{energy:14,relation:4},'balanced','dance','freestyle'),
     option('번호표 사진을 올린다',{fame:4,relation:1},'trick')]},
   {id:'overtime',kind:'일상',title:'부장님의 금요일',body:'퇴근 5분 전, “잠깐 회의하자”는 메시지가 왔다. 스팟 단톡에는 벌써 여섯 명이 모였다.',repeat:true,when:r=>r.week>1,choices:[
@@ -48,11 +49,15 @@ export const EVENTS:EventDef[] = [
     option('두 잔 마시고 잠깐 쉰다',{energy:17,relation:5},'balanced','dance'),
     option('한 바퀴 더 돌고 오기로 한다',{stat:'carve',gain:3,relation:4,energy:-6},'trick','freestyle')]},
   ...EXTRA_EVENTS,
+  ...RELATIONSHIP_EVENTS,
 ];
 export const EVENT = Object.fromEntries(EVENTS.map(e=>[e.id,e])) as Record<string,EventDef|undefined>;
 export const canStudy=(r:Rider,id:string)=>SKILL[id]?.requires.every(pre=>(r.skills[pre]?.study??0)>=100)??false;
 export const eventNpc=(e:EventDef,r?:Rider)=>e.npc==='mentor'?r?.mentor:e.npc?RIVAL.get(e.npc):undefined;
-export const eventPaused=(r:Rider,e:EventDef)=>r.settings.mode==='manual'||!!(r.settings.pauseStory&&e.important);
+export const eventPaused=(r:Rider,e:EventDef)=>e.decision||r.settings.mode==='manual'||!!(r.settings.pauseStory&&e.important);
+export const eventBody=(r:Rider,e:EventDef)=>typeof e.body==='string'?e.body:e.body(r);
+export const eventChoiceAvailable=(r:Rider,e:EventDef,index:number)=>
+  relationshipChoiceAvailable(r,e.npc,e.choices[index]?.relationship?.state);
 function mentorEvents(r:Rider):EventDef[]{
   const mentor=r.mentor;
   if(!mentor) return [];
@@ -76,11 +81,18 @@ export function pickEvent(r:Rider,rng:()=>number) {
   const choices=extras(r).choices;
   const eligible=[...EVENTS,...mentorEvents(r)].filter(e=>{
     const last=choices[e.id];
-    const cooldown=last ? (r.year-last.year)*52+r.week-last.week : Infinity;
+    const cooldown=last ? (r.year-last.year)*RULES.weeks+r.week-last.week : Infinity;
     return (!r.events[e.id]||(e.repeat&&cooldown>=8))&&e.when(r);
   });
-  const story=eligible.find(e=>e.story);
-  if(story) return story;
+  const stories=eligible.filter(e=>e.story);
+  if(stories.length){
+    const progress=r.extras??=freshExtras();
+    const ready=progress.storyReadyAt??={};
+    const now=(r.year-1)*RULES.weeks+r.week;
+    for(const story of stories)ready[story.id]??=now;
+    const recent=progress.lastEvent?.npc;
+    return stories.sort((a,b)=>ready[a.id]!-ready[b.id]!||Number(!!recent&&a.npc===recent)-Number(!!recent&&b.npc===recent))[0];
+  }
   const fresh=eligible.filter(e=>!r.events[e.id]);
   const pool=fresh.length?fresh:eligible;
   const effects=gearBonuses(r);

@@ -152,6 +152,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .rival .pixel-rider { border: 1px solid #dad6e8; background: #eae6f5; border-radius: 10px; }
 .rival strong { font-size: 1rem; }
 .rival p { min-height: 0; }
+.rival-grid { align-items: start; }
+.rival > strong > small { color: #526755; font-size: .73rem; font-weight: 600; }
+.relationship-title { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; margin-bottom:.85rem; font-size:.85rem; font-weight:700; }
+.relationship-title select { min-height:42px; max-width:100%; }
+.rival .relationship-hint { margin:.3rem 0; padding:.45rem .55rem; border-radius:6px; background:#e8efdf; color:#314b38; }
+.relationship-reward { display:flex; align-items:center; flex-wrap:wrap; gap:.4rem; margin-top:.2rem; }
+.relationship-episodes { margin-top:.35rem; min-width:0; }
+.relationship-episodes > summary { min-height:42px; }
+.relationship-episodes .hall-history { margin:.35rem 0; }
+.relationship-episodes .hall-history li { display:grid; gap:.2rem; overflow-wrap:anywhere; }
+.relationship-epilogue > div { margin-top:.45rem; }
+.relationship-epilogue p { margin:.2rem 0 .45rem; }
+.relationship-choice-lock { display:block; margin-top:.2rem; font-size:.75em; }
 .record-table { overflow-x: auto; }
 .record-table table { width: 100%; min-width: 470px; border-collapse: collapse; text-align: left; font-size: .86rem; }
 .record-table th, .record-table td { padding: .58rem; border-bottom: 1px solid #ded9cd; }

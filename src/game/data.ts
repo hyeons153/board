@@ -91,6 +91,7 @@ export const LOCATIONS = {
   studio:{ name:'실내 연습장', en:'INDOOR STUDIO', detail:'날씨 걱정 없이 지정 기술을 연습하는 곳.', boosted:['dance','trick'], boost:1.15, risk:.7, npc:'sol' },
   night:{ name:'야간 광장', en:'NEON PLAZA', detail:'노아와 준의 심야 잼. 고급 댄싱과 트릭을 깊게 파고들 수 있어요.', boosted:['dance','trick'], boost:1.35, risk:1.18, npc:'noa' },
   arena:{ name:'대회 연습장', en:'WARM-UP ARENA', detail:'대회 바닥에서 기술 사이의 연계를 집중적으로 점검해요.', boosted:['link'], boost:1.25, risk:.82, npc:'min' },
+  rooftop:{ name:'노을 옥상', en:'SUNSET ROOFTOP', detail:'크루가 번갈아 라인을 타는 도심 옥상. 해 질 녘 발소리가 멀리 퍼져요.', boosted:['dance','trick'], boost:1.15, risk:.9, npc:'yu' },
 } satisfies Record<Spot,{name:string; en:string; detail:string; boosted:Action[]; boost:number; risk:number; npc:string}>;
 
 export const CALENDAR:Meet[] = [

@@ -1,4 +1,4 @@
-import { newRider, processWeek } from '../src/game/career';
+import { command, newRider, processWeek } from '../src/game/career';
 import { DEFAULT_LOOK, RULES } from '../src/game/data';
 import { chooseEnding, summarize } from '../src/game/legacy';
 import { DISCIPLINES, STATS, STRATEGIES, type Career } from '../src/game/types';
@@ -15,6 +15,8 @@ for(const strategy of STRATEGIES){
     rider.settings={mode:'auto',strategy,entries:[strategy==='balanced'?'dance':strategy]};
     for(let week=0;week<RULES.weeks*RULES.years;week++){
       if(!processWeek(career)) throw new Error('Automatic progression stalled on seed '+seed);
+      // This batch run measures competition balance using the friendship choices.
+      if(rider.phase==='event'&&rider.event)command(career,{type:'event',eventId:rider.event,index:0},()=>({id:rider.id,seed}));
     }
     const [archive]=career.hall;
     if(!archive||archive.records.length!==48||!archive.records.every(meet=>meet.id.startsWith('international-')?meet.results.length===3:meet.results.length<=1)) throw new Error('Incomplete retirement ledger');

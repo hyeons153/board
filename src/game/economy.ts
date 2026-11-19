@@ -1,4 +1,4 @@
-import type { Discipline, Look, Result, Rider } from './types.js';
+import type { Discipline, Look, RelationshipHistory, Result, Rider } from './types.js';
 
 import { BASIC_SLOTS, GEAR, GEAR_SLOTS, ITEM, LEGACY_BONUSES, PREVIOUS_PRICES, STARTER_IDS, type Effects, type Gear, type GearSlot } from './equipmentCatalog.js';
 import { STATS, type Stats } from './types.js';
@@ -32,6 +32,8 @@ export type CareerExtras = {
   signedYear: number;
   achievements: string[];
   choices: Record<string, { index:number; year:number; week:number }>;
+  relationships?:RelationshipHistory;
+  storyReadyAt?:Partial<Record<string,number>>;
   timeline: { year:number; week:number; title:string; text:string }[];
   lastEvent?:import('./types.js').EventOutcome;
   lastTraining?: { reaction?:string; grade:'success'|'great'|'learned'|'mastery'|'miss'|'injury'|'recovery'; text:string; narration?:string; changes?:string[]; skill?:string; year:number; week:number };
@@ -95,13 +97,14 @@ export function effectiveStats(rider:Pick<Rider,'stats'|'extras'>):Stats{
   const bonus=equipmentStats(rider);return Object.fromEntries(STATS.map(stat=>[stat,round(rider.stats[stat]+bonus[stat])])) as Stats;
 }
 export function equipmentUnlocked(rider:Rider,item:Gear):boolean{
+  if(item.unlock==='relationship')return extras(rider).inventory.includes(item.id);
   const wins=rider.records.flatMap(meet=>meet.results).filter(result=>playerPlace(result)===1).length;
   if(!item.unlock)return true;
   if(item.unlock==='win')return wins>=1;
   if(item.unlock==='rainbow')return rider.year>=4&&wins>=6;
   return !!rider.events[item.unlock==='sticker'?'crew-sticker':'red-scarf'];
 }
-export const unlockText=(item:Gear)=>item.unlock==='win'?'첫 우승 달성':item.unlock==='rainbow'?'4년차 이상 · 통산 6승':item.unlock==='sticker'?'선배 스티커 이벤트':item.unlock==='scarf'?'빨간 머플러 이벤트':'구매 가능';
+export const unlockText=(item:Gear)=>item.unlock==='win'?'첫 우승 달성':item.unlock==='rainbow'?'4년차 이상 · 통산 6승':item.unlock==='sticker'?'선배 스티커 이벤트':item.unlock==='scarf'?'빨간 머플러 이벤트':item.unlock==='relationship'?'라이벌 개인 에피소드 보상':'구매 가능';
 export function unlockEquipment(rider:Rider){
   const progress=rider.extras??=freshExtras();
   for(const item of GEAR.filter(item=>item.unlock==='win'||item.unlock==='rainbow'))if(equipmentUnlocked(rider,item)&&!progress.inventory.includes(item.id)){

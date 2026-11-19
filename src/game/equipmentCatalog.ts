@@ -9,7 +9,7 @@ export type Rarity=typeof RARITIES[number];
 export const RARITY_NAMES={common:'일반',rare:'희귀',epic:'영웅',legendary:'전설'};
 export type Visual='helmet'|'knees'|'wrists'|'pouch'|'bottle'|'tape'|'dance-note'|'trick-note'|'metronome'|'headphones'|'bearing'|'laces'|'glasses'|'headband'|'camera'|'whistle'|'cloth'|'crown'|'clover'|'invitation'|'sticker'|'duck'|'cactus'|'scarf'|'led'|'pinwheel'|'chick'|'disco'|'snail'|'rainbow';
 export type Effects={injury:number;cost:number;rest:number;minorRecovery:number;danceMastery:number;trickMastery:number;linkGrowth:number;danceLink:number;discovery:number;great:number;podiumFame:number;fame:number;prize:number;entryEnergy:number;eventChance:number;specialWeight:number;relation:number;trickLand:number;practice:number;fatigue:number;carve:number;speed:number};
-export type Gear={id:string;slot:GearSlot;name:string;price:number;rarity:Rarity;description:string;stats:Partial<Record<Stat,number>>;effects:Partial<Effects>;visual?:Visual;event?:string;unlock?:'win'|'rainbow'|'sticker'|'scarf';legacy?:boolean;design?:number;shape?:number;color?:number;partColor?:string;wheelSize?:number};
+export type Gear={id:string;slot:GearSlot;name:string;price:number;rarity:Rarity;description:string;stats:Partial<Record<Stat,number>>;effects:Partial<Effects>;visual?:Visual;event?:string;unlock?:'win'|'rainbow'|'sticker'|'scarf'|'relationship';legacy?:boolean;design?:number;shape?:number;color?:number;partColor?:string;wheelSize?:number};
 const basic=(id:string,slot:BasicSlot,name:string,price:number,stats:Gear['stats'],description:string,appearance:Partial<Gear>):Gear=>({id,slot,name,price,stats,description,rarity:price>=200000?'legendary':price>=80000?'epic':price>=26000?'rare':'common',effects:{},...appearance});
 const accessory=(id:string,name:string,rarity:Rarity,price:number,effects:Gear['effects'],description:string,visual:Visual,extra:Partial<Gear>={}):Gear=>({id,slot:'accessory',name,rarity,price,stats:{},effects,description,visual,...extra});
 export const STARTER_IDS=['deck_001','truck_001','wheel_001'];
@@ -58,6 +58,12 @@ const ORIGINAL_GEAR:Gear[]=[
   accessory('acc_028','디스코볼 키링','rare',28000,{},'대성공한 날에는 혼자서도 작은 파티가 열린다.','disco'),
   accessory('acc_029','달팽이 마스코트','epic',38000,{},'늦은 게 아니라 풍경을 오래 보고 있는 중.','snail',{event:'snail-day'}),
   accessory('acc_030','무지개 오리 헬멧','legendary',0,{},'이걸 쓰고 우승하면 아무도 당신을 잊지 못한다.','rainbow',{unlock:'rainbow'}),
+  accessory('acc_yu_friend','합동 촬영 노트','epic',0,{danceMastery:.04},'강변에서 맞춘 동작을 두 사람의 필체로 기록한 노트.','dance-note',{unlock:'relationship'}),
+  accessory('acc_yu_rival','듀얼 메트로놈','epic',0,{danceMastery:.04},'서로 다른 두 박자를 기억하는 메트로놈.','metronome',{unlock:'relationship'}),
+  accessory('acc_yu_partner','듀엣 키링','epic',0,{danceMastery:.04},'카메라가 꺼진 뒤의 한 바퀴를 기억하는 키링.','disco',{unlock:'relationship'}),
+  accessory('acc_jun_friend','노컷 아카이브 핀','epic',0,{trickMastery:.04},'준과 함께 만든 실패 영상 보관함의 작은 표식.','sticker',{unlock:'relationship'}),
+  accessory('acc_jun_rival','재대결 마커','epic',0,{trickMastery:.04},'다음 승부의 출발선을 표시하는 마커.','led',{unlock:'relationship'}),
+  accessory('acc_jun_partner','필름 스트랩','epic',0,{trickMastery:.04},'준이 처음으로 촬영을 쉬기로 한 날 건네준 스트랩.','camera',{unlock:'relationship'}),
 ];
 
 // These IDs and their original effects are immutable inputs to older competition proofs.

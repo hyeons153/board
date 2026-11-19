@@ -247,7 +247,10 @@ test('verified complete and early careers rank by exact RP from their saved comp
   command(c,{type:'create',name:'Finalist',look:DEFAULT_LOOK},()=>({id:randomUUID(),seed:981}),true,true);
   const rider=c.rider!;
   rider.settings={mode:'auto',strategy:'freestyle',entries:['freestyle']};
-  for(let weeks=0;weeks<416;weeks++) assert.ok(processWeek(c,true));
+  for(let weeks=0;weeks<416;weeks++){
+    assert.ok(processWeek(c,true));
+    if(rider.phase==='event'&&rider.event)command(c,{type:'event',eventId:rider.event,index:0},()=>({id:rider.id,seed:rider.seed}),true,true);
+  }
   const archive=c.hall[0];
   assert.equal(archive.records.length,48);
   assert.equal(archive.records.at(-1)?.id,'international-8');
@@ -257,6 +260,10 @@ test('verified complete and early careers rank by exact RP from their saved comp
   assert.equal(publication.profile.division,'master');
   assert.deepEqual(publication.entries.map(item=>item.metric),['career','dance','trick','freestyle']);
   assert.deepEqual(publicationFor(archive),publication,'The same career reproduces its exact ranking projection');
+  assert.ok(archive.extras?.relationships?.titles.length);
+  const withoutRelationships=structuredClone(archive);
+  delete withoutRelationships.extras!.relationships;
+  assert.deepEqual(publicationFor(withoutRelationships),publication,'Private relationship records have no effect on the public or ranking projection');
   const short=structuredClone(archive);
   short.reason='early';short.year=1;short.week=21;short.seasons=[];
   short.records=short.records.filter(meet=>meet.year===1&&['regular-1','regular-2'].includes(meet.id));
