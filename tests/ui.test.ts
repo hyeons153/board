@@ -122,6 +122,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       await click(menu);assert.equal(win.document.querySelector('.game-console'),frame);assert.ok(win.document.querySelector('.console-panel'));
       if(menu==='기술'){
         assert.equal(win.document.querySelector('.skill-detail'),null);
+        assert.doesNotMatch(win.document.querySelector('.skill-library')!.textContent!,/동작 참고|보드를 타보자/);
         await click('피터팬 상세');
         assert.match(win.document.querySelector('.skill-detail')!.textContent!,/선행 기술|대회 성공률/);
         await click('피터팬 미리보기');
@@ -154,20 +155,36 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.ok([...win.document.querySelectorAll('button')].some(button=>button.textContent?.includes('저장된 구성')&&button.disabled));
     await click('뒤로 가기');await click('메뉴 닫기');
     const speedGauge=win.document.querySelector('.stat-speed');
+    const statusHud=win.document.querySelector('.console-status');
+    const hudCard=(metric:string)=>win.document.querySelector<HTMLButtonElement>('[data-hud-metric="'+metric+'"]')!;
+    const openHud=(metric:string)=>click(hudCard(metric).getAttribute('aria-label')!);
+    const closeHud=async()=>{await act(async()=>{
+      win.document.dispatchEvent(new win.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+    });};
     const selectionSlot=win.document.querySelector('.weekly-selection-slot');
     await click('속도 훈련 선택');
     assert.equal(win.document.querySelector('.weekly-selection-slot'),selectionSlot,'Reserve the same preview area for every selection');
     assert.equal(win.document.querySelector('.stat-speed'),speedGauge,'Forecast must update the existing top gauge');
-    assert.ok(win.document.querySelector('[aria-label="속도 예상 상승"]'));
-    assert.ok(win.document.querySelector('[aria-label="카빙 예상 상승"]'));
+    assert.equal(win.document.querySelector('.hud-popover'),null);
+    assert.ok(speedGauge?.classList.contains('has-projection'));
+    assert.ok(hudCard('carve').classList.contains('has-projection'));
+    await openHud('speed');
+    assert.ok(win.document.querySelector('.hud-popover [aria-label="속도 예상 상승"]'));
+    await openHud('carve');
+    assert.equal(win.document.querySelectorAll('.hud-popover').length,1);
+    assert.equal(win.document.querySelector('[aria-label="속도 예상 상승"]'),null);
+    assert.ok(win.document.querySelector('.hud-popover [aria-label="카빙 예상 상승"]'));
     assert.equal(win.document.querySelector<HTMLMeterElement>('meter[aria-label="속도"]')!.value,18,'A forecast must not change the saved stat');
     assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,8);
     assert.equal(win.document.querySelector('.weekly-preview'),null,'Do not open a second detail panel');
-    assert.match(win.document.querySelector('[aria-label="예상 체력 변화"]')!.textContent!,/100 → 83/);
+    await openHud('energy');
+    assert.match(win.document.querySelector('.hud-popover [aria-label="예상 체력 변화"]')!.textContent!,/100 → 83/);
+    await closeHud();
+    assert.equal(win.document.querySelector('.hud-popover'),null);
     assert.equal(win.document.querySelector('select[aria-label="훈련 강도"]'),null);
     await click('카빙 훈련 선택');
     assert.equal(win.document.querySelector('[aria-label="속도 예상 상승"]'),null);
-    assert.ok(win.document.querySelector('[aria-label="카빙 예상 상승"]'));
+    assert.ok(hudCard('carve').classList.contains('has-projection'));
     await click('선택 취소');
     assert.equal(win.document.querySelector('.status-projection'),null);
     assert.equal(win.document.querySelector('[aria-label="예상 체력 변화"]'),null);
@@ -179,11 +196,15 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.equal(clockRaces,1);assert.equal(win.document.querySelector('[role="alert"]'),null);
     assert.ok(!win.document.querySelector('.console-panel'));
     assert.ok(win.document.querySelector('[aria-label="행동 진행"]'));
+    assert.equal(win.document.querySelector('.console-status'),statusHud,'HUD stays mounted when training starts');
+    assert.equal(win.document.querySelector('.console-training-area')?.classList.contains('is-scene-hud'),false);
     await click('상점');assert.ok(win.document.querySelector('.equipment-panel'));
     await settle(2400);
     assert.ok(win.document.querySelector('.equipment-panel'),'Background completion must not close the equipment menu');
     await click('메뉴 닫기');
     assert.ok(win.document.querySelector('[aria-labelledby="training-outcome-title"]'));
+    assert.equal(win.document.querySelector('.console-status'),statusHud,'Training results reuse the same HUD');
+    assert.equal(win.document.querySelector('.console-training-area')?.classList.contains('is-scene-hud'),false);
     await click('계속');
     const event=win.document.querySelector('[aria-label="이벤트 선택"]');assert.ok(event);
     const choice=event.querySelector<HTMLButtonElement>('button')!;
@@ -198,7 +219,9 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await click('계속');
     assert.match(win.document.querySelector('.console-rider')!.textContent!,/2주/);
     await click('휴식 선택');
-    assert.ok(win.document.querySelector('[aria-label="예상 체력 변화"]'));
+    await openHud('energy');
+    assert.ok(win.document.querySelector('.hud-popover [aria-label="예상 체력 변화"]'));
+    await closeHud();
     assert.equal(win.document.querySelector('.status-projection'),null,'Rest should preview stamina instead of stat growth');
     await click('선택 취소');await click('속도 훈련 선택');injectChoice=true;
     await click('확인');
@@ -272,6 +295,8 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       assert.equal(win.document.querySelector('[aria-label="대회 스킵"]')?.textContent?.includes('스킵'),true);
       assert.doesNotMatch(win.document.querySelector('[aria-label="인게임 대회"]')!.textContent!,/하이라이트/);
       assert.ok(record.results[0].run.log.length>3);
+      assert.equal(win.document.querySelector('.scene-counter button'),null);
+      assert.equal(win.document.querySelector('.game-actions [aria-label="대회 2배속"]')?.textContent,'2배속');
       await click('대회 2배속');
       assert.equal(win.document.querySelector('[aria-label="대회 2배속"]')!.getAttribute('aria-pressed'),'true');
       for(const move of record.results[0].run.log){

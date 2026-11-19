@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { DISCIPLINE_NAMES, DIFFICULTY_NAMES, KIND_NAMES, RULES, SKILLS, SKILL, STYLE_NAMES } from '../game/data';
 import { allowed, chance, generateRoutine, learned, routineTime } from '../game/competition';
 import { canStudy } from '../game/events';
-import { skillDescription, TECHNIQUE_REFERENCE } from '../game/content';
+import { skillDescription } from '../game/content';
 import { TechniquePreview } from './TechniquePreview';
 import { DISCIPLINES, STYLES, type Discipline, type Rider, type Skill } from '../game/types';
 import { Tag } from './Brand';
@@ -58,7 +58,6 @@ export function Skills({r,onTrain}:{r:Rider;onTrain:(id:string)=>void}){
         <SkillDetail r={r} skill={skill} preview={preview===skill.id} onPreview={()=>setPreview(preview===skill.id?null:skill.id)} onTrain={onTrain} onClose={()=>select(undefined)}/>
       </section>}
     </div>
-    <p className="technique-source"><a href={TECHNIQUE_REFERENCE} target="_blank" rel="noreferrer">동작 참고 · 보드를 타보자!</a></p>
   </section>;
 }
 

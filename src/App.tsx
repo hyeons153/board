@@ -19,7 +19,8 @@ import Ceremony from './components/Ceremony';
 import GameStage from './components/GameStage';
 import Scene from './components/Scene';
 import { SpotMap } from './components/SpotMap';
-import { AutoSettings, StatusGauges, WeeklyChoices } from './components/WeeklyChoices';
+import { AutoSettings, WeeklyChoices } from './components/WeeklyChoices';
+import { RiderHud } from './components/RiderHud';
 import type { Look, MeetRecord, Plan } from './game/types';
 
 type Screen='home'|'training'|'skills'|'routine'|'meets'|'rank'|'workshop'|'profile'|'hall'|'online'|'account'|'menu'|'new'|'ending'|'journal';
@@ -112,6 +113,8 @@ export default function App(){
   const preview=r&&draft&&screen==='home'&&!busyFlow&&!replay&&(autoChoice||!r.plan&&r.settings.mode==='manual')?previewTraining(r,draft):undefined;
   const active=!!r&&r.phase!=='retired';
   const showTraining=active&&!busyFlow&&!replay&&!replayLoading&&(!r!.plan||!!autoChoice);
+  const trainingScene=!!r&&!pending&&!replay&&!replayLoading&&(!!trainingResult||!eventResult&&r.phase==='plan');
+  const trainingVisible=screen==='home'&&!spotMap;
   const upcoming=active?nextMeet(r!):undefined;
   const visitor=r?RIVAL.get(LOCATIONS[r.spot].npc):undefined;
   const dockPage=replay||replayLoading?replayFrom:
@@ -130,19 +133,7 @@ export default function App(){
     setReplayLoading(false);if(full)setReplay(full);else setScreen(screen);
   };
   const playHome=()=>{go('home');};
-  const status=r&&<div className="console-status">
-    <div className="console-vitals" aria-label="선수 상태">
-      <span className={'console-energy '+(preview?'has-projection':'')}>
-        <span className="console-energy-label">체력 <b>{Math.round(r.energy)}</b></span>
-        <i><em style={{width:r.energy+'%'}}/>{preview&&preview.energy!==0&&<span className={'energy-projection '+(preview.energy<0?'is-cost':'')} style={{left:Math.min(r.energy,preview.energyAfter)+'%',width:Math.abs(preview.energy)+'%'}} aria-hidden="true"/>}</i>
-        {preview&&<strong className={'energy-change '+(preview.energy<0?'is-cost':'')} aria-label="예상 체력 변화">{r.energy.toFixed(1).replace('.0','')} → {preview.energyAfter.toFixed(1).replace('.0','')} ({preview.energy>0?'+':''}{preview.energy})</strong>}
-      </span>
-      <span className={'console-money '+(preview?.money?'has-projection':'')}>₩{r.money.toLocaleString('ko-KR')}{!!preview?.money&&<small className="money-change">예상 비용 ₩{(-preview.money).toLocaleString('ko-KR')}</small>}</span>
-      <span>명성 {r.fame}</span>
-      {r.injury&&<span className="console-injury">{r.injury.severity==='major'?'중상':'경상'} · {r.injury.weeks}주</span>}
-    </div>
-    <StatusGauges r={r} preview={preview}/>
-  </div>;
+  const status=r&&<RiderHud r={r} preview={preview} interactive={screen==='home'&&!spotMap&&!replayLoading}/>;
   let content:ReactNode;
   if(screen==='new')content=<NewRider saving={game.saving} onCreate={async(name,look)=>{const ok=await game.send({type:'create',name,look});if(ok)go('home');return ok;}}/>;
   else if(screen==='account')content=<Account key={view.scope} view={view} send={game.send} onSwitch={playHome} onSessionChange={game.load}/>;
@@ -176,16 +167,16 @@ export default function App(){
     <div className="console-world">
       <div className="console-stage" inert={screen!=='home'||replayLoading||spotMap}>{r?<GameStage r={r} send={game.send} saving={game.saving} remaining={game.remaining} weekMs={view.weekMs} fastForward={view.fastForward} spot={r.plan?.spot??r.spot} motion={r.plan?.action==='rest'||r.plan?.action==='hospital'?'rest':'ride'} record={stageRecord} pendingTraining={replay?undefined:trainingResult} pendingEvent={replay?undefined:eventResult} active={screen==='home'&&!replayLoading&&!spotMap} autoChoosing={!!autoChoice} replaying={!!replay} guest={visitor?.look} onSpotMenu={()=>setSpotMap(true)} onDone={()=>void finishMeet()}/>:<><Scene spot="river" look={DEFAULT_LOOK} variant="title"/><div className="console-title-shade"/></>}</div>
       {replayLoading&&screen==='home'&&<div className="console-replay-loading" role="status">경기 기록을 불러오는 중…</div>}
-      {(!showTraining||screen!=='home'||spotMap)&&status}
-      {showTraining&&r&&
-        <div className="console-training-area" hidden={screen!=='home'||spotMap}>
-          {screen==='home'&&!spotMap&&status}
-          <div className="console-field-links">
+      {r&&<div className={'console-training-area'+(trainingScene?'':' is-scene-hud')}>
+        {status}
+        {showTraining&&<>
+          <div className="console-field-links" hidden={!trainingVisible}>
             {upcoming&&<button className="console-next-meet" onClick={()=>{setMeetSelection({rider:r.id,value:{year:r.year,id:upcoming.id}});go('meets');}}><CalendarDays size={17}/><span>{upcoming.name}</span><b>{upcoming.week===r.week?'이번 주':upcoming.week-r.week+'주 후'}</b><ArrowRight size={15}/></button>}
             {visitor&&<button className="console-visitor" aria-label={visitor.name+' · 함께 연습하는 라이더 보기'} onClick={()=>{revealRivals.current=true;go('profile');}}><UserRound size={16}/>{visitor.name}</button>}
           </div>
-          <WeeklyChoices key={weekKey+':'+r.settings.mode+':'+(trainingTarget??'weekly')} r={r} send={game.send} saving={game.saving} target={trainingTarget} onPreview={setDraft} pendingChoice={autoChoice} active={screen==='home'&&!spotMap}/>
-        </div>}
+          <WeeklyChoices key={weekKey+':'+r.settings.mode+':'+(trainingTarget??'weekly')} r={r} send={game.send} saving={game.saving} target={trainingTarget} onPreview={setDraft} pendingChoice={autoChoice} active={trainingVisible} hidden={!trainingVisible}/>
+        </>}
+      </div>}
       {screen==='home'&&!busyFlow&&!replay&&!replayLoading&&(r?<>
         {r.phase==='retired'&&<div className="console-home-actions"><button className="console-primary" onClick={()=>{setEndingId(r.id);go('ending');}}>은퇴식 보기 <Trophy size={18}/></button><button onClick={()=>go('new')}>새 선수 육성</button></div>}
       </>:<div className="console-welcome"><span>{ENGLISH_GAME_NAME}</span><h1>롱보더 <br/><em>키우기</em></h1><p>강변의 첫 푸시부터 마지막 국제대회까지.<br/>나만의 8년 커리어를 시작하세요.</p><button className="console-primary" onClick={()=>go('new')}>새 라이더 등록 <ArrowRight size={20}/></button></div>)}

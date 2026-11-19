@@ -1,11 +1,10 @@
 import { Aperture, ArrowRight, Check, Coffee, Cross, Footprints, Link2, MoveDiagonal2, Route, Wind, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { ACTION_NAMES, ACTION_STORIES, DISCIPLINE_NAMES, RULES, SKILL, SKILLS, STAT_NAMES, STRATEGY_DETAILS, STRATEGY_NAMES } from '../game/data';
-import { effectiveStats, equipmentStats } from '../game/economy';
+import { ACTION_NAMES, ACTION_STORIES, DISCIPLINE_NAMES, SKILL, SKILLS, STAT_NAMES, STRATEGY_DETAILS, STRATEGY_NAMES } from '../game/data';
 import { validatePlan } from '../game/career';
 import { canStudy } from '../game/events';
-import { previewTraining, type TrainingPreview } from '../game/training';
-import { ACTIONS, DISCIPLINES, STATS, STRATEGIES, type Plan, type Rider } from '../game/types';
+import { previewTraining } from '../game/training';
+import { ACTIONS, DISCIPLINES, STRATEGIES, type Plan, type Rider } from '../game/types';
 import type { Submit } from './Overview';
 import { AUTO_FLOW, useAutoAdvance } from '../useAutoAdvance';
 
@@ -14,22 +13,7 @@ const choiceLabels={...STAT_NAMES,dance:DISCIPLINE_NAMES.dance,trick:DISCIPLINE_
 const signed=(n:number)=>(n>0?'+':'')+n.toFixed(1).replace('.0','');
 const range=(min:number,max:number)=>min===max?signed(min):signed(min)+' ~ '+signed(max);
 
-export function StatusGauges({r,preview}:{r:Rider;preview?:TrainingPreview}){
-  const total=effectiveStats(r),bonus=equipmentStats(r);
-  return <div className="console-stats" aria-label="현재 능력치">{STATS.map(stat=>{
-    const gain=preview?.gains[stat],rising=!!gain&&gain.max>0;
-    return <div key={stat} className={'status-gauge stat-'+stat+(rising?' has-projection':'')}>
-      <span>{STAT_NAMES[stat]}</span><b>{total[stat].toFixed(1)}</b>
-      <div className="status-track"><meter min={0} max={RULES.statCap+bonus[stat]} value={total[stat]} aria-label={STAT_NAMES[stat]}/>
-        {rising&&<span className="status-projection" style={{left:total[stat]/(RULES.statCap+bonus[stat])*100+'%',width:gain.max/(RULES.statCap+bonus[stat])*100+'%'}} aria-hidden="true"><i style={{width:gain.min/gain.max*100+'%'}}/></span>}
-      </div>
-      {!!bonus[stat]&&<small className="status-equipment">기본 {r.stats[stat]} + 장비 {bonus[stat]}</small>}
-      {rising&&<strong className="status-delta" aria-label={STAT_NAMES[stat]+' 예상 상승'}>{range(gain.min,gain.max)}</strong>}
-    </div>;
-  })}</div>;
-}
-
-export function WeeklyChoices({r,send,saving,target,onPreview,pendingChoice,active=true}:{r:Rider;send:Submit;saving:boolean;target?:string;onPreview?:(plan:Plan|undefined)=>void;pendingChoice?:string;active?:boolean}){
+export function WeeklyChoices({r,send,saving,target,onPreview,pendingChoice,active=true,hidden=false}:{r:Rider;send:Submit;saving:boolean;target?:string;onPreview?:(plan:Plan|undefined)=>void;pendingChoice?:string;active?:boolean;hidden?:boolean}){
   const initial=SKILL[target??''];
   const [action,setAction]=useState<typeof ACTIONS[number]|undefined>(initial?.family);
   const spot=r.spot;
@@ -46,7 +30,7 @@ export function WeeklyChoices({r,send,saving,target,onPreview,pendingChoice,acti
   useEffect(()=>{onPreview?.(auto&&pendingChoice?r.plan??undefined:!blocked&&!auto?plan:undefined);},[plan,blocked,auto,pendingChoice,r.plan,onPreview]);
   useAutoAdvance(pendingChoice??'',active&&auto&&!!pendingChoice&&!saving,AUTO_FLOW.choiceMs,()=>void send({type:'start-training',record:pendingChoice!}));
   useEffect(()=>()=>onPreview?.(undefined),[onPreview]);
-  return <section className={'weekly-choices '+(auto?'is-auto ':'')+(action||pendingChoice?'has-preview':'')} aria-label={auto?'자동 행동 선택':'이번 주 행동 선택'}>
+  return <section className={'weekly-choices '+(auto?'is-auto ':'')+(action||pendingChoice?'has-preview':'')} aria-label={auto?'자동 행동 선택':'이번 주 행동 선택'} hidden={hidden}>
     <h2>이번 주엔 무엇을 할까?</h2>
     <div className="weekly-action-grid">{ACTIONS.map(next=>{
       const Icon=icons[next];

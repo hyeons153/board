@@ -19,15 +19,10 @@
 .status-projection { position:absolute; top:0; bottom:0; min-width:2px; background:repeating-linear-gradient(90deg,#e4f6b390 0 2px,#e4f6b330 2px 4px); box-shadow:0 0 6px #d5f788; }
 .status-projection > i { display:block; height:100%; background:#d9f79c; }
 .status-gauge.has-projection { border-color:#d6ed9d; background:#243e49f2; }
-.status-delta { grid-column:1/-1; font:750 .65rem var(--mono); color:#dff5a8; white-space:nowrap; }
-.console-vitals .console-energy.has-projection { display:grid; grid-template-columns:auto 74px; gap:3px 7px; }
 .console-energy .console-energy-label { display:flex; align-items:center; gap:5px; }
 .console-energy > i { position:relative; }
 .energy-projection { position:absolute; top:0; bottom:0; background:#d1ef8d; }
 .energy-projection.is-cost { background:repeating-linear-gradient(90deg,#efac90 0 2px,#d080602b 2px 4px); }
-.energy-change { grid-column:1/-1; font:700 .65rem var(--mono); color:#dff5a8; }
-.energy-change.is-cost { color:#ffc0a4; }
-.console-vitals .console-money.has-projection { display:grid; gap:3px; }.money-change { font-size:.64rem; color:#ffcf9e; }
 .weekly-inline-controls { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-top:8px; }
 .weekly-inline-controls > label { display:flex; align-items:center; gap:6px; font-size:.68rem; color:#526c5c; }
 .weekly-inline-controls select { min-height:30px; padding:4px 7px; font-size:.73rem; width:auto; max-width:185px; }
@@ -47,7 +42,7 @@
 @media(max-height:620px) and (min-width:701px){ .console-stats { left:auto; right:16px; top:64px; width:390px; }.weekly-choices { max-height:calc(100% - 34px); padding:10px; } }
 
 @media(max-width:700px){
- .console-vitals .console-energy.has-projection { grid-template-columns:auto 40px; }.status-delta { font-size:.58rem; }.weekly-inline-controls select { max-width:165px; }.weekly-confirm > strong { font-size:.75rem; }.weekly-success { flex-wrap:wrap; gap:2px 5px; }
+ .weekly-inline-controls select { max-width:165px; }.weekly-confirm > strong { font-size:.75rem; }.weekly-success { flex-wrap:wrap; gap:2px 5px; }
 }
 
 .weekly-choices.is-auto .weekly-action-grid button:disabled { opacity:.8; cursor:default; }.weekly-choices.is-auto .weekly-action-grid button[aria-pressed=true] { opacity:1; outline:2px solid #b6d971; outline-offset:-2px; }.weekly-auto { justify-content:space-between; margin-top:8px; }.weekly-auto strong { color:#365e45; }.weekly-auto button { flex:none; font-size:.75rem; }
