@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ACTION_NAMES, ACTION_STORIES, DISCIPLINE_NAMES, SKILL, SKILLS, STAT_NAMES, STRATEGY_DETAILS, STRATEGY_NAMES } from '../game/data';
 import { validatePlan } from '../game/career';
 import { canStudy, skipsEventChoices } from '../game/events';
-import { previewTraining } from '../game/training';
+import { isTrainingAction, meetTrainingAvailable, previewTraining, randomSpecialTraining } from '../game/training';
 import { ACTIONS, DISCIPLINES, STRATEGIES, type Plan, type Rider } from '../game/types';
 import type { Submit } from './Overview';
 import { AUTO_FLOW, useAutoAdvance } from '../useAutoAdvance';
@@ -17,26 +17,37 @@ export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true
   const [action,setAction]=useState<typeof ACTIONS[number]>();
   const spot=r.spot;
   const [skill,setSkill]=useState(''),[lesson,setLesson]=useState(false);
+  const [skipMeet,setSkipMeet]=useState(false);
+  const auto=r.settings.mode==='auto';
+  const meetChoice=!auto&&meetTrainingAvailable(r);
+  const meetTraining=auto?!!r.plan?.meetTraining:meetChoice&&skipMeet;
+  const offer=meetTraining?undefined:randomSpecialTraining(r);
   useEffect(()=>setLesson(false),[spot]);
   const choose=(next:typeof ACTIONS[number])=>{setAction(current=>current===next?undefined:next);setSkill('');setLesson(false);};
-  const plan=useMemo<Plan|undefined>(()=>action?{action,spot,...(skill?{skill}:{}),...(lesson?{lesson:true}:{})}:undefined,[action,spot,skill,lesson]);
-  const preview=plan?previewTraining(r,plan):undefined;
+  const plan=useMemo<Plan|undefined>(()=>action?{action,spot,...(skill?{skill}:{}),...(lesson?{lesson:true}:{}),...(meetTraining?{meetTraining:true}:{})}:undefined,[action,spot,skill,lesson,meetTraining]);
+  const selected=auto?r.plan:plan;
+  const preview=selected?previewTraining(r,selected):undefined;
   const recoveryNote=preview?.recovery
     ? action==='hospital'?'치료로 회복 기간 최대 2주 단축':r.injury?'쉬면서 몸을 회복해요.':''
     : '';
   let blocked='';if(plan)try{validatePlan(r,plan);}catch(error){blocked=error instanceof Error?error.message:'이 행동을 선택할 수 없어요.';}
-  const auto=r.settings.mode==='auto';
   useEffect(()=>{onPreview?.(auto&&pendingChoice?r.plan??undefined:!blocked&&!auto?plan:undefined);},[plan,blocked,auto,pendingChoice,r.plan,onPreview]);
   useAutoAdvance(pendingChoice??'',active&&auto&&!!pendingChoice&&!saving,AUTO_FLOW.choiceMs,()=>void send({type:'start-training',record:pendingChoice!}));
   useEffect(()=>()=>onPreview?.(undefined),[onPreview]);
   return <section className={'weekly-choices '+(auto?'is-auto ':'')+(action||pendingChoice?'has-preview':'')} aria-label={auto?'자동 행동 선택':'이번 주 행동 선택'} hidden={hidden}>
     <h2>이번 주엔 무엇을 할까?</h2>
+    {meetChoice&&<div className="weekly-meet-choice" role="group" aria-label="대회 주간 행동">
+      <button type="button" disabled={saving} aria-pressed={!skipMeet} onClick={()=>setSkipMeet(false)}>대회 준비</button>
+      <button type="button" disabled={saving} aria-pressed={skipMeet} onClick={()=>setSkipMeet(true)}>불참하고 특별훈련</button>
+    </div>}
     <div className="weekly-action-grid">{ACTIONS.map(next=>{
-      const Icon=icons[next];
-      return <button key={next} aria-label={ACTION_NAMES[next]+' 선택'} aria-pressed={(auto?r.plan?.action:action)===next} disabled={saving||auto} onClick={()=>choose(next)}><Icon size={16} aria-hidden="true"/><strong>{choiceLabels[next]}</strong></button>;
+      const Icon=icons[next],special=meetTraining&&isTrainingAction(next)||offer===next;
+      return <button key={next} className={special?'weekly-special-card':undefined} aria-label={ACTION_NAMES[next]+' 선택'} aria-description={special?'특별훈련, 성장량 두 배':undefined} aria-pressed={selected?.action===next} disabled={saving||auto} onClick={()=>choose(next)}>
+        <Icon size={16} aria-hidden="true"/><span className="weekly-action-copy"><strong>{choiceLabels[next]}</strong>{special&&<SpecialTrainingBadge/>}</span>
+      </button>;
     })}</div>
     <div className="weekly-selection-slot">
-    {auto?<div className="weekly-auto"><strong>{r.plan?ACTION_STORIES[r.plan.action].start:'이번 주 일정을 고르는 중…'}</strong></div>:<>
+    {auto?<div className="weekly-auto"><strong>{r.plan?ACTION_STORIES[r.plan.action].start:'이번 주 일정을 고르는 중…'}</strong>{preview?.special&&<SpecialTrainingForecast/>}</div>:<>
         {(action==='dance'||action==='trick')&&<div className="weekly-inline-controls" aria-label="행동 설정">
           <label>연마 목표<select aria-label="연마 목표" value={skill} disabled={saving} onChange={e=>{setSkill(e.target.value);setLesson(false);}}><option value="">자유 연마</option>{SKILLS.filter(s=>s.family===action&&canStudy(r,s.id)).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           {!!skill&&['studio','night','arena'].includes(spot)&&<label className="weekly-lesson"><input type="checkbox" checked={lesson} disabled={saving} onChange={e=>setLesson(e.target.checked)}/> 개인 레슨</label>}
@@ -45,7 +56,7 @@ export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true
           {plan&&<button className="weekly-cancel" aria-label="선택 취소" disabled={saving} onClick={()=>setAction(undefined)}><X size={15}/></button>}
           <div className="weekly-summary">
             {plan&&preview?<><strong>{ACTION_STORIES[plan.action].start}</strong>
-              {!preview.recovery&&<span className={'weekly-success '+(preview.success<.7?'is-risky':'')}>성공률 <b>{Math.round(preview.success*100)}%</b>{preview.success<.7&&<small>체력 부족 · 실패 위험 높음</small>}</span>}
+              {preview.special?<SpecialTrainingForecast/>:!preview.recovery&&<span className={'weekly-success '+(preview.success<.7?'is-risky':'')}>성공률 <b>{Math.round(preview.success*100)}%</b>{r.energy<40&&<small>실패 위험 · 성공 시 성장 보너스</small>}</span>}
             </>:<span>행동을 고르면 예상 변화가 표시돼요.</span>}
           </div>
           <button className="weekly-execute" disabled={!plan||saving||!!blocked} onClick={()=>{if(plan)void send({type:'plan',plan});}}>확인 <Check size={16}/></button>
@@ -58,6 +69,9 @@ export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true
     </div>
   </section>;
 }
+
+export function SpecialTrainingBadge(){return <span className="weekly-special-badge">SPECIAL ×2</span>;}
+function SpecialTrainingForecast(){return <span className="weekly-special-forecast">성공률 100% · 체력 소모 0 · 성장 ×2</span>;}
 
 export function AutoSettings({r,send,saving,onApplied}:{r:Rider;send:Submit;saving:boolean;onApplied:()=>void}){
   const [draft,setDraft]=useState(()=>({

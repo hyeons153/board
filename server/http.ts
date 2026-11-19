@@ -4,6 +4,7 @@ import { ACTIONS, DISCIPLINES, SPOTS, STRATEGIES, type View } from '../src/game/
 import { BOARDS, BOTTOMS, EYE_COLORS, FOOTWEAR, HAIR_COLORS, HAIR_STYLES, OUTFITS, PANTS, RULES, SHIRTS, SHOES, SKINS } from '../src/game/data.js';
 import { extras, GEAR_SLOTS } from '../src/game/economy.js';
 import { divisionFor, GameError, singleEntry } from '../src/game/career.js';
+import { randomSpecialTraining } from '../src/game/training.js';
 import { advance, remaining } from './clock.js';
 import { GUEST_SECONDS, type Row, type Store } from './store.js';
 import { AccessError, type OnlineStore } from './databaseStore.js';
@@ -26,7 +27,7 @@ const actionSchema=z.discriminatedUnion('type',[
   z.strictObject({type:z.literal('continue-meet'),record:z.string().max(140)}),
   z.strictObject({type:z.literal('fast-forward'),enabled:z.boolean()}),
   z.strictObject({type:z.literal('create'),name:z.string().trim().min(1).max(16).regex(/^[\p{L}\p{N} _.-]+$/u),look}),
-  z.strictObject({type:z.literal('plan'),plan:z.strictObject({action:z.enum(ACTIONS),spot:z.enum(SPOTS),intensity:legacyIntensity,skill:skill.optional(),lesson:z.boolean().optional(),discipline:z.enum(DISCIPLINES).optional()}).transform(({intensity,...plan})=>plan)}),
+  z.strictObject({type:z.literal('plan'),plan:z.strictObject({action:z.enum(ACTIONS),spot:z.enum(SPOTS),intensity:legacyIntensity,skill:skill.optional(),lesson:z.boolean().optional(),discipline:z.enum(DISCIPLINES).optional(),meetTraining:z.literal(true).optional()}).transform(({intensity,...plan})=>plan)}),
   z.strictObject({type:z.literal('settings'),settings:z.strictObject({mode:z.enum(['manual','auto']),strategy:z.enum(STRATEGIES),intensity:legacyIntensity,entries:disciplines,pauseStory:z.boolean().optional(),pauseMeet:z.boolean().optional(),pauseInjury:z.boolean().optional(),manualEvents:z.boolean().optional(),skipEvents:z.boolean().optional(),skipMeets:z.boolean().optional()}).transform(({intensity,...settings})=>settings)}),
   z.strictObject({type:z.literal('entry'),disciplines}),
   z.strictObject({type:z.literal('event'),index:z.number().int().min(0).max(5),eventId:z.string().max(100).optional()}),
@@ -75,7 +76,10 @@ export function createHandler(store:Store,weekMs:number,secure:boolean,rateSecre
       return {...meet,...(compact?{detail:summary?'summary' as const:'full' as const}:{}),results:meet.results.map(({proof,opponents:replays,...result})=>summary?{...result,run:{...result.run,log:[],highlight:result.run.log.find(move=>move.outcome==='great')??result.run.log.find(move=>move.outcome==='clean')}}:opponents?{...result,opponents:replays}:result)};
     });
     const hall=career.hall.map(archive=>({...archive,records:records(archive.records,false)}));
-    const rider=career.rider?{...career.rider,settings:{...career.rider.settings,entries:singleEntry(career.rider.settings.entries)},extras:extras(career.rider),seed:0,season:{...career.rider.season,division:divisionFor(career.rider.year)},records:records(career.rider.records,true)}:null;
+    const active=career.rider;
+    const rider=active?{...active,settings:{...active.settings,entries:singleEntry(active.settings.entries)},extras:extras(active),seed:0,
+      trainingOffer:active.phase==='plan'?randomSpecialTraining(active)??null:null,
+      season:{...active.season,division:divisionFor(active.year)},records:records(active.records,true)}:null;
     const parked=career.parked?.map(item=>({...item,seed:0,records:records(item.records,false)}));
     const background=row.snapshot.clock.background;
     const backgroundMs=background&&background.tab===tab?Math.max(0,background.at-Date.now()):undefined;

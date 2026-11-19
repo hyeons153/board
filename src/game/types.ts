@@ -5,7 +5,9 @@ export const SPOTS = ['river','plaza','park','studio','night','arena','rooftop']
 export const STRATEGIES = ['balanced','dance','trick','freestyle'] as const;
 export const STYLES = ['stable','flow','score'] as const;
 export const NPC_NAMES={min:'이민재',sol:'윤솔',jun:'강준',ha:'최하린',noa:'정노아',yu:'한유리'} as const;
-export const ACTIONS = [...STATS,'dance','trick','rest','hospital'] as const;
+export const TRAINING_ACTIONS = [...STATS,'dance','trick'] as const;
+export type TrainingAction = typeof TRAINING_ACTIONS[number];
+export const ACTIONS = [...TRAINING_ACTIONS,'rest','hospital'] as const;
 export type Stat = typeof STATS[number];
 export type Stats = Record<Stat,number>;
 export type Division = typeof DIVISIONS[number];
@@ -17,7 +19,7 @@ export type RoutineStyle = typeof STYLES[number];
 export type Action = typeof ACTIONS[number]|'rehearsal';
 export type Family = 'dance'|'trick';
 export type Look = { hair: number; skin: number; shirt: number; board: number; gender?:'male'|'female'; hairColor?:number; pants?:number; shoes?:number; deckDesign?:number; outfit?:number; bottom?:number; footwear?:number; eyes?:number; equipment?:{deck?:{shape:number;color?:number};trucks?:string;wheels?:{color?:string;size:number};accessories:import('./equipmentCatalog.js').Visual[]} };
-export type Plan = { action: Action; spot: Spot; skill?: string; lesson?:boolean; discipline?:Discipline };
+export type Plan = { action: Action; spot: Spot; skill?: string; lesson?:boolean; discipline?:Discipline; meetTraining?:true };
 export type Settings = { mode: 'manual'|'auto'; strategy: Strategy; entries: Discipline[]; pauseStory?:boolean; pauseMeet?:boolean; pauseInjury?:boolean; manualEvents?:boolean; skipEvents?:boolean; skipMeets?:boolean };
 export type Skill = { id:string; name:string; family:Family; kind:'step'|'technique'|'spin'|'pop'|'flip'; difficulty:number; points:number; seconds:number; requires:string[]; risk:number; tags:readonly string[] };
 export type Progress = { study:number; mastery:number };
@@ -48,6 +50,7 @@ export type Rider = {
   injury:Injury|null; skills:Record<string,Progress>; relations:Record<string,number>; events:Record<string,number>;
   settings:Settings; plan:Plan|null; lastPlan?:Plan; spot:Spot; phase:'plan'|'event'|'meet'|'injury'|'retired'; event:string|null;
   entries:Discipline[]|null; routines:Record<Discipline,string[]>; records:MeetRecord[]; season:Season; seasons:Season[];
+  trainingOffer?:TrainingAction|null; // Included in the client view because the career seed stays on the server.
   news:News[]; reason:'early'|'complete'|null; extras?:CareerExtras; rankedStart?:number; mentor?:Mentor; calendarVersion?:2;
 };
 export type Ending = { kind:'legend'|'champion'|'technician'|'veteran'|'early'; discipline?:Discipline; friends:string[] };

@@ -8,6 +8,7 @@ import { advance, blankSave } from '../server/clock';
 import { localStore } from '../server/store';
 import { BOARDS, BOTTOMS, DEFAULT_LOOK, EYE_COLORS, FOOTWEAR, HAIR_COLORS, HAIR_STYLES, OUTFITS, PANTS, SHIRTS, SHOES, SKINS } from '../src/game/data';
 import { ECONOMY, playerPlace } from '../src/game/economy';
+import { randomSpecialTraining } from '../src/game/training';
 import type { View } from '../src/game/types';
 
 test('hidden auto mode follows server deadlines, keeps full competition records and resumes the visible flow',()=>{
@@ -96,6 +97,9 @@ test('guest snapshots survive reopening storage; concurrent tournament submissio
     assert.ok(owner);
     const row=await store.get(owner);
     const rider=row.snapshot.career.rider!;
+    assert.equal(save.career.rider!.seed,0);
+    assert.equal(save.career.rider!.trainingOffer,randomSpecialTraining(rider)??null);
+    assert.equal(rider.trainingOffer,undefined);
     delete rider.extras; // A phase-one snapshot has no career extensions.
     rider.plan=null;delete row.snapshot.clock.readyAt;
     rider.week=7;rider.phase='meet';
@@ -151,6 +155,40 @@ test('guest snapshots survive reopening storage; concurrent tournament submissio
     assert.deepEqual((await (await reload(new Request(base))).json()).career,{rider:null,hall:[]});
   }finally{
     for(const file of await readdir(path)) await unlink(join(path,file));
+    await rmdir(path);
+  }
+});
+
+test('the API keeps a claimed special plan across reloads and rejects a conflicting entry',async()=>{
+  const path=await mkdtemp(join(process.cwd(),'.longboard-test-'));
+  try{
+    const base='http://127.0.0.1/api/game';
+    const store=localStore(path),tab=randomUUID();
+    const handle=createHandler(store,2000,false);
+    const guest=await handle(new Request(base));
+    const cookie=guest.headers.get('set-cookie')!.split(';')[0];
+    const send=(handler:typeof handle,version:number,action:unknown)=>handler(new Request(base,{
+      method:'POST',headers:{cookie,origin:'http://127.0.0.1','Content-Type':'application/json'},body:JSON.stringify({version,tab,action}),
+    }));
+    const started:View=await (await send(handle,0,{type:'create',name:'Special',look:DEFAULT_LOOK})).json();
+    const owner=await store.authenticate(createHash('sha256').update(cookie.split('=')[1]).digest('hex'));
+    assert.ok(owner);
+    const row=await store.get(owner);
+    const rider=row.snapshot.career.rider!;
+    rider.week=7;rider.energy=12;rider.events.first=1;
+    const ready=await store.replace(owner,started.version,row.snapshot);
+    assert.ok(ready);
+    const plan={action:'speed',spot:'river',meetTraining:true};
+    const submitted=await send(handle,ready.version,{type:'plan',plan});
+    assert.equal(submitted.status,200);
+    const accepted:View=await submitted.json();
+    const reload=createHandler(localStore(path),2000,false);
+    const view:View=await (await reload(new Request(base,{headers:{cookie,'X-Game-View':'compact'}}))).json();
+    assert.deepEqual(view.career.rider!.plan,plan);
+    assert.equal(view.career.rider!.trainingOffer,null);
+    assert.equal((await send(reload,accepted.version,{type:'entry',disciplines:['dance']})).status,422);
+  }finally{
+    for(const file of await readdir(path))await unlink(join(path,file));
     await rmdir(path);
   }
 });

@@ -3,6 +3,7 @@ import { extras } from '../src/game/economy.js';
 import { AUTO_FLOW, RULES } from '../src/game/data.js';
 import { eventPaused } from '../src/game/events.js';
 import { happeningDuration } from '../src/game/happenings.js';
+import { meetTrainingAvailable } from '../src/game/training.js';
 import type { Career, EventOutcome, GameAction, TrainingSetup } from '../src/game/types.js';
 
 export type Save = { format:1; career:Career; clock:{credit:number; stamp:number; tabs:Record<string,number>; readyAt?:number; fastForward?:boolean; pendingChoice?:string; pendingMeet?:string; pendingTraining?:string; pendingEvent?:EventOutcome; trainingSetup?:TrainingSetup; stateVersion?:number; background?:{tab:string;at:number}} };
@@ -109,11 +110,15 @@ function advanceOne(prev:Save,a:GameAction,tab:string,now:number,weekMs:number,i
   if(clock.pendingChoice&&r){
     if(a.type==='pulse')return prev;
     if(a.type==='settings'){
+      const changePlan=r.entries===null&&meetTrainingAvailable(r)&&!!a.settings.entries.length!==!!r.settings.entries.length;
       r.settings={...a.settings,pauseStory:false,pauseMeet:false,pauseInjury:false};
       if(r.settings.mode==='manual'){r.plan=null;delete clock.pendingChoice;delete clock.readyAt;}
+      else if(changePlan){r.plan=null;prepareWeek(r);}
       return revise();
     }
     if(a.type!=='start-training'||a.record!==clock.pendingChoice)throw new GameError('자동 행동을 선택하고 있어요. 잠시 기다려 주세요.');
+    const meet=currentMeet(r);
+    if(meet&&!meet.international)r.entries??=singleEntry(r.settings.entries);
     delete clock.pendingChoice;clock.readyAt=now+weekMs;snapshotTraining();return revise();
   }
   if(a.type==='start-training')throw new GameError('이미 시작했거나 변경된 행동입니다.');

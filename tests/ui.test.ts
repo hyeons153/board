@@ -88,7 +88,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     const createdView=await created.json();assert.equal(createdView.career.rider.look.hair,10);assert.equal(createdView.career.rider.look.outfit,1);assert.equal(createdView.career.rider.look.bottom,3);
     const options=win.document.querySelector('[aria-label="이번 주 행동 선택"]')!;
     assert.equal(options.querySelector('h2')?.textContent,'이번 주엔 무엇을 할까?');
-    assert.deepEqual([...options.querySelectorAll('.weekly-action-grid > button')].map(button=>button.textContent),
+    assert.deepEqual([...options.querySelectorAll('.weekly-action-grid strong')].map(label=>label.textContent),
       ['속도','카빙','연계','밸런스','댄싱','트릭','휴식','병원 치료']);
     assert.equal(win.document.querySelector('[aria-label="라인 리허설 선택"]'),null);
     assert.equal(win.document.querySelectorAll('[aria-label="현재 능력치"] meter').length,4);
@@ -267,14 +267,26 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.ok(win.document.querySelector('[aria-label="행동 진행"]'));
     assert.equal(win.document.querySelector('.game-console'),frame);
     const rider=newRider('automatic-ui',71,'Auto rider',DEFAULT_LOOK);
+    rider.trainingOffer=null;
     rider.energy=0;
     let selected:Parameters<typeof previewTraining>[1]|undefined;
     await act(async()=>root.render(createElement(WeeklyChoices,{r:rider,send:async()=>true,saving:false,onPreview:plan=>{selected=plan;}})));
     await click('속도 훈련 선택');
-    assert.match(win.document.querySelector('.weekly-success')!.textContent!,/12%/);
+    assert.match(win.document.querySelector('.weekly-success')!.textContent!,/15%/);
     assert.match(win.document.querySelector('.weekly-success')!.textContent!,/실패 위험/);
     await click('휴식 선택');
     assert.equal(previewTraining(rider,selected!).energyAfter,41);
+    rider.week=7;
+    await act(async()=>root.render(createElement(WeeklyChoices,{r:{...rider},send:async()=>true,saving:false,onPreview:plan=>{selected=plan;}})));
+    await click('불참하고 특별훈련');await click('속도 훈련 선택');
+    assert.equal(win.document.querySelectorAll('.weekly-special-card').length,6);
+    assert.match(win.document.querySelector('.weekly-special-forecast')!.textContent!,/100% · 체력 소모 0 · 성장 ×2/);
+    assert.equal(selected?.meetTraining,true);
+    rider.lastPlan={action:'speed',spot:'river',meetTraining:true};
+    rider.extras!.lastTraining={grade:'success',special:'meet',year:1,week:7,text:'',changes:['속도 +4.2']};
+    await act(async()=>root.render(createElement(GameStage,{r:{...rider},send:async()=>true,saving:false,remaining:0,weekMs:2000,fastForward:false,spot:'river',motion:'rest',pendingTraining:'special-test',onDone:()=>{}})));
+    assert.equal(win.document.querySelector('#training-outcome-title')?.textContent,'특별훈련 성공');
+    assert.match(win.document.querySelector('.training-special-result')!.textContent!,/속도 \+4\.2.*불참/);
     for(const [action,grade,title] of [
       ['rest','recovery','휴식을 완료했다'],
       ['dance','success','댄싱 연습에 몰두했다'],
@@ -328,7 +340,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await act(async()=>root.render(createElement(GameStage,{r:rider,send:async action=>{selectedEntry=action;return true;},saving:false,remaining:0,weekMs:2000,fastForward:false,spot:'river',motion:'ride',onDone:()=>{}})));
     assert.match(win.document.querySelector('[aria-label="대회 출전 선택"]')!.textContent!,/서울|3종목/);
     assert.equal(win.document.querySelectorAll('.game-disciplines button[aria-pressed="true"]:disabled').length,3);
-    assert.equal([...win.document.querySelectorAll('button')].some(button=>button.textContent==='이번 대회 쉬기'),false);
+    assert.equal([...win.document.querySelectorAll('button')].some(button=>button.textContent==='출전 취소'),false);
     await click('경기장 입장');assert.deepEqual(selectedEntry,{type:'entry',disciplines:['dance','trick','freestyle']});
     let loadedLogs=0;
     const summary={...record,detail:'summary' as const,results:record.results.map(result=>({...result,run:{...result.run,log:[]}}))};

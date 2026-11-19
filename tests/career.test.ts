@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CALENDAR, calendarFor, formatCareerDate, formatMonthWeek, INTERNATIONAL_MEETS, monthWeek, DEFAULT_LOOK, RULES, SKILL, SKILLS } from '../src/game/data';
-import { command, divisionFor, GameError, newRider, processWeek } from '../src/game/career';
+import { command, divisionFor, GameError, newRider, prepareWeek, processWeek } from '../src/game/career';
 import { chance, generateRoutine, learned, routineTime, simulateMeet, simulateRun, validRoutine } from '../src/game/competition';
 import { ECONOMY, equippedLook, extras, gearBonuses, playerPlace, SPONSOR } from '../src/game/economy';
-import { previewTraining, statAfter, trainingSuccess } from '../src/game/training';
+import { previewTraining, randomSpecialTraining, statAfter, trainingFactor, trainingSuccess } from '../src/game/training';
 import { EVENTS, eventBody, eventChoiceAvailable, eventFor, pickEvent } from '../src/game/events';
 import { RIVALS, spotUnlocked } from '../src/game/content';
 import { HAPPENINGS, pickHappening } from '../src/game/happenings';
@@ -15,7 +15,7 @@ import { RELATIONSHIP_REWARDS, relationshipEpilogues, relationshipWith, represen
 import { seeded } from '../src/game/random';
 import { meetRP, rankingPoints } from '../src/game/rp';
 import { advance, blankSave, remaining } from '../server/clock';
-import { DISCIPLINES, STATS, type Career, type Plan } from '../src/game/types';
+import { DISCIPLINES, STATS, TRAINING_ACTIONS, type Career, type Plan } from '../src/game/types';
 
 const identity=()=>({id:'rider-1',seed:5411});
 const career=():Career=>({rider:newRider(identity().id,identity().seed,'리버',{...DEFAULT_LOOK}),hall:[]});
@@ -234,7 +234,8 @@ test('training previews and results use the requested primary, secondary and tec
       command(c,{type:'plan',plan:p},identity);processWeek(c);if(r.extras!.lastTraining!.grade==='miss')continue;succeeded=true;
       for(const stat of STATS){const gain=r.stats[stat]-before.stats[stat],forecast=preview.gains[stat];if(forecast)assert.ok(gain>=forecast.min-.001&&gain<=forecast.max+.001);else assert.equal(gain,0);}
       if(p.skill)assert.ok(r.skills[p.skill].mastery>before.skills[p.skill].mastery);
-      assert.ok(r.extras!.lastTraining!.narration);assert.ok(r.extras!.lastTraining!.changes!.some(change=>change.startsWith('체력')));
+      assert.ok(r.extras!.lastTraining!.narration);
+      assert.equal(r.extras!.lastTraining!.changes!.some(change=>change.startsWith('체력')),preview.energy<0);
     }
     assert.ok(succeeded);
   }
@@ -626,6 +627,80 @@ test('training previews match recovery and successful stat gains while low stami
   const rest=previewTraining({...r,energy:80},{...p,action:'rest'});assert.equal(rest.energy,20);assert.equal(rest.energyAfter,100);
   const hospital=previewTraining({...r,money:0,energy:0,injury:{severity:'major',weeks:3,treated:false}},{...p,action:'hospital'});
   assert.equal(hospital.energy,24);assert.equal(hospital.money,0);
+});
+
+test('ordinary training follows the energy curve and the low-energy bonus leaves rest worthwhile',()=>{
+  const r=career().rider!,p={action:'trick',spot:'river',skill:'hardflip'} as const;
+  const curve=Array.from({length:101},(_,energy)=>trainingSuccess({...r,energy},p));
+  for(const [from,to,min,max] of [[0,19,.15,.39],[20,39,.4,.69],[40,69,.7,.87],[70,79,.9,.98],[80,100,1,1]]){
+    assert.ok(curve.slice(from,to+1).every(chance=>chance>=min-1e-9&&chance<=max+1e-9));
+  }
+  assert.ok(curve.every((chance,energy)=>!energy||chance>=curve[energy-1]&&chance-curve[energy-1]<=.031));
+  assert.equal(trainingSuccess({...r,energy:100,injury:{severity:'minor',weeks:2,treated:false}},p),.88);
+  const exhausted={...r,energy:0},afterRest={...r,energy:RULES.restEnergy};
+  const gainAt=(rider:typeof r)=>trainingFactor(rider,p,.5)/(.72+.0028*rider.energy);
+  assert.ok(Math.abs(gainAt(exhausted)/gainAt(afterRest)-1.30)<1e-9);
+  assert.ok(2*curve[0]*trainingFactor(exhausted,p,.5)<curve[RULES.restEnergy]*trainingFactor(afterRest,p,.5));
+});
+
+test('one deterministic random special is visible in the client view and yields the exact forecast',()=>{
+  const c=career(),r=c.rider!;
+  const offers=TRAINING_ACTIONS.map(action=>{
+    let seed=0;
+    while(randomSpecialTraining({...r,seed})!==action)seed++;
+    return seed;
+  });
+  for(const [index,seed] of offers.entries()){
+    const c=career(),r=c.rider!;
+    r.energy=12;r.seed=seed;
+    const action=TRAINING_ACTIONS[index];
+    const projected={...r,seed:0,trainingOffer:randomSpecialTraining(r)??null};
+    assert.equal(randomSpecialTraining(JSON.parse(JSON.stringify(projected))),action);
+    const p:Plan={action,spot:'river',skill:action==='dance'?'peter-pan':action==='trick'?'pivot':undefined};
+    const forecast=previewTraining(projected,p);
+    assert.deepEqual(forecast,previewTraining(r,p));
+    assert.deepEqual([forecast.special,forecast.success,forecast.energy],['random',1,0]);
+    assert.ok(TRAINING_ACTIONS.filter(other=>previewTraining(projected,plan(other)).special).length===1);
+    const before=structuredClone(r);
+    command(c,{type:'plan',plan:p},identity);assert.ok(processWeek(c));
+    assert.equal(r.energy,before.energy);assert.equal(r.injury,null);
+    assert.equal(r.extras!.lastTraining!.special,'random');
+    for(const stat of STATS)assert.ok(Math.abs(r.stats[stat]-before.stats[stat]-(forecast.gains[stat]?.max??0))<1e-8);
+    if(p.skill)assert.ok(Math.abs(r.skills[p.skill].mastery-before.skills[p.skill].mastery-forecast.skill!.max)<1e-8);
+  }
+});
+
+test('special training replaces a booked ordinary meet once and cannot replace an international meet',()=>{
+  const p:Plan={...plan('speed'),meetTraining:true};
+  for(const week of [CALENDAR[0].week,CALENDAR.find(meet=>meet.major)!.week]){
+    const state=blankSave(),r=state.career.rider=career().rider!;
+    r.week=week;r.energy=14;r.events.first=1;
+    const step=(save:typeof state,action:Parameters<typeof advance>[1],now:number)=>advance(save,action,'tab',now,2000,identity);
+    const queued=step(state,{type:'plan',plan:p},0);
+    assert.throws(()=>step(queued,{type:'entry',disciplines:['dance']},1),/출전 대신 훈련/);
+    const restored:typeof state=JSON.parse(JSON.stringify(queued));
+    let resolved=step(restored,{type:'pulse'},2000);
+    assert.equal(resolved.career.rider!.extras!.lastTraining!.special,'meet');
+    assert.equal(resolved.career.rider!.energy,r.energy);
+    assert.equal(resolved.career.rider!.money,r.money+RULES.weeklyAllowance);
+    assert.equal(step(resolved,{type:'pulse'},2100),resolved);
+    resolved=step(resolved,{type:'continue-training',record:resolved.clock.pendingTraining!},2200);
+    const pending=resolved.career.rider!;
+    if(pending.phase==='event')resolved=step(resolved,{type:'event',eventId:pending.event!,index:0},2300);
+    const trained=resolved.career.rider!;
+    assert.equal(trained.records.length,1);
+    assert.deepEqual(trained.records[0].results,[]);
+    assert.equal(rankingPoints(trained).total,0);
+  }
+  const c=career(),r=c.rider!;
+  assert.throws(()=>command(c,{type:'plan',plan:p},identity),/정규·메이저/);
+  r.settings={mode:'auto',strategy:'dance',entries:[]};r.energy=0;r.week=CALENDAR[0].week;
+  prepareWeek(r);
+  assert.equal(r.plan?.meetTraining,true);assert.ok(processWeek(c));
+  assert.equal(r.extras!.lastTraining!.special,'meet');assert.equal(r.records[0].results.length,0);
+  const international=career();
+  international.rider!.year=2;international.rider!.week=52;
+  assert.throws(()=>command(international,{type:'plan',plan:p},identity),/정규·메이저/);
 });
 
 
