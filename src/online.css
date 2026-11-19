@@ -27,7 +27,7 @@
 .archive-achievements > div { display:grid; gap:4px; min-width:0; padding:10px; border:1px solid #d2d8c3; border-radius:7px; background:#fffdf3; }
 .archive-achievements svg { color:#42725b; }
 .archive-achievements strong { color:#24394e; font:750 clamp(1rem,3vw,1.5rem) var(--mono); }
-.archive-achievements small,.honor-record small { color:#55665a; }
+.archive-achievements small,.rank-record small { color:#55665a; }
 .archive-honors { margin-bottom:8px; }
 .archive-details h4 { margin:.6rem 0 .3rem; }
 .archive-details .archive-final-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; padding:0; border:0; }
@@ -42,29 +42,32 @@
 .online-controls select { min-height: 42px; }
 .rules-note { background: #edf2f6; padding: .65rem .75rem; border: 1px solid #c7d8e7; border-radius: 8px; margin: .65rem 0; font-size: .84rem; }
 .my-ranking { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; background:#ecf2df; border:1px solid #cdd9bc; border-radius:9px; padding:.6rem .75rem; margin:.7rem 0; }
-.honor-rules { margin:0 0 10px; }
-.honor-rules ul { margin:8px 0; padding-inline-start:19px; font-size:.82rem; line-height:1.55; }
-.honor-rules li + li { margin-top:4px; }
-.honor-rules > p,.honor-rules > small { margin:0 0 6px 4px; font-size:.8rem; }
-.honor-weights { display:grid; gap:5px; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); margin:8px 0; }
-.honor-weights > div { background:#eef1e2; border-radius:5px; display:grid; gap:4px; padding:6px 8px; font-size:.79rem; }
-.honor-weights dd { margin:0; font:750 .83rem var(--mono); }
-.honor-ranking { display:grid; gap:7px; }
-.honor-rank-card { display:grid; grid-template-columns:42px 60px minmax(0,1.1fr) minmax(0,1.5fr) 82px auto; align-items:center; gap:10px; padding:8px; border:1px solid #d4d8c5; border-radius:8px; background:#fffdf3; }
-.honor-rank-card[data-podium] { border-left:4px solid #a7a886; }
-.honor-rank-card[data-podium="1"] { background:#f1f1db; border-left-color:#a68142; }
-.honor-rank-card[data-podium="2"] { border-left-color:#718598; }
-.honor-rank-card[data-podium="3"] { border-left-color:#a87760; }
-.honor-rank-card .pixel-rider { width:60px; height:64px; object-fit:contain; border-radius:7px; background:#e9efdf; }
-.honor-place { color:#355369; text-align:center; font:750 1.1rem var(--mono); }
-.honor-place small { font-size:.65rem; }
-.honor-rider,.honor-record,.honor-score { min-width:0; display:grid; gap:3px; overflow-wrap:anywhere; }
-.honor-rider span,.honor-record span,.honor-record small,.honor-score small { font-size:.76rem; }
-.honor-rider small { color:#41684d; font-size:.65rem; }
-.honor-record strong { font-size:.86rem; }
-.honor-score { text-align:right; color:#2f5946; }
-.honor-score strong { font:750 1.08rem var(--mono); }
-.honor-view { justify-self:end; }
+.rp-overview { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 13px; padding:8px 11px; margin:8px 0; border:1px solid #cdd9bc; border-radius:8px; background:#ecf2df; }
+.rp-overview > strong { color:#2f5946; font-size:1rem; }
+.rp-overview > b,.rp-overview > small { color:#465b50; font-size:.82rem; }
+.rp-overview > small { flex-basis:100%; }
+.rp-breakdown { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); width:100%; margin:3px 0; gap:5px; }
+.rp-breakdown > div { display:grid; gap:3px; padding:6px; border-radius:5px; background:#f2f4e7; font-size:.75rem; }
+.rp-breakdown dd { margin:0; font:750 .78rem var(--mono); }
+.rp-rules { margin:0 0 10px; }
+.rp-rules ul { margin:8px 0; padding-inline-start:19px; font-size:.82rem; line-height:1.55; }
+.rp-rules li + li { margin-top:4px; }
+.rp-payouts p { margin:.3rem 0; font-size:.82rem; }
+.global-rank-list { display:grid; gap:7px; }
+.global-rank-card { display:grid; grid-template-columns:42px 60px minmax(0,1.1fr) minmax(0,1.5fr) 96px auto; align-items:center; gap:10px; padding:8px; border:1px solid #d4d8c5; border-radius:8px; background:#fffdf3; }
+.global-rank-card[data-podium] { border-left:4px solid #a7a886; }
+.global-rank-card[data-podium="1"] { background:#f1f1db; border-left-color:#a68142; }
+.global-rank-card[data-podium="2"] { border-left-color:#718598; }
+.global-rank-card[data-podium="3"] { border-left-color:#a87760; }
+.global-rank-card .pixel-rider { width:60px; height:64px; object-fit:contain; border-radius:7px; background:#e9efdf; }
+.rank-place { color:#355369; text-align:center; font:750 1.1rem var(--mono); }
+.rank-place small { font-size:.65rem; }
+.rank-rider,.rank-record { min-width:0; display:grid; gap:3px; overflow-wrap:anywhere; }
+.rank-rider span,.rank-record span,.rank-record small { font-size:.76rem; }
+.rank-rider small { color:#41684d; font-size:.65rem; }
+.rank-record strong { font-size:.86rem; }
+.rank-rp { text-align:right; color:#2f5946; font:750 1.08rem var(--mono); white-space:nowrap; }
+.rank-view { justify-self:end; }
 .public-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
 .public-card { display: flex; align-items: center; gap: .5rem; min-width: 0; text-align: left; background: #f8f1e4; border: 1px solid #e0d3bd; border-radius: 9px; padding: .5rem; }
 .public-card:hover { background: #e5efe3; border-color: #9cb19c; }
@@ -95,11 +98,11 @@
   .console-panel .hall-tabs .pill { min-height:44px; padding-inline:3px; font-size:.78rem; white-space:nowrap; }
   .hall-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)) minmax(0,1.55fr); gap:4px; }
   .console-panel .hall-metrics .pill { min-height:40px; padding-inline:3px; font-size:.78rem; white-space:nowrap; }
-  .honor-rank-card { grid-template-columns:27px 48px minmax(0,1fr) 73px; gap:7px; padding:7px; }
-  .honor-rank-card .pixel-rider { width:48px; height:52px; }
-  .honor-record { grid-column:2/-1; }
-  .honor-score { grid-column:4; grid-row:1; }
-  .honor-view { grid-column:2/-1; min-height:40px; }
+  .global-rank-card { grid-template-columns:27px 48px minmax(0,1fr) 78px; gap:7px; padding:7px; }
+  .global-rank-card .pixel-rider { width:48px; height:52px; }
+  .rank-record { grid-column:2/-1; }
+  .rank-rp { grid-column:4; grid-row:1; font-size:.94rem; }
+  .rank-view { grid-column:2/-1; min-height:40px; }
   .archive-achievements,.archive-details .archive-final-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .online-controls { margin-top:0; }
   .search-form { width:100%; }

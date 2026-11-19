@@ -3,6 +3,7 @@ import { generateRoutine, learned, simulateMeet, validRoutine } from './competit
 import { autoChoice, canStudy, eventFor, eventPaused, pickEvent } from './events.js';
 import { chooseEnding, honors, mentorFrom } from './legacy.js';
 import { RUN_PROOF_VERSION } from './public.js';
+import { meetRP } from './rp.js';
 import { RIVALS, SPOT_GATE, spotUnlocked } from './content.js';
 import { ECONOMY, effectiveStats, eligibleSponsor, equipmentReaction, equipmentUnlocked, extras, freshExtras, gearBonuses, ITEM, maintainedSponsor, milestone, playerPlace, resaleValue, SPONSOR, STARTER_IDS, supply, unlockEquipment, upgradeEquipment } from './economy.js';
 import { clamp, round, seeded } from './random.js';
@@ -267,7 +268,7 @@ function finishWeek(c:Career,r:Rider) {
       supply(r,brand);
       milestone(r,'스폰서 계약 갱신',brand.name);
     } else if(brand) milestone(r,'스폰서 계약 종료',`${brand.name} · 지난 시즌 입상 조건 미달`);
-    note(r,'system',`${r.year}년차가 시작됐다. 새 시즌 포인트를 쌓아 보자!`);
+    note(r,'system',`${r.year}년차가 시작됐다. 새 시즌 RP를 쌓아 보자!`);
   } else r.week++;
   r.phase='plan'; r.plan=null; r.entries=null;
 }
@@ -279,7 +280,7 @@ function runMeet(c:Career,r:Rider,disciplines:Discipline[],official:boolean) {
   const {results,rankings}=simulateMeet(r,meet,entries,official);
   for(const d of DISCIPLINES){
     const points=r.season.scores[d];
-    for(const s of rankings[d]) points[s.id]=(points[s.id]??0)+Math.round(RULES.places[Math.min(s.place-1,5)]*(meet.major?RULES.majorMultiplier:1));
+    for(const standing of rankings[d]) points[standing.id]=(points[standing.id]??0)+meetRP(standing.place,meet.major);
   }
   for(const result of results){
     const contract=extras(r).contract;

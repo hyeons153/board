@@ -4,6 +4,7 @@ import { meetById, DISCIPLINE_NAMES, SKILL } from '../game/data';
 import { RIVAL } from '../game/content';
 import { equippedLook } from '../game/economy';
 import { chooseEnding, endingName, ENDINGS, summarize } from '../game/legacy';
+import { formatRP, rankingPoints } from '../game/rp';
 import { DISCIPLINES, type Archive } from '../game/types';
 import Scene from './Scene';
 import { Tag } from './Brand';
@@ -36,7 +37,7 @@ export default function Ceremony({archive,onHall,onNew}:{archive:Archive;onHall:
       {step===1&&rival&&<blockquote><strong>{rival.name}</strong><p>{ending.friends.length?'“우리가 같이 탔던 시간도 네 기록이야. 다음에 타게 되면, 또 강변에서 보자.”':'“어디까지 가든 그 첫 한 바퀴는 네 거야. 오늘 네가 탄 길을 잊지 마.”'}</p></blockquote>}
       {step===2&&moment&&<p><Flag size={16}/> 대표 장면 · {SKILL[moment.id]?.name}</p>}
       {step===3&&<>
-        <div className="archive-stats"><span><Trophy size={17}/> {summary.wins}승 · {summary.podiums}회 입상</span><span>{summary.meets}개 대회 · 시즌 포인트 {summary.points}</span><span>기술 {summary.learned.length}개</span></div>
+        <div className="archive-stats"><span><Trophy size={17}/> {summary.wins}승 · {summary.podiums}회 입상</span><span>{summary.meets}개 대회 · 통산 {formatRP(rankingPoints(archive).total)}</span><span>명성 {archive.fame} · 기술 {summary.learned.length}개</span></div>
         <div className="pill-row">{DISCIPLINES.map(d=><Tag key={d}>{DISCIPLINE_NAMES[d]} {summary.best[d].toFixed(1)}점</Tag>)}</div>
         {!!ending.friends.length&&<div className="epilogue"><strong>우정·라이벌 에필로그</strong>
           {ending.friends.map(id=><p key={id}>{RIVAL.get(id)?.name}와 함께한 스팟과 대회 이야기는 은퇴식 뒤에도 이어졌다.</p>)}</div>}

@@ -1,6 +1,6 @@
 import { meetById, DISCIPLINE_NAMES, SKILLS } from './data.js';
 import { equippedLook } from './economy.js';
-import { DISCIPLINES, STATS, type Archive, type Career, type Discipline, type Ending, type Look, type Mentor, type Rider } from './types.js';
+import { DISCIPLINES, type Archive, type Career, type Discipline, type Ending, type Look, type Mentor, type Rider } from './types.js';
 
 type CareerRecord = Pick<Archive,'name'|'year'|'week'|'stats'|'skills'|'records'|'relations'|'seasons'|'extras'> & { reason?: Rider['reason']; season?: Rider['season']; events?: Rider['events'] };
 export const ENDING_RULES = { openWins:24, majors:8, openChampionships:2, seniorChampionships:1, advancedSkillCount:6, mastery:82, friendship:30 } as const;
@@ -26,7 +26,7 @@ export function summarize(record:CareerRecord){
   const advanced=learned.filter(skill=>skill.difficulty>=3&&(record.skills[skill.id]?.mastery??0)>=ENDING_RULES.mastery);
   const favorite=[...learned].sort((a,b)=>(record.skills[b.id]?.mastery??0)-(record.skills[a.id]?.mastery??0)||b.difficulty-a.difficulty)[0];
   return {meets:meets.length,wins:results.filter(x=>place(x)===1).length,podiums:results.filter(x=>place(x)<=3).length,best,
-    points:results.reduce((total,result)=>total+result.points,0),champions,learned,advanced,favorite,
+    champions,learned,advanced,favorite,
     openWins:meets.filter(meet=>(meet.division==='open'||meet.division==='master')).flatMap(meet=>meet.results).filter(x=>place(x)===1).length,
     majorWins:meets.filter(meet=>(meet.division==='open'||meet.division==='master')&&meetById(meet.id)?.major).flatMap(meet=>meet.results).filter(x=>place(x)===1).length,
     triple:meets.some(meet=>meet.results.length===3&&meet.results.every(x=>place(x)===1))};
@@ -80,4 +80,3 @@ export function mergeCareers(destination:Career,guest:Career):Career {
   const halls=new Map([...destination.hall,...guest.hall].map(archive=>[archive.id,archive]));
   return {rider:keep,hall:[...halls.values()],parked:[...new Map(parked.filter(r=>r.id!==keep?.id).map(r=>[r.id,r])).values()]};
 }
-export const statTotal=(stats:Rider['stats'])=>STATS.reduce((sum,stat)=>sum+stats[stat],0);

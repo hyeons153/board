@@ -2,6 +2,7 @@ import { RULES, SKILL, SKILLS, START_SKILLS } from './data.js';
 import { RIVALS, type Rival } from './content.js';
 import { ECONOMY, effectiveStats, equippedLook, gearBonuses, legacyBonuses } from './economy.js';
 import { RUN_PROOF_VERSION } from './public.js';
+import { meetRP } from './rp.js';
 import { clamp, round, seeded } from './random.js';
 import { DISCIPLINES, STATS, type Discipline, type Rider, type RoutineStyle, type Run, type Skill, type Meet, type Result, type Stats, type Progress, type Outcome, type Standing } from './types.js';
 
@@ -155,7 +156,7 @@ export function simulateMeet(rider:Rider,meet:Meet,entries:Discipline[],official
     const proof=official&&routine?structuredClone({version:RUN_PROOF_VERSION,rules:3 as const,seed:rider.seed,routine,stats:p.stats,energy:p.energy,
       injury:p.injury,skills:p.skills,gear:p.extras?{inventory:p.extras.inventory,equipped:p.extras.equipped,accessories:p.extras.accessories,equipmentVersion:p.extras.equipmentVersion}:undefined}):undefined;
     results.push({
-      discipline:d,run,standings,points:Math.round(RULES.places[Math.min(place-1,5)]*(meet.major?RULES.majorMultiplier:1)),
+      discipline:d,run,standings,points:meetRP(place,meet.major),
       prize:Math.round(prize*(1+effects.prize))+ECONOMY.participation,participation:ECONOMY.participation,fame:round(Math.max(1,8-place)*(meet.major?2:1)*(1+Math.min(.06,effects.fame+(place<=3?effects.podiumFame:0)))),energy,opponents,look,proof,
     });
   }

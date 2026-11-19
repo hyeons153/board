@@ -20,6 +20,7 @@ import { chooseEnding } from '../src/game/legacy';
 import { DISCIPLINES, type Career, type GameAction, type View } from '../src/game/types';
 import type { Directory, Publication, PublicCard } from '../src/game/public';
 import { RANKING_VERSION } from '../src/game/public';
+import { rankingPoints } from '../src/game/rp';
 
 const pw='test-account-passphrase-42';
 const base='https://longboard.test/api/game';
@@ -156,7 +157,10 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
     const profile=await (await status(viewer.call('?area=public&id='+publish.id),200)).json() as PublicCard;
     assert.equal(profile.profile.name,archive.name);
     assert.ok(profile.profile.official);
-    assert.ok((profile.profile.honorScores?.career?.total??0)>0,'An eligible early retirement earns an overall score');
+    const savedRP=rankingPoints(archive);
+    assert.ok(savedRP.total>0,'An eligible early retirement earns RP');
+    assert.deepEqual(profile.profile.rp,savedRP);
+    assert.equal(profile.profile.fame,archive.fame);
     assert.equal(profile.mine,false);
     const serialized=JSON.stringify(profile);
     for(const privateValue of [ownerRider.id,ownerId,'river_archive','passwordHash','proof']) assert.ok(!serialized.includes(privateValue));
@@ -167,19 +171,29 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
     assert.equal(ranked.rows[0]?.rank,1);
     assert.equal(ranked.mine[0]?.rank,1);
     const overall=async()=>await (await status(viewer.call('?area=public&metric=career'),200)).json() as Directory;
-    assert.equal((await overall()).rows[0].score,profile.profile.honorScores?.career?.total);
+    assert.equal((await overall()).rows[0].score,savedRP.total);
+    assert.equal(ranked.rows[0].score,savedRP.disciplines.dance);
+    assert.equal(ranked.rows[0].representative?.rp,savedRP.disciplines.dance);
     for(const metric of ['trick','freestyle'])assert.equal((await (await status(viewer.call('?area=public&metric='+metric),200)).json() as Directory).rows.length,0);
 
     // Recreate the pre-update public projection without altering the authoritative career.
     const serializedCareer=JSON.stringify((await store.get(ownerId)).snapshot);
-    await pg.db.query('UPDATE public_riders SET profile=profile - \'rankingVersion\' - \'honorScores\' WHERE id=$1',[publish.id]);
-    await pg.db.query('UPDATE rider_rankings SET version=1 WHERE public_id=$1',[publish.id]);
-    assert.deepEqual(await refreshPublicHall(pg.db,false),{checked:1,ranked:1,missing:0,updated:0});
+    const oldProjection={rankingVersion:2,honorScores:{career:{total:455.3}},careerPoints:455.3,points:savedRP.total};
+    await pg.db.query(`UPDATE public_riders SET profile=(profile - ARRAY['rp','representatives']) || $2::jsonb WHERE id=$1`,[publish.id,JSON.stringify(oldProjection)]);
+    await pg.db.query('UPDATE rider_rankings SET version=2,score=455.3 WHERE public_id=$1',[publish.id]);
+    assert.deepEqual(await refreshPublicHall(pg.db,false),{checked:1,ranked:1,missing:0,partial:0,updated:0});
     assert.equal((await overall()).rows.length,0);
-    assert.deepEqual(await refreshPublicHall(pg.db,true),{checked:1,ranked:1,missing:0,updated:1});
-    assert.deepEqual(await refreshPublicHall(pg.db,true),{checked:0,ranked:0,missing:0,updated:0});
+    assert.deepEqual(await refreshPublicHall(pg.db,true),{checked:1,ranked:1,missing:0,partial:0,updated:1});
+    assert.deepEqual(await refreshPublicHall(pg.db,true),{checked:0,ranked:0,missing:0,partial:0,updated:0});
     assert.equal((await overall()).rows[0].id,publish.id);
     assert.equal(JSON.stringify((await store.get(ownerId)).snapshot),serializedCareer);
+    const oldScores=await pg.db.query<{score:number}>('SELECT score FROM rider_rankings WHERE public_id=$1 AND version=2',[publish.id]);
+    assert.deepEqual(oldScores.map(row=>row.score),[455.3,455.3]);
+    const [oldFields]=await pg.db.query<{honor:unknown}>(`SELECT profile->'honorScores' AS honor FROM public_riders WHERE id=$1`,[publish.id]);
+    assert.deepEqual(oldFields.honor,oldProjection.honorScores);
+    const refreshed=await (await status(viewer.call('?area=public&id='+publish.id),200)).json() as PublicCard;
+    assert.deepEqual(refreshed.profile.rp,savedRP);
+    assert.equal('honorScores' in refreshed.profile,false);
 
     // Equal verified scores share a rank, with one representative per account.
     const viewerId=(await store.actor(sessionHash(viewer.token())))!.id;
@@ -201,8 +215,11 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
 
     await status(owner.call('?area=public',{type:'publish',archiveId:archive.id,active:false}),200);
     await status(viewer.call('?area=public&id='+publish.id),404);
-    assert.equal((await pg.db.query('SELECT public_id FROM rider_rankings')).length,0);
+    assert.equal((await overall()).rows.length,0);
+    assert.equal((await (await status(viewer.call('?area=public'),200)).json() as Directory).rows.length,0);
+    const beforeRepublish=await pg.db.query('SELECT public_id,metric,score,version FROM rider_rankings ORDER BY version,metric');
     await status(owner.call('?area=public',{type:'publish',archiveId:archive.id,active:true}),200);
+    assert.deepEqual(await pg.db.query('SELECT public_id,metric,score,version FROM rider_rankings ORDER BY version,metric'),beforeRepublish);
 
     await status(owner.game({type:'create',name:'다음 회차',look:DEFAULT_LOOK}),200);
     assert.equal(owner.snapshot().career.rider?.mentor?.name,'리버 공식 선수');
@@ -225,7 +242,7 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
   }finally{await pg.close();}
 });
 
-test('verified complete and early careers share one score formula; invalid or unverified results stay outside',()=>{
+test('verified complete and early careers rank by exact RP from their saved competition results',()=>{
   const c:Career={rider:null,hall:[]};
   command(c,{type:'create',name:'Finalist',look:DEFAULT_LOOK},()=>({id:randomUUID(),seed:981}),true,true);
   const rider=c.rider!;
@@ -245,11 +262,13 @@ test('verified complete and early careers share one score formula; invalid or un
   short.records=short.records.filter(meet=>meet.year===1&&['regular-1','regular-2'].includes(meet.id));
   const early=publicationFor(short);
   assert.deepEqual(early.entries.map(item=>item.metric),['career','freestyle']);
-  assert.ok(early.profile.honorScores?.career?.verifiedMeets===2);
-  for(const score of Object.values(publication.profile.honorScores??{})){
-    assert.ok(score.total>=0&&score.total<=1000);
-    assert.equal(score.total,Math.round(Object.values(score.components).reduce((sum,points)=>sum+points,0)*10)/10);
-  }
+  const rp=rankingPoints(archive);
+  assert.deepEqual(publication.profile.rp,rp);
+  assert.equal(rp.total,archive.records.flatMap(meet=>meet.results).reduce((sum,result)=>sum+result.points,0));
+  assert.equal(rp.total,Object.values(rp.disciplines).reduce((sum,points)=>sum+points,0));
+  assert.equal(rp.total,rp.seasons.reduce((sum,season)=>sum+season.total,0));
+  assert.equal(early.entries[0].score,short.records.flatMap(meet=>meet.results).reduce((sum,result)=>sum+result.points,0));
+  assert.deepEqual(publicationFor({...archive,fame:9999,skills:{},stats:{speed:0,carve:0,link:0,balance:0}}).entries,publication.entries);
   const incomplete=structuredClone(archive);
   incomplete.records.find(meet=>meet.id==='international-2')!.results.pop();
   assert.equal(publicationFor(incomplete).entries.some(item=>item.metric==='career'),false,'Graduation requires every international discipline');
@@ -265,6 +284,7 @@ test('verified complete and early careers share one score formula; invalid or un
   delete historical.rankedStart;
   for(const meet of historical.records) for(const result of meet.results) delete result.proof;
   assert.equal(publicationFor(historical).entries.length,0);
+  assert.deepEqual(publicationFor(historical).profile.rp,rp,'Provenance limits global ranking without changing the archived RP');
   assert.equal(publicationFor(historical).profile.wins,publicationFor(archive).profile.wins);
 });
 

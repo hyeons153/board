@@ -9,6 +9,8 @@ import { PixelRider } from './Appearance';
 import { divisionFor } from '../game/career';
 import { DISCIPLINES, STATS, type Archive, type Rider, type View } from '../game/types';
 import { chooseEnding, endingName, honors, summarize } from '../game/legacy';
+import { formatRP, peakSeasonRP, rankingPoints, validRP } from '../game/rp';
+import { RPDisciplines } from './RankingPoints';
 import type { Publication } from '../game/public';
 import { SectionTitle, Tag } from './Brand';
 import { RiderCard, StatCards, type Submit } from './Overview';
@@ -19,14 +21,18 @@ export function Rankings({r}:{r:Rider}){
   const [discipline,setDiscipline]=useState<typeof DISCIPLINES[number]>('dance');
   const history=[...r.seasons,...(r.seasons.some(s=>s.year===r.year)?[]:[r.season])];
   const season=history.find(s=>s.year===(year??r.year))??r.season;
-  const scores=season.scores[discipline];
+  const rp=rankingPoints(r);
+  const own=rp.seasons.find(item=>item.year===season.year);
+  const scores={...season.scores[discipline]};
+  if(own&&own.disciplines[discipline]>0)scores.player=own.disciplines[discipline];
   const board=Object.entries(scores).sort(([a,x],[b,y])=>y-x||a.localeCompare(b));
   return <section className="panel content-panel">
-    <p className="game-section-note">부문과 종목별 시즌 포인트 순위예요.</p>
+    <p className="game-section-note">선택한 연차에 획득한 종목별 RP로 순위를 매깁니다.</p>
+    <div className="rp-overview"><strong>통산 {formatRP(rp.total)}</strong><b>{season.year}년차 시즌 {formatRP(own?.total??0)}</b></div>
     <div className="filter-line"><div className="pill-row">{DISCIPLINES.map(d=><button key={d} aria-pressed={d===discipline} className={`pill ${d===discipline?'active':''}`} onClick={()=>setDiscipline(d)}>{DISCIPLINE_NAMES[d]}</button>)}</div><label className="inline-select">시즌<select value={season.year} onChange={e=>setYear(Number(e.target.value))}>{history.map(s=><option value={s.year} key={s.year}>{s.year}년차 · {DIVISION_NAMES[s.division]}</option>)}</select></label></div>
     <div className="inner-card rankings">
       <div className="card-heading"><span><Trophy size={19}/> {DISCIPLINE_NAMES[discipline]} 순위표</span><Tag kind="lime">{DIVISION_NAMES[season.division]}</Tag></div>
-      {board.length?<ol className="rank-list">{board.map(([id,points],i)=><li className={id==='player'?'you':''} key={id}><b>{i+1}</b><span>{id==='player'?r.name:NAMES[id]} {id==='player'&&<small>나</small>}</span><strong>{points} P</strong></li>)}</ol>:<p className="empty">아직 집계된 포인트가 없어요. 대회가 열리면 순위표가 채워집니다.</p>}
+      {board.length?<ol className="rank-list">{board.map(([id,points],i)=><li className={id==='player'?'you':''} key={id}><b>{i+1}</b><span>{id==='player'?r.name:NAMES[id]} {id==='player'&&<small>나</small>}</span><strong>{formatRP(points)}</strong></li>)}</ol>:<p className="empty">아직 집계된 RP가 없어요. 대회가 열리면 순위표가 채워집니다.</p>}
     </div>
   </section>;
 }
@@ -79,7 +85,7 @@ function RetirementSummary({r}:{r:Rider}){
   const stats=summarize(r);
   return <div className="retirement-summary">
     <h3>은퇴 시 보관할 기록</h3>
-    <p>{r.year}년차 {r.week}주 · 대회 {stats.meets}회 · {stats.wins}승 · {stats.podiums}회 입상 · 시즌 포인트 {stats.points}</p>
+    <p>{r.year}년차 {r.week}주 · 대회 {stats.meets}회 · {stats.wins}승 · {stats.podiums}회 입상 · 통산 {formatRP(rankingPoints(r).total)}</p>
     <div className="pill-row">{DISCIPLINES.map(d=><Tag key={d}>{DISCIPLINE_NAMES[d]} 최고 {stats.best[d].toFixed(1)}점</Tag>)}</div>
     <details className="past-meets"><summary>기술 {stats.learned.length}개와 라이벌 관계</summary>
       <div className="pill-row">{stats.learned.map(s=><Tag key={s.id}>{s.name} {r.skills[s.id].mastery}%</Tag>)}</div>
@@ -98,7 +104,7 @@ function CareerLog({r}:{r:Rider}){
         <tbody>{recent.map(meet=><tr key={meet.year+meet.id}><th scope="row">{meet.year}년차 {meetById(meet.id)?.name}</th>
           {DISCIPLINES.map(d=>{
             const result=meet.results.find(x=>x.discipline===d);
-            return <td key={d}>{result?`${result.run.score.toFixed(1)}점 · ${playerPlace(result)}위`:'—'}</td>;
+          return <td key={d}>{result?`${result.run.score.toFixed(1)}점 · ${playerPlace(result)}위${validRP(result.points)?' · +'+formatRP(result.points):''}`:'—'}</td>;
           })}</tr>)}</tbody>
       </table></div>}
     {!!timeline.length&&<details className="past-meets"><summary>주요 사건과 보상 <ChevronDown size={16}/></summary><div>
@@ -147,6 +153,8 @@ export function PrivateHall({hall,view,onEnding,onAccount,onPublic}:{hall:Archiv
 }
 function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNode}){
   const summary=summarize(a);
+  const rp=rankingPoints(a);
+  const peak=peakSeasonRP(rp);
   const earned=a.honors??honors(a);
   const ending=a.ending??chooseEnding(a);
   const time=(a.year-1)*RULES.weeks+a.week;
@@ -172,6 +180,9 @@ function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNod
         <Icon size={16} aria-hidden="true"/><strong>{value}</strong><small>{label}</small>
       </div>)}
     </div>
+    <div className="rp-overview"><strong>통산 {formatRP(rp.total)}</strong>
+      {!!peak?.total&&<b>최고 시즌 · {peak.year}년차 {formatRP(peak.total)}</b>}{rp.partial&&<small>확인된 RP만 집계했습니다.</small>}
+    </div>
     {!!earned.length&&<div className="pill-row archive-honors">{earned.slice(-3).reverse().map(title=><Tag key={title} kind="lime"><Medal size={14}/> {title}</Tag>)}</div>}
     <details className="past-meets"><summary>커리어 상세 보기 <ChevronDown size={16}/></summary><div className="archive-details">
       <h4>최종 능력치</h4>
@@ -181,14 +192,16 @@ function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNod
       <h4>기술과 숙련도</h4>
       <div className="pill-row">{summary.learned.map(skill=><Tag key={skill.id}>{skill.name} {a.skills[skill.id].mastery}%</Tag>)}</div>
       {relationships.length>0&&<><h4>라이벌</h4><div className="pill-row">{relationships.map(rival=><Tag key={rival.id}>{rival.name} 관계 {a.relations[rival.id]??0}</Tag>)}</div></>}
-      {years.length>0&&<><h4>연차별 성장과 대회 · 시즌 포인트 {summary.points.toLocaleString('ko-KR')}</h4>{years.map(year=>{
+      <h4>통산 종목별 RP</h4><RPDisciplines points={rp.disciplines}/>
+      {years.length>0&&<><h4>연차별 성장과 대회</h4>{years.map(year=>{
         const season=a.seasons.find(item=>item.year===year);
         const matches=a.records.filter(item=>item.year===year);
         const events=timeline.filter(item=>item.year===year).sort((left,right)=>left.week-right.week);
         const division=season?.division??matches[0]?.division;
-        const seasonPoints=season&&DISCIPLINES.flatMap(d=>season.scores[d].player===undefined?[]:[`${DISCIPLINE_NAMES[d]} ${season.scores[d].player}P`]);
-        return <details className="past-meets archive-year" key={year}><summary>{year}년차{division?' · '+DIVISION_NAMES[division]:''}{seasonPoints?.length?' · '+seasonPoints.join(' / '):''}</summary>
-          <ul className="hall-history">{matches.map(meet=><li key={meet.id}><b>{meetById(meet.id)?.name??meet.id}</b><span>{meet.results.map(result=>`${DISCIPLINE_NAMES[result.discipline]} ${playerPlace(result)}위 · ${result.run.score.toFixed(1)}점`).join(' / ')||'불참'}</span></li>)}</ul>
+        const seasonRP=rp.seasons.find(item=>item.year===year);
+        return <details className="past-meets archive-year" key={year}><summary>{year}년차{division?' · '+DIVISION_NAMES[division]:''}{seasonRP?' · '+formatRP(seasonRP.total):''}</summary>
+          {seasonRP&&<RPDisciplines points={seasonRP.disciplines}/>}
+          <ul className="hall-history">{matches.map(meet=><li key={meet.id}><b>{meetById(meet.id)?.name??meet.id}</b><span>{meet.results.map(result=>`${DISCIPLINE_NAMES[result.discipline]} ${playerPlace(result)}위 · ${result.run.score.toFixed(1)}점${validRP(result.points)?' · +'+formatRP(result.points):''}`).join(' / ')||'불참'}</span></li>)}</ul>
           <ul className="hall-history">{events.map((event,i)=><li key={`${event.week}:${event.title}:${i}`}><b>{event.week}주 · {lineTerms(event.title)}</b><span>{lineTerms(event.text)}</span></li>)}</ul>
         </details>;
       })}</>}

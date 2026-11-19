@@ -7,6 +7,7 @@ import { ECONOMY, equippedLook, extras, playerPlace, SPONSOR } from '../src/game
 import { previewTraining, statAfter, trainingSuccess } from '../src/game/training';
 import { pickEvent } from '../src/game/events';
 import { seeded } from '../src/game/random';
+import { meetRP, rankingPoints } from '../src/game/rp';
 import { advance, blankSave, remaining } from '../server/clock';
 import { DISCIPLINES, STATS, type Career, type Plan } from '../src/game/types';
 
@@ -14,6 +15,38 @@ const identity=()=>({id:'rider-1',seed:5411});
 const career=():Career=>({rider:newRider(identity().id,identity().seed,'리버',{...DEFAULT_LOOK}),hall:[]});
 const plan=(p:Plan['action']):Plan=>({action:p,spot:'river'});
 const enterAuto=(c:Career)=>command(c,{type:'settings',settings:{mode:'auto',strategy:'freestyle',entries:['freestyle']}},identity);
+
+test('RP comes from competition, accumulates after a new season, and restores exact saved season totals without duplication',()=>{
+  assert.deepEqual([1,2,3,4,5,6,7].map(place=>meetRP(place,false)),[100,75,60,45,35,10,10]);
+  assert.deepEqual([1,2,3,4,5,6,7].map(place=>meetRP(place,true)),[150,113,90,68,53,15,15]);
+  const c=career(),r=c.rider!;
+  // A scouting event adds reputation and leaves the RP ledger empty.
+  r.week=7;r.phase='event';r.event='registration';
+  const oldFame=r.fame;
+  command(c,{type:'event',index:1},identity);
+  assert.ok(r.fame>oldFame);
+  assert.equal(rankingPoints(r).total,0);
+
+  r.week=52;r.phase='meet';
+  command(c,{type:'entry',disciplines:['dance']},identity,true);
+  const medal=r.records[0].results[0];
+  const after=rankingPoints(r);
+  assert.equal(r.year,2);
+  assert.equal(after.total,medal.points);
+  assert.equal(after.seasons.find(season=>season.year===2)?.total,0);
+  const duplicate={...r,records:[...r.records,...structuredClone(r.records)]};
+  assert.deepEqual(rankingPoints(duplicate),after);
+  duplicate.records[1].results[0].points+=100;
+  assert.deepEqual(rankingPoints(duplicate),after,'Conflicting duplicate records defer to the saved season total');
+  assert.equal(rankingPoints({...duplicate,seasons:[]}).partial,true);
+  assert.deepEqual(rankingPoints({...r,records:[]}),after,'A preserved season table recovers the exact RP');
+  const missing=structuredClone(r);
+  missing.records[0].results[0].points=Number.NaN;
+  assert.deepEqual(rankingPoints(missing),after);
+  missing.seasons=[];
+  assert.equal(rankingPoints(missing).total,0);
+  assert.equal(rankingPoints(missing).partial,true);
+});
 
 test('career divisions follow the four age groups and stats grow above 100 up to 200',()=>{
   assert.deepEqual(Array.from({length:9},(_,year)=>divisionFor(year)),['rookie','rookie','rookie','regular','regular','open','open','master','master']);

@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { blankSave, type Save } from './clock.js';
 import type { Database, Query } from './database.js';
 import { mergeCareers } from '../src/game/legacy.js';
-import { RANKING_VERSION, type Directory, type HonorScore, type Metric, type Publication, type PublicCard, type PublicProfile, type PublicSummary } from '../src/game/public.js';
+import { RANKING_VERSION, type Directory, type MeetHighlight, type Metric, type Publication, type PublicCard, type PublicProfile, type PublicSummary } from '../src/game/public.js';
 import type { Division } from '../src/game/types.js';
 import type { Row, Store } from './store.js';
 import { publicationFor } from './ranking.js';
-import { saveHonorEntries } from './hallIndex.js';
+import { saveRankEntries } from './hallIndex.js';
 
 export const ACCOUNT_SECONDS=30*24*60*60;
 const GUEST_SECONDS=365*24*60*60;
@@ -23,7 +23,7 @@ const normalized=(value:string)=>value.normalize('NFKC').toLocaleLowerCase('ko-K
 const searchPrefix=(value:string)=>[...normalized(value)].map(char=>['%','_','\\'].includes(char)?'\\'+char:char).join('')+'%';
 
 type PublicRow<P=PublicProfile>={id:string;profile:P;mine:boolean};
-type RankRow=PublicRow<PublicSummary>&{score:number;rank:number;honor:HonorScore;ownedRow:boolean};
+type RankRow=PublicRow<PublicSummary>&{score:number;rank:number;representative:MeetHighlight;ownedRow:boolean};
 const summaryKeys=['name','look','title','year','week','complete','division','wins','podiums','meets','best','ending','official','historic','honors'] as const satisfies readonly (keyof PublicSummary)[];
 const publicSummary=`jsonb_build_object(${summaryKeys.map(key=>`'${key}',p.profile->'${key}'`).join(',')})`;
 
@@ -168,7 +168,6 @@ export function databaseStore(db:Database,kind:Store['kind'],legacy?:LocalLegacy
         if(!active){
           if(!existing) throw new AccessError('공개 기록이 없어요.',404);
           await tx.query('UPDATE public_riders SET active=false WHERE id=$1',[existing.id]);
-          await tx.query('DELETE FROM rider_rankings WHERE public_id=$1',[existing.id]);
           return {...existing,active:false};
         }
         if(existing?.moderated) throw new AccessError('운영 검토로 비공개 처리된 기록이에요.',409);
@@ -179,10 +178,10 @@ export function databaseStore(db:Database,kind:Store['kind'],legacy?:LocalLegacy
         await tx.query(`
           INSERT INTO public_riders (id,owner_id,archive_id,profile,search_name,complete,division,ending)
           VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8)
-          ON CONFLICT(owner_id,archive_id) DO UPDATE SET active=true,profile=EXCLUDED.profile,search_name=EXCLUDED.search_name,
+          ON CONFLICT(owner_id,archive_id) DO UPDATE SET active=true,profile=public_riders.profile || EXCLUDED.profile,search_name=EXCLUDED.search_name,
             complete=EXCLUDED.complete,division=EXCLUDED.division,ending=EXCLUDED.ending`,
           [id,owner.id,archiveId,JSON.stringify(profile),normalized(profile.name),profile.complete,profile.division,profile.ending.kind]);
-        await saveHonorEntries(tx,id,entries);
+        await saveRankEntries(tx,id,entries);
         return {id,archiveId,active:true,moderated:false};
       });
     },
@@ -196,7 +195,7 @@ export function databaseStore(db:Database,kind:Store['kind'],legacy?:LocalLegacy
       });
     },
     async profile(id:string,owner?:string):Promise<PublicCard|undefined>{
-      const [row]=await db.query<PublicRow>(`SELECT id,profile,COALESCE(owner_id=$2,false) AS mine FROM public_riders
+      const [row]=await db.query<PublicRow>(`SELECT id,profile - ARRAY['points','careerPoints','honorScores'] AS profile,COALESCE(owner_id=$2,false) AS mine FROM public_riders
         WHERE id=$1 AND active AND NOT hidden`,[id,owner??null]);
       return row;
     },
@@ -227,7 +226,7 @@ export function databaseStore(db:Database,kind:Store['kind'],legacy?:LocalLegacy
           SELECT id,score,rank,true AS owned_row FROM ranks WHERE owner_id=$5
         )
         SELECT p.id,${publicSummary} AS profile,COALESCE(p.owner_id=$5,false) AS mine,
-          s.score,s.rank,p.profile->'honorScores'->$1 AS honor,s.owned_row AS "ownedRow"
+          s.score,s.rank,p.profile->'representatives'->$1 AS representative,s.owned_row AS "ownedRow"
         FROM selected s JOIN public_riders p ON p.id=s.id ORDER BY s.owned_row,s.rank,p.id`,[filter.metric,RANKING_VERSION,PAGE_SIZE+1,offset,owner??null]);
       const {page,mine}=ranked.reduce<{page:PublicCard<PublicSummary>[];mine:PublicCard<PublicSummary>[]}>((groups,{ownedRow,...card})=>{
         groups[ownedRow?'mine':'page'].push(card);return groups;

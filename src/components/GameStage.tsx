@@ -5,6 +5,7 @@ import { currentMeet, divisionFor, singleEntry } from '../game/career';
 import { eventFor, eventNpc } from '../game/events';
 import { RIVAL, lineTerms } from '../game/content';
 import { equippedLook, gearBonuses, playerPlace } from '../game/economy';
+import { formatRP, meetRP, validRP } from '../game/rp';
 import { DISCIPLINES, type Discipline, type EventOutcome, type GameAction, type Look, type MeetRecord, type Rider, type Spot } from '../game/types';
 import type { Motion } from '../scene/motion';
 import { headingsBefore, trainingTechnique } from '../scene/techniques';
@@ -73,7 +74,7 @@ function Entry({r,send,saving,active}:{r:Rider;send:Submit;saving:boolean;active
     <p>{meet.international?`${meet.host} · 부문 졸업 무대입니다. 댄싱·트릭·프리스타일 모두 출전합니다.`:'댄싱·트릭·프리스타일 중 1종목만 골라 출전하세요.'}</p>
     <p>{locked?'출전하려면 먼저 중상을 치료해야 해요.':'체력 0에서도 출전할 수 있어요. 기술 성공률과 점수는 체력과 관계없어요.'}</p>
     <div className={'game-disciplines'+(meet.international?' is-required':'')}>{DISCIPLINES.map(d=><button key={d} disabled={saving||locked||meet.international} aria-pressed={entries.includes(d)} onClick={()=>setEntries([d])}><span>{DISCIPLINE_NAMES[d]}</span><small>체력 −{RULES.entryCost[d]-fatigue}</small>{entries.includes(d)&&<b>{meet.international?entries.indexOf(d)+1:'선택'}</b>}</button>)}</div>
-    <p className="game-hint">{entries.map(d=>DISCIPLINE_NAMES[d]).join(' → ')||'종목을 선택해 주세요'} · 체력 {Math.round(r.energy)} / 소모 {cost}</p>
+    <p className="game-hint">{entries.map(d=>DISCIPLINE_NAMES[d]).join(' → ')||'종목을 선택해 주세요'} · 체력 {Math.round(r.energy)} / 소모 {cost} · 종목별 1위 {formatRP(meetRP(1,meet.major))}</p>
     <div className="game-actions">{!meet.international&&<button className="game-quiet" disabled={saving} onClick={()=>void send({type:'entry',disciplines:[]})}>이번 대회 쉬기</button>}<button disabled={saving||locked||!entries.length} onClick={()=>void send({type:'entry',disciplines:entries})}>경기장 입장 <ArrowRight size={15}/></button></div>
   </div>;
 }
@@ -127,7 +128,7 @@ function Playback({record,index,r,saving,active,playbackRate,onSpeed,onNext,done
   if(mode==='result') panel=<>
     <div className="game-caption"><Trophy size={16}/> {DISCIPLINE_NAMES[result.discipline]} 시상식</div><h2>{r.name} · {playerPlace(result)}위</h2>
     <div className="game-podium">{podium.map(row=><div key={row.id} className={'place-'+row.place}><PixelRider look={row.id==='player'?result.look??equippedLook(r):RIVAL.get(row.id)?.look??r.look}/><strong>{row.name}</strong><small>{row.score.toFixed(1)}점</small><b>{row.place}</b></div>)}</div>
-    <p className="game-reward">내 점수 {result.run.score.toFixed(1)} · 시즌 +{result.points}점 · 보상 {money(result.prize)}</p>
+    <p className="game-reward">내 점수 {result.run.score.toFixed(1)} · {validRP(result.points)?'획득 +'+formatRP(result.points):'RP 기록 없음'} · 보상 {money(result.prize)}</p>
     <details className="game-scoreboard"><summary>전체 순위와 채점 보기</summary>
       <ol>{result.standings.map(row=><li key={row.id}><b>{row.place}</b><span>{row.name}</span><strong>{row.score.toFixed(1)}</strong></li>)}</ol>
       <p>{standing.name} · 성공률 {Math.round(run.log.filter(log=>log.outcome!=='miss').length/Math.max(1,run.log.length)*100)}% · 최고 {Math.max(0,...run.log.map(log=>log.combo))}콤보</p>

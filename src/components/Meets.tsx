@@ -3,15 +3,17 @@ import { useRef, useState } from 'react';
 import { calendarFor, meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, OUTCOME_NAMES, SKILL } from '../game/data';
 import { divisionFor } from '../game/career';
 import { playerPlace } from '../game/economy';
+import { formatRP, meetRP, rankingPoints, validRP } from '../game/rp';
 import { DISCIPLINES, type MeetRecord, type Rider } from '../game/types';
 import { Tag } from './Brand';
+import { RPDisciplines, RPPayouts } from './RankingPoints';
 
 function Results({record}:{record:MeetRecord}){
   if(!record.results.length)return <p className="meet-absent">이번 대회는 불참했습니다.</p>;
   return <div className="meet-results" aria-label={`${record.year}년차 ${meetById(record.id)?.name} 성적`}>
     <div className="meet-result-grid">{DISCIPLINES.map(d=>{
       const result=record.results.find(item=>item.discipline===d);
-      return <div key={d}><span>{DISCIPLINE_NAMES[d]}</span>{result?<><strong>{playerPlace(result)}위 <small>{result.run.score.toFixed(1)}점</small></strong><p>시즌 +{result.points}점 · 명성 +{result.fame}</p><p>상금 ₩{result.prize.toLocaleString('ko-KR')}</p>{!!result.sponsorBonus&&<p>협찬 보너스 ₩{result.sponsorBonus.toLocaleString('ko-KR')}</p>}</>:<strong className="muted-text">미출전</strong>}</div>;
+      return <div key={d}><span>{DISCIPLINE_NAMES[d]}</span>{result?<><strong>{playerPlace(result)}위 <small>{result.run.score.toFixed(1)}점</small></strong><p>{validRP(result.points)?'+'+formatRP(result.points):'RP 기록 없음'} · 명성 +{result.fame}</p><p>상금 ₩{result.prize.toLocaleString('ko-KR')}</p>{!!result.sponsorBonus&&<p>협찬 보너스 ₩{result.sponsorBonus.toLocaleString('ko-KR')}</p>}</>:<strong className="muted-text">미출전</strong>}</div>;
     })}</div>
     <details className="meet-standings"><summary>종목별 전체 순위 <ChevronDown size={15}/></summary><div>{record.results.map(result=><div key={result.discipline}><h4>{DISCIPLINE_NAMES[result.discipline]}</h4><ol>{result.standings.map(row=><li key={row.id} className={row.id==='player'?'is-player':''}><b>{row.place}위</b><span>{row.name}{row.id==='player'?' (나)':''}</span><strong>{row.score.toFixed(1)}점</strong></li>)}</ol></div>)}</div></details>
   </div>;
@@ -29,6 +31,8 @@ export function Meets({r,onPlay,onEntry,onLine,onLoadRecord,selection,onSelectio
   const choice=selection??local;
   const years=[...new Set([r.year,...r.seasons.map(season=>season.year),...r.records.map(record=>record.year)])].sort((a,b)=>b-a);
   const year=choice&&years.includes(choice.year)?choice.year:r.year;
+  const rp=rankingPoints(r);
+  const seasonRP=rp.seasons.find(item=>item.year===year);
   const setChoice=onSelection??setLocal;
   const showDetail=(value:MeetSelection)=>{
     setChoice(value);
@@ -68,6 +72,9 @@ export function Meets({r,onPlay,onEntry,onLine,onLoadRecord,selection,onSelectio
       {latest&&<button className="button secondary small" onClick={()=>showDetail({year:latest.year,id:latest.id})}>최근 성적</button>}
       {onLine&&<button className="button secondary small game-toolbar-end" onClick={onLine}>라인 편집 <ArrowRight size={15}/></button>}
     </div>
+    <div className="rp-overview"><strong>통산 {formatRP(rp.total)}</strong><b>{year}년차 시즌 {formatRP(seasonRP?.total??0)}</b>
+      {seasonRP&&<RPDisciplines points={seasonRP.disciplines}/>}{rp.partial&&<small>확인된 RP만 집계했습니다.</small>}
+    </div>
     <div className="meet-browser-grid">
       <div className="calendar-list" aria-label={year+'년차 대회 일정'}>
         {rows.map(row=>{
@@ -90,6 +97,7 @@ export function Meets({r,onPlay,onEntry,onLine,onLoadRecord,selection,onSelectio
           <p>{meet.host??LOCATIONS[meet.spot].name} · {meet.international?'국제대회':meet.major?'메이저 대회':'정기 대회'}</p>
         </header>
         {record?<Results record={record}/>:<>
+          <p className="game-section-note">종목별 1위 {formatRP(meetRP(1,meet.major))}</p>
           <p className="game-section-note">{meet.international?'댄싱·트릭·프리스타일 모두 출전':'댄싱·트릭·프리스타일 중 1종목 선택'}</p>
           {canEnter?<button className="button primary" onClick={onEntry}>출전 선택 <ArrowRight size={16}/></button>:
             selected.meet.week>r.week&&year===r.year&&r.phase!=='retired'&&<p className="meet-countdown">{meet.week-r.week}주 후 개최</p>}
@@ -97,7 +105,7 @@ export function Meets({r,onPlay,onEntry,onLine,onLoadRecord,selection,onSelectio
         {!!record?.results.length&&<MeetActions record={record} onPlay={onPlay} onLoad={onLoadRecord}/>}
       </article>
     </div>
-    <details className="game-rule-note"><summary>시즌과 출전 규칙</summary><p>한 시즌에 6개 대회가 열려요. 1~2년차는 뉴비부, 3~4년차는 일반부, 5~6년차는 오픈부, 7~8년차는 마스터부입니다.</p><p>홀수 해 마지막 대회는 롱보드 페스티벌, 2·4·6·8년차 마지막 대회는 국제대회예요. 국제대회에는 3종목 모두 출전하고 8년차 마지막 경기 후 은퇴합니다.</p></details>
+    <details className="game-rule-note"><summary>RP 보상과 출전 규칙</summary><RPPayouts/><p>한 시즌에 6개 대회가 열려요. 1~2년차는 뉴비부, 3~4년차는 일반부, 5~6년차는 오픈부, 7~8년차는 마스터부입니다.</p><p>홀수 해 마지막 대회는 롱보드 페스티벌, 2·4·6·8년차 마지막 대회는 국제대회예요. 국제대회에는 3종목 모두 출전하고 8년차 마지막 경기 후 은퇴합니다.</p></details>
   </section>;
 }
 
