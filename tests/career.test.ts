@@ -95,7 +95,7 @@ test('manual event preference pauses a regular auto choice and skip shortens onl
   const held=step(seed,{type:'settings',settings:{...r.settings,mode:'auto',manualEvents:true,skipMeets:true}},0);
   assert.equal(held.career.rider?.event,'park-tea');
   assert.equal(step(held,{type:'pulse',background:'hidden'},15_000),held);
-  const released=step(held,{type:'settings',settings:{...held.career.rider!.settings,manualEvents:false}},16_000);
+  const released=step(held,{type:'settings',settings:{...held.career.rider!.settings,skipEvents:true}},16_000);
   assert.equal(released.clock.pendingEvent?.eventId,'park-tea');
   assert.equal(released.career.rider?.settings.skipMeets,true);
 
@@ -111,6 +111,23 @@ test('manual event preference pauses a regular auto choice and skip shortens onl
   const resumed=step(skipped,{type:'pulse',background:'hidden'},2000);
   assert.equal(resumed.clock.pendingMeet,undefined);
   assert.deepEqual(resumed.career.rider?.records[0].results,result);
+});
+
+test('pending relationship choices resume in foreground and background using the saved event-skip setting',()=>{
+  for(const action of [{type:'pulse'},{type:'pulse',background:'hidden'}] as const){
+    const save=blankSave(),r=career().rider!;
+    save.career.rider=r;
+    r.year=6;r.week=11;r.phase='event';r.event='relationship-yu-partner';
+    r.energy=20;
+    r.settings={mode:'auto',strategy:'dance',entries:['dance'],manualEvents:false,pauseStory:true};
+    r.extras!.relationships={npcs:{yu:{state:'partner',flags:['confession-accepted']}},titles:[]};
+    const next=advance(save,action,'tab',2000,RULES.weekMs,identity);
+    assert.equal(next.clock.pendingEvent?.eventId,'relationship-yu-partner');
+    assert.equal(next.career.rider?.events['relationship-yu-partner'],1);
+    assert.equal(relationshipWith(next.career.rider!,'yu')?.state,'partner');
+    assert.equal(next.career.rider?.extras?.choices['relationship-yu-partner'].index,0);
+    assert.equal(next.career.rider?.week,12);
+  }
 });
 
 test('RP comes from competition, accumulates after a new season, and restores exact saved season totals without duplication',()=>{
@@ -349,7 +366,7 @@ test('specific story choices pause auto mode and unlock follow-up dialogue',()=>
   r.week=11;
   r.events.first=1;r.events.registration=1;
   r.relations.yu=8;
-  r.settings={mode:'auto',strategy:'dance',entries:[],pauseStory:true};
+  r.settings={mode:'auto',strategy:'dance',entries:[],skipEvents:false};
   assert.ok(processWeek(c));
   assert.equal(r.event,'mango-lesson');
   assert.equal(r.phase,'event');
@@ -451,7 +468,7 @@ test('overlapping story opportunities survive to the next week and auto stops at
   r.week=28;
   assert.equal(pickEvent(r,()=>.99)?.id,'relationship-jun-trust','The waiting NPC precedes the newly eligible fork');
   r.events['relationship-jun-trust']=1;
-  r.settings={mode:'auto',strategy:'freestyle',entries:['trick']};
+  r.settings={mode:'auto',strategy:'freestyle',entries:['trick'],skipEvents:false};
   const start=1_000_000,tab='relationship-tab';
   const save=blankSave();save.career.rider=r;
   const step=(prev:typeof save,action:Parameters<typeof advance>[1],ms:number)=>advance(prev,action,tab,start+ms,2000,identity);

@@ -141,7 +141,7 @@ export default function App(){
     </section>)}
   </div>;
   else if(r){
-    if(screen==='training')content=<AutoSettings r={r} send={game.send} saving={game.saving}/>;
+    if(screen==='training')content=<AutoSettings key={r.id} r={r} send={game.send} saving={game.saving} onApplied={playHome}/>;
     else if(screen==='skills')content=<Skills r={r}/>;
     else if(screen==='routine')content=<Routines r={r} send={game.send} saving={game.saving}
       draft={lineDraft?.rider===r.id?lineDraft.value:undefined} onDraft={value=>setLineDraft({rider:r.id,value})}/>;

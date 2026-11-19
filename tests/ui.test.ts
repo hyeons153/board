@@ -111,8 +111,11 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await click('자동 육성 설정');
     assert.doesNotMatch(win.document.querySelector('.auto-settings')!.textContent!,/훈련 강도|안전형|집중형/);
     assert.ok(win.document.querySelector('.console-panel-settings'));
-    assert.deepEqual([...win.document.querySelectorAll('.auto-settings input[type="checkbox"]')].map(node=>node.parentElement?.textContent),
-      ['이벤트 선택지 직접 고르기','대회 진행 건너뛰고 결과 보기']);
+    const optionsChecks=[...win.document.querySelectorAll<HTMLInputElement>('.auto-settings input[type="checkbox"]')];
+    assert.deepEqual(optionsChecks.map(node=>node.parentElement?.textContent),['이벤트 선택지 스킵하기','대회 진행 스킵하기']);
+    assert.deepEqual(optionsChecks.map(node=>node.checked),[true,false]);
+    const beforeApply=requestActions.filter(action=>action==='settings').length;
+    await act(async()=>{optionsChecks[0].click();optionsChecks[1].click();});
     const entryRadios=[...win.document.querySelectorAll<HTMLInputElement>('.auto-settings input[type="radio"]')];assert.equal(entryRadios.filter(input=>input.checked).length,1);
     await act(async()=>entryRadios[1].click());await settle();await act(async()=>{await Promise.all([...pendingRequests]);});
     assert.equal(win.document.querySelectorAll('.auto-settings input[type="radio"]:checked').length,1);
@@ -120,7 +123,12 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     const strategy=win.document.querySelector<HTMLSelectElement>('.auto-settings select')!;
     await act(async()=>{strategy.value='freestyle';strategy.dispatchEvent(new win.Event('change',{bubbles:true}));});await settle();await act(async()=>{await Promise.all([...pendingRequests]);});
     assert.match(win.document.querySelector('[aria-label="자동 육성 전략 설명"]')!.textContent!,/댄싱·트릭|연계·카빙·밸런스/);
-    await click('메뉴 닫기');
+    assert.equal(requestActions.filter(action=>action==='settings').length,beforeApply,'Edit preferences in the form without saving each input');
+    await click('설정 적용');
+    assert.equal(win.document.querySelector('.auto-settings'),null);
+    const applied=await (await handler(new Request('http://127.0.0.1/api/game',{headers:{cookie}}))).json();
+    assert.deepEqual([applied.career.rider.settings.mode,applied.career.rider.settings.entries,applied.career.rider.settings.skipEvents,applied.career.rider.settings.skipMeets],
+      ['manual',['trick'],false,true]);
     for(const menu of ['기술','대회','상점','메뉴']){
       await click(menu);assert.equal(win.document.querySelector('.game-console'),frame);assert.ok(win.document.querySelector('.console-panel'));
       if(menu==='기술'){
@@ -280,7 +288,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       assert.equal(win.document.querySelector('.game-reward')?.textContent,'체력 -23');
     }
     const story=newRider('story-ui',991,'Story rider',DEFAULT_LOOK);
-    story.year=3;story.week=9;story.phase='event';story.event='relationship-yu-fork';story.settings.mode='auto';
+    story.year=3;story.week=9;story.phase='event';story.event='relationship-yu-fork';story.settings.mode='auto';story.settings.skipEvents=false;
     let submitted:unknown;
     const sendStory=async(action:unknown)=>{submitted=action;return true;};
     const storyProps={r:story,send:sendStory,saving:false,remaining:0,weekMs:2000,fastForward:false,spot:'river' as const,motion:'rest' as const,onDone:()=>{}};

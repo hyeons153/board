@@ -1,14 +1,14 @@
 import { command, currentMeet, divisionFor, GameError, prepareWeek, processWeek, singleEntry, validateAutoEntries } from '../src/game/career.js';
 import { extras } from '../src/game/economy.js';
 import { AUTO_FLOW, RULES } from '../src/game/data.js';
-import { eventFor } from '../src/game/events.js';
+import { eventPaused } from '../src/game/events.js';
 import { happeningDuration } from '../src/game/happenings.js';
 import type { Career, EventOutcome, GameAction, TrainingSetup } from '../src/game/types.js';
 
 export type Save = { format:1; career:Career; clock:{credit:number; stamp:number; tabs:Record<string,number>; readyAt?:number; fastForward?:boolean; pendingChoice?:string; pendingMeet?:string; pendingTraining?:string; pendingEvent?:EventOutcome; trainingSetup?:TrainingSetup; stateVersion?:number; background?:{tab:string;at:number}} };
 export const blankSave=():Save=>({format:1,career:{rider:null,hall:[]},clock:{credit:0,stamp:0,tabs:{}}});
 export const remaining=(save:Save,weekMs:number,now=Date.now())=>!save.clock.pendingChoice&&!save.clock.pendingEvent&&!save.clock.pendingMeet&&!save.clock.pendingTraining&&save.career.rider?.phase==='plan'&&!!save.career.rider.plan?Math.max(0,(save.clock.readyAt??now+weekMs)-now):0;
-const awaitingDecision=(rider:Save['career']['rider'])=>rider?.phase==='event'&&(rider.settings.manualEvents||eventFor(rider,rider.event??'')?.decision);
+const awaitingDecision=(rider:Save['career']['rider'])=>rider?.phase==='event'&&eventPaused(rider);
 const visibleEvent=(clock:Save['clock'])=>clock.pendingMeet&&clock.pendingEvent?.afterMeet?undefined:clock.pendingEvent;
 
 export function advance(prev:Save,a:GameAction,tab:string,now:number,weekMs:number,identity:()=>{id:string;seed:number},official=false,account=false):Save {

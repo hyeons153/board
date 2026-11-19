@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, Flag, HeartPulse, ListChecks, MapPin, Play, Timer, Trophy } from 'lucide-react';
 import { ACTION_NAMES, ACTION_STORIES, formatCareerDate, meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, OUTCOME_NAMES, RULES, SKILL } from '../game/data';
 import { currentMeet, divisionFor, singleEntry } from '../game/career';
-import { eventBody, eventCast, eventChoiceAvailable, eventFor, eventNpc } from '../game/events';
+import { eventBody, eventCast, eventChoiceAvailable, eventFor, eventNpc, eventPaused } from '../game/events';
 import { happeningDuration } from '../game/happenings';
 import { RIVAL, lineTerms } from '../game/content';
 import { equippedLook, gearBonuses, playerPlace } from '../game/economy';
@@ -35,12 +35,13 @@ export default function GameStage({r,send,saving,remaining,weekMs,fastForward,sp
   const [playbackRate,setPlaybackRate]=useState<PlaybackRate>(readPlaybackRate);
   useEffect(()=>savePlaybackRate(playbackRate),[playbackRate]);
   const event=r.phase==='event'?eventFor(r,r.event??''):undefined;
+  const waitsForChoice=r.phase==='event'&&eventPaused(r);
   const dialogue=useDialogueFocus(r.id+':'+r.phase+':'+r.event,active&&(r.phase==='event'||r.phase==='injury'));
   useEffect(()=>{
-    if(!active||event&&(event.decision||r.settings.manualEvents)||pendingEvent||pendingTraining||record||saving||r.settings.mode!=='auto'||!['event','meet','injury'].includes(r.phase))return;
+    if(!active||waitsForChoice||pendingEvent||pendingTraining||record||saving||r.settings.mode!=='auto'||!['event','meet','injury'].includes(r.phase))return;
     const timer=window.setTimeout(()=>{if(!document.hidden)void send(r.phase==='injury'?{type:'resume'}:{type:'settings',settings:{...r.settings,pauseStory:false,pauseMeet:false,pauseInjury:false}});},800);
     return ()=>window.clearTimeout(timer);
-  },[r.phase,r.settings.mode,r.settings.manualEvents,event?.decision,pendingTraining,pendingEvent?.key,record?.id,saving,send,active]);
+  },[r.phase,r.settings.mode,waitsForChoice,pendingTraining,pendingEvent?.key,record?.id,saving,send,active]);
   if(pendingTraining)return <TrainingOutcome r={r} saving={saving||!active} active={active} onDone={()=>void send({type:'continue-training',record:pendingTraining})}/>;
   if(pendingEvent&&(!record||!pendingEvent.afterMeet)){
     const props={r,result:pendingEvent,active,saving:saving||!active,onDone:()=>void send({type:'continue-event',record:pendingEvent.key})};
@@ -61,13 +62,13 @@ export default function GameStage({r,send,saving,remaining,weekMs,fastForward,sp
     {event?<div className="game-dialogue" role="region" aria-label="이벤트 선택" key={r.event} ref={dialogue} tabIndex={-1}>
       <div className="game-caption">{event.kind}{person&&<span className="game-speaker"><PixelRider look={person.look}/>{eventCast(r,event).map(id=>id==='mentor'?person.name:RIVAL.get(id)?.name).filter(Boolean).join(' · ')||person.name}</span>}</div>
       <h2>{event.title}</h2><p>{eventBody(r,event)}</p>
-      {(event.decision||r.settings.manualEvents)&&r.settings.mode==='auto'&&<p className="game-reward">자동 육성 일시 정지 · 직접 선택해 주세요.</p>}
-      <div className="game-choices">{event.choices.map((choice,index)=>{
+      {waitsForChoice&&r.settings.mode==='auto'&&<p className="game-reward">자동 육성 일시 정지 · 직접 선택해 주세요.</p>}
+      {waitsForChoice&&<div className="game-choices">{event.choices.map((choice,index)=>{
         const available=eventChoiceAvailable(r,event,index);
         return <button key={choice.label} disabled={saving||!available} onClick={()=>void send({type:'event',index,eventId:event.id})}>
           <span>{choice.label}{!available&&<small className="relationship-choice-lock">이 커리어에서 이미 연애 상대를 선택했어요.</small>}</span><ArrowRight size={15}/>
         </button>;
-      })}</div>
+      })}</div>}
     </div>:meet?<Entry key={r.year+':'+r.week} r={r} send={send} saving={saving} active={active}/>:r.phase==='injury'?<div className="game-dialogue" role="region" aria-label="부상 확인" ref={dialogue} tabIndex={-1}><div className="game-caption"><HeartPulse size={16}/> 컨디션 알림</div><h2>잠깐, 몸 상태를 확인해요.</h2><p>새 부상으로 자동 육성을 멈췄어요. 다음 훈련에서 휴식이나 치료를 선택할 수 있습니다.</p><div className="game-actions"><button disabled={saving} onClick={()=>void send({type:'resume'})}>확인하고 재개 <ArrowRight size={15}/></button></div></div>:!r.plan&&<div className="spot-title"><span>{formatCareerDate(r)}</span><h2>{LOCATIONS[viewSpot].name}</h2><p>{LOCATIONS[viewSpot].detail}</p>{guest&&<span className="spot-visitor"><PixelRider look={guest}/> 함께 연습 중</span>}</div>}
     {r.plan&&!overlay&&!autoChoosing&&<div className="weekly-running" role="status"><strong>{ACTION_STORIES[r.plan.action].start}{r.plan.skill?' · '+SKILL[r.plan.skill]?.name:''}</strong><progress max={weekMs} value={Math.max(0,weekMs-remaining)} aria-label="행동 진행"/></div>}
   </section>;

@@ -404,7 +404,7 @@ function playWeekEvent(r:Rider,afterMeet=false){
   if('happening' in event){applyHappening(r,event);return false;}
   r.phase='event';
   r.event=event.id;
-  if(eventPaused(r,event))return true;
+  if(eventPaused(r))return true;
   applyEvent(r,autoChoice(r,event));
   return false;
 }
@@ -463,7 +463,7 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
     if(r.settings.mode==='auto'){
       if(r.phase==='event'){
         const e=eventFor(r,r.event??'');
-        if(e&&eventPaused(r,e)) return;
+        if(e&&eventPaused(r)) return;
         if(e) applyEvent(r,autoChoice(r,e));
         afterTraining(c,r,official);
       } else if(r.phase==='meet'&&!r.settings.pauseMeet) runMeet(c,r,r.entries??r.settings.entries,official);

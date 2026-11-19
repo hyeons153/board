@@ -6,9 +6,9 @@ import { RELATIONSHIP_EVENTS, relationshipChoiceAvailable, type RelationshipChoi
 import { STORY_ARCS } from './storyArcs.js';
 import { CREW_STORIES } from './crewStories.js';
 import { CAREER_STORIES } from './careerStories.js';
-import { elapsed, type StoryImpact } from './storyState.js';
+import { elapsed, storyProgress, type StoryChange, type StoryImpact } from './storyState.js';
 import { pickHappening, type Happening } from './happenings.js';
-import type { Family, Rider, Stat, Strategy } from './types.js';
+import type { Family, Rider, Settings, Stat, Strategy } from './types.js';
 
 type Effect = { energy?:number; money?:number; fame?:number; relation?:number; skill?:string; study?:number; stat?:Stat; gain?:number; item?:string };
 type Choice = { label:string; effect:Effect; tags:Strategy[]; dialogue?:string; relationship?:RelationshipChoice; story?:(r:Rider)=>StoryImpact };
@@ -70,7 +70,8 @@ export const eventNpc=(e:EventDef,r?:Rider)=>{
   const id=e.npc??(r&&eventCast(r,e)[0]);
   return id==='mentor'?r?.mentor:id?RIVAL.get(id):undefined;
 };
-export const eventPaused=(r:Rider,e:EventDef)=>e.decision||r.settings.mode==='manual'||r.settings.manualEvents||!!(r.settings.pauseStory&&e.important);
+export const skipsEventChoices=(settings:Settings)=>settings.skipEvents??!settings.manualEvents;
+export const eventPaused=(r:Rider)=>r.settings.mode==='manual'||!skipsEventChoices(r.settings);
 export const eventBody=(r:Rider,e:EventDef)=>typeof e.body==='string'?e.body:e.body(r);
 export const eventCast=(r:Rider,e:EventDef)=>[...new Set(e.cast?.(r)??(e.npc?[e.npc]:[]))];
 export const eventChoiceAvailable=(r:Rider,e:EventDef,index:number)=>
@@ -128,9 +129,23 @@ export function pickEvent(r:Rider,rng:()=>number,afterMeet=false):EventDef|Happe
   let roll=rng()*weights.reduce((sum,weight)=>sum+weight,0);
   return pool.find((_,index)=>(roll-=weights[index])<0)??pool.at(-1);
 }
+function keepsRelationship(r:Rider,e:EventDef,choice:Choice){
+  const changes:StoryChange[]=[...(choice.story?.(r).changes??[])];
+  if(e.npc&&choice.relationship?.state)changes.push({npc:e.npc,state:choice.relationship.state});
+  return changes.every(({npc,state,mode})=>{
+    const current=storyProgress(r,npc);
+    if(mode&&mode!==(current?.mode??'private'))return false;
+    if(!state||state===current?.state)return true;
+    return current?.state!=='partner'&&state!=='partner'&&state!=='interested'&&state!=='ended';
+  });
+}
 export function autoChoice(r:Rider,e:EventDef) {
-  if(r.energy<35 || r.injury) return e.choices.reduce((best,c,i)=> (c.effect.energy??0)>(e.choices[best].effect.energy??0)?i:best,0);
+  const available=e.choices.map((choice,index)=>({choice,index})).filter(({index})=>eventChoiceAvailable(r,e,index));
+  const unchanged=e.decision?available.filter(({choice})=>keepsRelationship(r,e,choice)):[];
+  const options=unchanged.length?unchanged:available;
+  if(!options.length)return -1;
+  if(r.energy<35||r.injury)return options.reduce((best,item)=>(item.choice.effect.energy??0)>(best.choice.effect.energy??0)?item:best).index;
   const primary:Family|null = r.settings.strategy==='dance'||r.settings.strategy==='trick'?r.settings.strategy:null;
-  const index=e.choices.findIndex(c=>c.tags.includes(r.settings.strategy) || (primary&&c.effect.skill&&SKILL[c.effect.skill]?.family===primary));
-  return index<0?0:index;
+  return (options.find(({choice})=>choice.tags.includes(r.settings.strategy)||
+    (primary&&choice.effect.skill&&SKILL[choice.effect.skill]?.family===primary))??options[0]).index;
 }
