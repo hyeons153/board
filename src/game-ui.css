@@ -359,7 +359,7 @@
   padding:8px;
 }
 .meet-list-row:hover,.meet-list-row[aria-pressed=true] { background:var(--game-selected); }
-.meet-list-row .date-block { min-width:0; padding:3px; gap:2px; white-space:nowrap; }
+.meet-list-row .date-block { flex-direction:column; min-width:0; padding:3px; gap:2px; white-space:nowrap; }
 .meet-list-row .date-block span { font-size:.7rem; }
 .meet-list-row .date-block b { font-size:1rem; }
 .meet-list-name { display:grid; gap:2px; line-height:1.35; }
@@ -563,6 +563,7 @@
   .console-top-actions { gap:4px; }
   .console-top-actions button { width:32px; height:34px; }
   .console-rider > span { max-width:70px; }
+  .console-rider b { white-space:normal; word-break:keep-all; }
   .console-panel-body { padding:9px; }
   .console-status .status-gauge { padding-inline:4px; }
   .equipment-comparison .game-facts > div { flex-wrap:wrap; }

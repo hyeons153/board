@@ -1,6 +1,6 @@
 import { ArrowRight, CalendarDays, ChevronDown, CirclePlay } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { calendarFor, meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, OUTCOME_NAMES, SKILL } from '../game/data';
+import { calendarFor, formatCareerDate, meetById, monthWeek, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, OUTCOME_NAMES, SKILL } from '../game/data';
 import { divisionFor } from '../game/career';
 import { playerPlace } from '../game/economy';
 import { formatRP, meetRP, rankingPoints, validRP } from '../game/rp';
@@ -79,9 +79,10 @@ export function Meets({r,onPlay,onEntry,onLine,onLoadRecord,selection,onSelectio
       <div className="calendar-list" aria-label={year+'년차 대회 일정'}>
         {rows.map(row=>{
           const state=stateFor(row);
+          const {month,weekLabel}=monthWeek(row.meet.week);
           return <button className="meet-list-row" aria-pressed={row.id===selected.id} key={row.id}
             onClick={()=>showDetail({year,id:row.id})}>
-            <span className="date-block"><b>{row.meet.week}</b><span>주차</span></span>
+            <span className="date-block"><b>{month}월</b>{' '}<span>{weekLabel}</span></span>
             <span className="meet-list-name"><strong>{row.meet.name}</strong><small>{row.meet.host??LOCATIONS[row.meet.spot].name}</small>
               {row.record?.results.length?<span className="meet-results-inline">{row.record.results.map(result=>DISCIPLINE_NAMES[result.discipline]+' '+playerPlace(result)+'위').join(' · ')}</span>:row.meet.international?<small>3종목 필수</small>:null}
             </span>
@@ -91,7 +92,7 @@ export function Meets({r,onPlay,onEntry,onLine,onLoadRecord,selection,onSelectio
       </div>
       <article key={year+':'+meet.id} className="meet-detail" aria-label="선택한 대회 상세" ref={detail} tabIndex={-1}>
         <header>
-          <div><CalendarDays size={16}/> {year}년차 · {meet.month}월 {meet.week}주차</div>
+          <div><CalendarDays size={16}/> {formatCareerDate({year,week:meet.week})}</div>
           <Tag kind={canEnter?'lime':'muted'}>{stateFor(selected)}</Tag>
           <h2>{meet.name}</h2>
           <p>{meet.host??LOCATIONS[meet.spot].name} · {meet.international?'국제대회':meet.major?'메이저 대회':'정기 대회'}</p>

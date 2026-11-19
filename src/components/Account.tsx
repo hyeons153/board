@@ -1,6 +1,7 @@
 import { ArrowRight, DoorOpen, KeyRound, ShieldCheck, UserRound } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../game/accountPolicy';
+import { formatCareerDate } from '../game/data';
 import type { View } from '../game/types';
 import { PixelRider } from './Appearance';
 import { SectionTitle, Tag } from './Brand';
@@ -64,11 +65,11 @@ export default function Account({view,send,onSwitch,onSessionChange}:{view:View;
     {view.username&&<section className="panel content-panel">
       <SectionTitle code="MY CAREERS" title="보유 선수"/>
       {view.career.rider&&<div className="account-identity">
-        <PixelRider look={view.career.rider.look}/><div><strong>{view.career.rider.name}</strong><p>{view.career.rider.year}년차 {view.career.rider.week}주</p></div>
+        <PixelRider look={view.career.rider.look}/><div><strong>{view.career.rider.name}</strong><p>{formatCareerDate(view.career.rider)}</p></div>
         <Tag kind="lime">{view.career.rider.phase==='retired'?'은퇴':'현재 육성'}</Tag>
       </div>}
       {view.career.parked?.map(rider=><div className="account-identity" key={rider.id}>
-        <PixelRider look={rider.look}/><div><strong>{rider.name}</strong><p>{rider.year}년차 {rider.week}주 · 보관 중</p></div>
+        <PixelRider look={rider.look}/><div><strong>{rider.name}</strong><p>{formatCareerDate(rider)} · 보관 중</p></div>
         <button className="button secondary" disabled={busy} onClick={async()=>{
           setBusy(true);
           try { if(await send({type:'switch-rider',id:rider.id})) onSwitch(); }

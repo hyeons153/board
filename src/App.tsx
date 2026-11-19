@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Flag, Footprints, ListOrdered, Menu, NotebookText, Settings, ShoppingBag, Trophy, UserRound, UsersRound, X } from 'lucide-react';
 import { useGame } from './useGame';
-import { ACTION_NAMES, DEFAULT_LOOK, DIVISION_NAMES, LOCATIONS } from './game/data';
+import { ACTION_NAMES, DEFAULT_LOOK, DIVISION_NAMES, formatCareerDate, LOCATIONS } from './game/data';
 import { divisionFor, nextMeet } from './game/career';
 import { lineTerms, RIVAL } from './game/content';
 import { previewTraining } from './game/training';
@@ -151,11 +151,11 @@ export default function App(){
       lookDraft={lookDraft?.rider===r.id?lookDraft.value:undefined} onLookDraft={value=>setLookDraft({rider:r.id,value})}/>;
     else if(screen==='profile')content=<Profile r={r} send={game.send} saving={game.saving||busyFlow} onNew={()=>go('new',true)} onHall={()=>go('hall',true)}/>;
     else if(screen==='rivals')content=<Rivals r={r} send={game.send} saving={game.saving}/>;
-    else if(screen==='journal')content=<div className="console-journal"><NewsCard r={{...r,news:r.news.slice(0,100)}}/>{r.news.slice(5).map((note,i)=><p key={i}><b>{note.year}년차 {note.week}주</b> {lineTerms(note.text)}</p>)}</div>;
+    else if(screen==='journal')content=<div className="console-journal"><NewsCard r={{...r,news:r.news.slice(0,100)}}/>{r.news.slice(5).map((note,i)=><p key={i}><b>{formatCareerDate(note)}</b> {lineTerms(note.text)}</p>)}</div>;
   }
   return <div className="console-page"><main className="game-console" aria-label="롱보더 키우기">
     <header className="console-top"><button className="console-brand" onClick={playHome} aria-label="게임 홈"><Brand/></button>
-      {r?<div className="console-rider"><span>{r.name}</span><b>{r.year}년차 {r.week}주</b><small>{DIVISION_NAMES[divisionFor(r.year)]}</small></div>:<span className="console-motto">나만의 롱보드 커리어</span>}
+      {r?<div className="console-rider"><span>{r.name}</span><b>{formatCareerDate(r)}</b><small>{DIVISION_NAMES[divisionFor(r.year)]}</small></div>:<span className="console-motto">나만의 롱보드 커리어</span>}
       <div className="console-top-actions">{active&&<button aria-label="자동 육성 설정" title="자동 육성 설정" onClick={()=>go('training')}><Settings size={18}/></button>}{active&&<button className={'console-auto '+(r!.settings.mode==='auto'?'is-on':'')} aria-label="자동 진행" aria-pressed={r!.settings.mode==='auto'} disabled={game.saving} onClick={async()=>{if(await game.send({type:'settings',settings:{...r!.settings,mode:r!.settings.mode==='auto'?'manual':'auto',pauseStory:false,pauseMeet:false,pauseInjury:false}}))playHome();}}>{r!.settings.mode==='auto'?'AUTO ON':'AUTO OFF'}</button>}<span className="console-save" role="status">{game.saving?'저장 중':view.storage==='neon'?'저장됨':'로컬 저장'}</span><button aria-label="라이더 일지" onClick={()=>go(r?'journal':'menu')}><NotebookText size={18}/></button><button aria-label="계정" onClick={()=>go('account')}><UserRound size={18}/></button></div>
     </header>
     <div className={'console-world'+(showTraining&&trainingVisible?' has-weekly-choices':'')}>

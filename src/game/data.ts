@@ -116,6 +116,22 @@ export const calendarFor=(year:number):Meet[]=>{
 };
 export const meetById=(id:string|undefined)=>CALENDAR.find(meet=>meet.id===id)??INTERNATIONAL_MEETS.find(meet=>meet.id===id);
 
+const WEEK_LABELS=['첫째 주','둘째 주','셋째 주','넷째 주','다섯째 주'];
+export function monthWeek(week:number){
+  // Each 13-week quarter has months of four, four and five weeks.
+  const weekInQuarter=(week-1)%13;
+  const monthInQuarter=Math.min(2,Math.floor(weekInQuarter/4));
+  const month=Math.floor((week-1)/13)*3+monthInQuarter+1;
+  return {month,weekLabel:WEEK_LABELS[weekInQuarter-monthInQuarter*4]};
+}
+export function formatMonthWeek(week:number){
+  const {month,weekLabel}=monthWeek(week);
+  return `${month}월 ${weekLabel}`;
+}
+export function formatCareerDate({year,week}:{year:number;week:number}){
+  return `${year}년차 · ${formatMonthWeek(week)}`;
+}
+
 const skill = (id:string,name:string,family:Family,kind:Skill['kind'],difficulty:number,points:number,seconds:number,requires:string[]=[],tags:string[]=[]):Skill =>
   ({id,name,family,kind,difficulty,points,seconds,requires,risk:[0,.07,.12,.18,.23][difficulty],tags});
 export const SKILLS = [

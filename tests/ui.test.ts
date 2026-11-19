@@ -105,7 +105,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await click('도심 광장 이동');
     assert.equal(win.document.querySelector('[aria-label="스팟 지도"]'),null);
     assert.match(win.document.querySelector('.spot-map-trigger')!.textContent!,/도심 광장/);
-    assert.match(win.document.querySelector('.console-rider')!.textContent!,/1주/);
+    assert.equal(win.document.querySelector('.console-rider b')!.textContent,'1년차 · 1월 첫째 주');
     await click('스팟 지도 열기');await click('강변 스팟 이동');
     assert.ok(![...win.document.querySelectorAll('.console-dock button')].some(button=>button.textContent==='훈련'));
     await click('자동 육성 설정');
@@ -243,7 +243,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await click('메뉴 닫기');
     assert.ok(win.document.querySelector('[aria-label="이벤트 결과"]'));
     await click('계속');
-    assert.match(win.document.querySelector('.console-rider')!.textContent!,/2주/);
+    assert.equal(win.document.querySelector('.console-rider b')!.textContent,'1년차 · 1월 둘째 주');
     await click('휴식 선택');
     await openHud('energy');
     assert.ok(win.document.querySelector('.hud-popover [aria-label="예상 체력 변화"]'));
@@ -316,6 +316,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     })));
     assert.equal(win.document.querySelectorAll('.meet-list-row').length,6);
     assert.match(win.document.querySelector('.calendar-list')!.textContent!,/국제대회 · 서울|3종목 필수/);
+    assert.match(win.document.querySelector('.calendar-list')!.textContent!,/12월 다섯째 주/);
     await click('최근 성적');
     const history=win.document.querySelector('.meet-detail')!;
     assert.match(history.textContent!,/위|점|상금 ₩|미출전/);
@@ -382,7 +383,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
         await settle(1150);
       }
     }
-    assert.match(win.document.querySelector('.console-rider')!.textContent!,/3주/);
+    assert.equal(win.document.querySelector('.console-rider b')!.textContent,'1년차 · 1월 셋째 주');
     await act(async()=>root.unmount());await Promise.allSettled([...pendingRequests]);
     const store=localStore(directory),owner=await store.authenticate(createHash('sha256').update(cookie.split('=')[1]).digest('hex'));
     assert.ok(owner);const finalRow=await store.get(owner),finalRider=finalRow.snapshot.career.rider!;

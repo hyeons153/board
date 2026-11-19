@@ -1,6 +1,6 @@
 import { ArrowUpRight, ChevronDown, Flag, Medal, Play, Shield, Star, Trophy, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, RULES, SKILL, STAT_NAMES, STYLE_NAMES } from '../game/data';
+import { formatCareerDate, formatMonthWeek, meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, RULES, SKILL, STAT_NAMES, STYLE_NAMES } from '../game/data';
 import { NAMES, competitor, learned } from '../game/competition';
 import { RIVALS, lineTerms } from '../game/content';
 import { equippedLook, extras, ITEM, playerPlace } from '../game/economy';
@@ -44,7 +44,7 @@ export function Profile({r,send,saving,onHall,onNew}:{r:Rider;send:Submit;saving
   const awards=honors(r);
   return <div className="stack">
     <section className="panel content-panel">
-      <SectionTitle code="RIDER PROFILE" title={r.name} detail={`${r.year}년차 ${r.week}주 · ${DIVISION_NAMES[divisionFor(r.year)]}`}/>
+      <SectionTitle code="RIDER PROFILE" title={r.name} detail={`${formatCareerDate(r)} · ${DIVISION_NAMES[divisionFor(r.year)]}`}/>
       {representativeTitle(r)&&<Tag kind="lime"><Medal size={14}/> {representativeTitle(r)}</Tag>}
       <div className="profile-avatar"><PixelRider look={equippedLook(r)} label={r.name+' 외형'}/></div>
       <StatCards r={r}/><RiderCard r={r}/>
@@ -97,7 +97,7 @@ export function Rivals({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
           <ul className="hall-history">{episodes.map(episode=>{
             const choice=choices[episode.id],outcome=choice&&episode.choices[choice.index];
             return <li key={episode.id}>
-              <b>{choice&&<>{choice.year}년차 {choice.week}주 · </>}{episode.title}</b>
+              <b>{choice&&<>{formatCareerDate(choice)} · </>}{episode.title}</b>
               {outcome&&<span>{outcome.label}</span>}{outcome?.dialogue&&<span>{outcome.dialogue}</span>}
             </li>;
           })}</ul>
@@ -110,7 +110,7 @@ function RetirementSummary({r}:{r:Rider}){
   const stats=summarize(r);
   return <div className="retirement-summary">
     <h3>은퇴 시 보관할 기록</h3>
-    <p>{r.year}년차 {r.week}주 · 대회 {stats.meets}회 · {stats.wins}승 · {stats.podiums}회 입상 · 통산 {formatRP(rankingPoints(r).total)}</p>
+    <p>{formatCareerDate(r)} · 대회 {stats.meets}회 · {stats.wins}승 · {stats.podiums}회 입상 · 통산 {formatRP(rankingPoints(r).total)}</p>
     <div className="pill-row">{DISCIPLINES.map(d=><Tag key={d}>{DISCIPLINE_NAMES[d]} 최고 {stats.best[d].toFixed(1)}점</Tag>)}</div>
     <details className="past-meets"><summary>기술 {stats.learned.length}개와 라이벌 관계</summary>
       <div className="pill-row">{stats.learned.map(s=><Tag key={s.id}>{s.name} {r.skills[s.id].mastery}%</Tag>)}</div>
@@ -133,7 +133,7 @@ function CareerLog({r}:{r:Rider}){
           })}</tr>)}</tbody>
       </table></div>}
     {!!timeline.length&&<details className="past-meets"><summary>주요 사건과 보상 <ChevronDown size={16}/></summary><div>
-      {timeline.map((item,index)=><div key={item.year+'-'+item.week+'-'+index}><span>{item.year}년차 {item.week}주 · <b>{lineTerms(item.title)}</b></span><span>{lineTerms(item.text)}</span></div>)}
+      {timeline.map((item,index)=><div key={item.year+'-'+item.week+'-'+index}><span>{formatCareerDate(item)} · <b>{lineTerms(item.title)}</b></span><span>{lineTerms(item.text)}</span></div>)}
     </div></details>}
   </section>;
 }
@@ -199,7 +199,7 @@ function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNod
     <div className="archive-cover">
       <PixelRider look={equippedLook(a)} label={a.name+' 은퇴 당시 외형'}/>
       <div><Tag kind={a.reason==='complete'?'lime':'muted'}>{a.reason==='complete'?'8년 완주':'조기 은퇴'}</Tag><h3>{a.name}</h3><p>{endingName(ending)}{title&&' · '+title}</p>
-      <small>{a.year}년차 {a.week}주 은퇴 · 활동 {time}주 · 명성 {a.fame.toLocaleString('ko-KR')}</small></div>
+      <small>{formatCareerDate(a)} 은퇴 · 활동 {time}주 · 명성 {a.fame.toLocaleString('ko-KR')}</small></div>
     </div>
     <div className="archive-achievements">
       {achievements.map(([Icon,value,label])=><div key={label}>
@@ -230,7 +230,7 @@ function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNod
         return <details className="past-meets archive-year" key={year}><summary>{year}년차{division?' · '+DIVISION_NAMES[division]:''}{seasonRP?' · '+formatRP(seasonRP.total):''}</summary>
           {seasonRP&&<RPDisciplines points={seasonRP.disciplines}/>}
           <ul className="hall-history">{matches.map(meet=><li key={meet.id}><b>{meetById(meet.id)?.name??meet.id}</b><span>{meet.results.map(result=>`${DISCIPLINE_NAMES[result.discipline]} ${playerPlace(result)}위 · ${result.run.score.toFixed(1)}점${validRP(result.points)?' · +'+formatRP(result.points):''}`).join(' / ')||'불참'}</span></li>)}</ul>
-          <ul className="hall-history">{events.map((event,i)=><li key={`${event.week}:${event.title}:${i}`}><b>{event.week}주 · {lineTerms(event.title)}</b><span>{lineTerms(event.text)}</span></li>)}</ul>
+          <ul className="hall-history">{events.map((event,i)=><li key={`${event.week}:${event.title}:${i}`}><b>{formatMonthWeek(event.week)} · {lineTerms(event.title)}</b><span>{lineTerms(event.text)}</span></li>)}</ul>
         </details>;
       })}</>}
     </div></details>

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CALENDAR, calendarFor, INTERNATIONAL_MEETS, DEFAULT_LOOK, RULES, SKILL, SKILLS } from '../src/game/data';
+import { CALENDAR, calendarFor, formatCareerDate, formatMonthWeek, INTERNATIONAL_MEETS, monthWeek, DEFAULT_LOOK, RULES, SKILL, SKILLS } from '../src/game/data';
 import { command, divisionFor, GameError, newRider, processWeek } from '../src/game/career';
 import { chance, generateRoutine, learned, routineTime, simulateMeet, simulateRun, validRoutine } from '../src/game/competition';
 import { ECONOMY, equippedLook, extras, gearBonuses, playerPlace, SPONSOR } from '../src/game/economy';
@@ -17,6 +17,15 @@ const identity=()=>({id:'rider-1',seed:5411});
 const career=():Career=>({rider:newRider(identity().id,identity().seed,'리버',{...DEFAULT_LOOK}),hall:[]});
 const plan=(p:Plan['action']):Plan=>({action:p,spot:'river'});
 const enterAuto=(c:Career)=>command(c,{type:'settings',settings:{mode:'auto',strategy:'freestyle',entries:['freestyle']}},identity);
+
+test('every season week has a distinct calendar date and existing meets remain in their listed months',()=>{
+  const dates=Array.from({length:RULES.weeks},(_,i)=>formatMonthWeek(i+1));
+  assert.equal(new Set(dates).size,RULES.weeks);
+  assert.deepEqual([dates[0],dates[3],dates[4],dates[12],dates[13],dates[51]],
+    ['1월 첫째 주','1월 넷째 주','2월 첫째 주','3월 다섯째 주','4월 첫째 주','12월 다섯째 주']);
+  assert.equal(formatCareerDate({year:5,week:50}),'5년차 · 12월 셋째 주');
+  for(const meet of [...CALENDAR,...INTERNATIONAL_MEETS])assert.equal(monthWeek(meet.week).month,meet.month,meet.id);
+});
 
 test('RP comes from competition, accumulates after a new season, and restores exact saved season totals without duplication',()=>{
   assert.deepEqual([1,2,3,4,5,6,7].map(place=>meetRP(place,false)),[100,75,60,45,35,10,10]);
