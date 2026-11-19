@@ -7,6 +7,10 @@ import { ECONOMY, equippedLook, extras, gearBonuses, playerPlace, SPONSOR } from
 import { previewTraining, statAfter, trainingSuccess } from '../src/game/training';
 import { EVENTS, eventBody, eventChoiceAvailable, eventFor, pickEvent } from '../src/game/events';
 import { RIVALS, spotUnlocked } from '../src/game/content';
+import { HAPPENINGS, pickHappening } from '../src/game/happenings';
+import { CREW_STORIES } from '../src/game/crewStories';
+import { STORY_ARCS } from '../src/game/storyArcs';
+import { activePartners, formerPartners, storyLog } from '../src/game/storyState';
 import { RELATIONSHIP_REWARDS, relationshipEpilogues, relationshipWith, representativeTitle } from '../src/game/relationships';
 import { seeded } from '../src/game/random';
 import { meetRP, rankingPoints } from '../src/game/rp';
@@ -25,6 +29,88 @@ test('every season week has a distinct calendar date and existing meets remain i
     ['1월 첫째 주','1월 넷째 주','2월 첫째 주','3월 다섯째 주','4월 첫째 주','12월 다섯째 주']);
   assert.equal(formatCareerDate({year:5,week:50}),'5년차 · 12월 셋째 주');
   for(const meet of [...CALENDAR,...INTERNATIONAL_MEETS])assert.equal(monthWeek(meet.week).month,meet.month,meet.id);
+});
+
+test('affinity scenes run without a choice or a relationship transition, then observe the same-NPC cooldown',()=>{
+  assert.equal(HAPPENINGS.length,32);
+  assert.equal(new Set(HAPPENINGS.map(event=>event.id)).size,32);
+  const c=career(),r=c.rider!;
+  r.week=4;r.events.first=1;r.relations.yu=15;
+  command(c,{type:'plan',plan:{action:'rest',spot:'river'}},identity);
+  assert.equal(processWeek(c),true);
+  assert.equal(r.extras?.lastEvent?.eventId,'happening-yu-1');
+  assert.equal(r.extras?.lastEvent?.happening,true);
+  assert.equal(r.phase,'plan');
+  assert.equal(r.week,5);
+  assert.equal(r.extras?.choices['happening-yu-1'],undefined);
+  assert.equal(relationshipWith(r,'yu'),undefined);
+  const [seen]=storyLog(JSON.parse(JSON.stringify(r)));
+  assert.equal(seen.choice,undefined);
+  assert.deepEqual(seen.npcs,['yu']);
+  r.relations.yu=35;r.week=10;
+  assert.equal(pickHappening(r),undefined);
+  r.week=12;
+  assert.equal(pickHappening(r)?.id,'happening-yu-2');
+  assert.equal(rankingPoints(r).total,0);
+});
+
+test('the six stories have their full episode sets and consent changes whether an overlap can be exposed',()=>{
+  assert.equal(STORY_ARCS.length+1,24); // 유리의 첫 장면은 기존 first
+  assert.equal(CREW_STORIES.filter(event=>event.id.startsWith('cross-')).length,12);
+  assert.ok([...STORY_ARCS,...CREW_STORIES].every(event=>event.choices.length===3));
+  for(const branch of [0,1,2]){
+    const c=career(),r=c.rider!;
+    r.year=7;r.week=15;r.relations.yu=55;r.relations.noa=65;
+    r.extras!.relationships={titles:[],npcs:{
+      yu:{state:'partner',flags:['clear-boundary']},
+      noa:{state:'interested',flags:['clear-boundary','overlap-requested'],pendingReward:{title:'noa-neon',item:'acc_noa_neon'}},
+    }};
+    const overlap=eventFor(r,'crew-overlap')!;
+    assert.equal(overlap.when(r),true);
+    r.phase='event';r.event=overlap.id;
+    command(c,{type:'event',eventId:overlap.id,index:branch},identity);
+    assert.equal(activePartners(r).length,branch===2?1:2);
+    assert.equal(r.extras?.inventory.includes('acc_noa_neon'),branch!==2);
+    r.week=20;
+    const confrontation=eventFor(r,'cross-01')!;
+    assert.equal(confrontation.when(r),branch===1);
+    if(branch===1){
+      r.phase='event';r.event=confrontation.id;
+      command(c,{type:'event',eventId:confrontation.id,index:0},identity);
+      assert.equal(activePartners(r).length,0);
+      assert.deepEqual(formerPartners(r),['noa','yu']);
+      assert.ok(r.extras?.inventory.includes('acc_crew_photo'));
+    }
+    assert.equal(rankingPoints(r).total,0);
+  }
+});
+
+test('manual event preference pauses a regular auto choice and skip shortens only competition playback in background',()=>{
+  const start=1_000_000, tab='options';
+  const step=(prev:ReturnType<typeof blankSave>,action:Parameters<typeof advance>[1],elapsed:number)=>
+    advance(prev,action,tab,start+elapsed,RULES.weekMs,identity);
+  const seed=blankSave(),r=career().rider!;
+  seed.career.rider=r;
+  r.week=10;r.phase='event';r.event='park-tea';
+  const held=step(seed,{type:'settings',settings:{...r.settings,mode:'auto',manualEvents:true,skipMeets:true}},0);
+  assert.equal(held.career.rider?.event,'park-tea');
+  assert.equal(step(held,{type:'pulse',background:'hidden'},15_000),held);
+  const released=step(held,{type:'settings',settings:{...held.career.rider!.settings,manualEvents:false}},16_000);
+  assert.equal(released.clock.pendingEvent?.eventId,'park-tea');
+  assert.equal(released.career.rider?.settings.skipMeets,true);
+
+  const meet=blankSave(),competitor=career().rider!;
+  competitor.settings={mode:'auto',strategy:'balanced',entries:['dance'],skipMeets:true};
+  competitor.week=8;
+  const result=simulateMeet(competitor,CALENDAR[0],['dance']).results;
+  competitor.records.push({year:1,id:CALENDAR[0].id,division:'rookie',results:result});
+  meet.career.rider=competitor;
+  meet.clock.pendingMeet=competitor.id+':1:'+CALENDAR[0].id;
+  const skipped=step(meet,{type:'pulse',background:'hidden'},0);
+  assert.equal(skipped.clock.background?.at,start+2000);
+  const resumed=step(skipped,{type:'pulse',background:'hidden'},2000);
+  assert.equal(resumed.clock.pendingMeet,undefined);
+  assert.deepEqual(resumed.career.rider?.records[0].results,result);
 });
 
 test('RP comes from competition, accumulates after a new season, and restores exact saved season totals without duplication',()=>{

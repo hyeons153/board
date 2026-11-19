@@ -1,5 +1,6 @@
 import type { EventDef } from './events.js';
 import { RULES } from './data.js';
+import { chosen, hasFlag, STORY_NPCS, STORY_TITLES } from './storyState.js';
 import type { RelationshipState, Rider } from './types.js';
 
 type CareerRelationships = Pick<Rider,'extras'>;
@@ -34,11 +35,13 @@ export const RELATIONSHIP_REWARDS = {
   },
 } satisfies Record<ArcId,Record<Route,RelationshipReward&{title:string}>>;
 export const RELATIONSHIP_TITLES = new Map(Object.values(RELATIONSHIP_REWARDS).flatMap(routes=>
-  Object.values(routes).map(reward=>[reward.titleId,reward.title] as const)));
+  Object.values(routes).map(reward=>[reward.titleId,reward.title] as const)).concat(Object.entries(STORY_TITLES)));
 
 export const relationshipWith = (r:CareerRelationships,npc:string) => r.extras?.relationships?.npcs[npc];
-export const representativeTitle = (r:CareerRelationships) =>
-  RELATIONSHIP_TITLES.get(r.extras?.relationships?.representative??'');
+export const representativeTitle = (r:CareerRelationships) => {
+  const history=r.extras?.relationships,id=history?.representative;
+  return id&&history?.titles.includes(id)?RELATIONSHIP_TITLES.get(id):undefined;
+};
 
 export function relationshipChoiceAvailable(r:CareerRelationships,npc:string|undefined,state?:RelationshipState){
   return (state!=='interested'&&state!=='partner')||
@@ -202,23 +205,59 @@ export const RELATIONSHIP_EVENTS:EventDef[] = [
 ];
 
 export function rooftopUnlocked(r:CareerRelationships){
-  return !!r.extras?.relationships?.titles.length;
+  return r.extras?.relationships?.titles.some(id=>!id.startsWith('crew-'))??false;
 }
 
 export function relationshipHint(r:Rider,npc:string){
-  if(npc!=='yu'&&npc!=='jun')return undefined;
-  if(r.phase==='event'&&r.event?.startsWith('relationship-'+npc+'-'))return '육성 화면에서 다음 이야기를 확인할 수 있어요.';
-  if(!r.events[atArc(npc,'trust')])return '2년차부터 이전 만남을 이어갈 수 있어요. 3년차부터는 새로 이야기가 시작돼요.';
-  if(!r.events[atArc(npc,'fork')])return '3년차부터 함께 만든 기록을 다시 돌아봐요.';
   const progress=relationshipWith(r,npc);
-  if(progress?.state==='interested')return '다음 만남에서 서로의 마음을 확인해요.';
-  if(progress?.state==='ended'||progress?.flags.some(flag=>flag.startsWith('finished-')))return '이 관계의 결말은 은퇴 기록에 남아요.';
-  return '관계를 정한 뒤 주간 행동을 이어가면 다음 이야기가 열려요.';
+  if(r.phase==='event'&&(r.event?.startsWith('relationship-'+npc+'-')||r.event?.startsWith('story-'+npc+'-')))
+    return '육성 화면에서 다음 이야기를 확인할 수 있어요.';
+  if(progress?.state==='interested'&&hasFlag(r,npc,'overlap-requested')&&!r.events['crew-overlap'])
+    return '기존 교제에 대해 두 사람과 이야기할 장면이 남았어요.';
+  const hasSeen=(part:number)=>Boolean(r.events['story-'+npc+'-'+part]);
+  if(hasSeen(4))return '지금까지 고른 관계는 은퇴 기록에 남아요.';
+  if(hasSeen(3))return [`jun`,`min`,`noa`].includes(npc)?'7년차부터 마지막 인사를 나눠요.':'8년차 마지막 시즌에 답을 나눠요.';
+  if(hasSeen(2))return '5년차부터 지난 약속과 선택이 다시 이야기로 이어져요.';
+  if(hasSeen(1)||npc==='yu')return '3년차부터 개인 이야기가 깊어져요.';
+  return '초반 시즌에 스팟에서 만나면 첫 장면이 열려요. 시즌을 이어가면 다시 만날 기회가 생겨요.';
 }
 
+const EXPANDED_ENDINGS:Partial<Record<string,Partial<Record<RelationshipState,string>>>>={
+  min:{partner:'마지막 점검표의 일정은 둘이 정했다. 민재가 마지막 칸에는 네가 직접 쓰라며 연필을 건넸다.',
+    rival:'민재는 은퇴식에서 새 기록 대신 각자 타고 싶은 시간을 물었다. 둘의 마지막 장비 점검은 여전히 완벽했다.',
+    ended:'체크리스트를 돌려주며 민재가 마지막으로 물었다. “이제 다 돌려받았어?” 대답을 들은 뒤 그는 먼저 길을 비켜 줬다.'},
+  sol:{partner:'솔은 은퇴식 뒤 커피를 두 잔 따랐다. 한 잔을 건네며 좋다는 말을 이번에도 농담 없이 했다.',
+    friend:'두 사람은 좋은 친구라고 소개한 날처럼 따뜻한 커피부터 마셨다. 그날 솔의 농담은 대회 이야기뿐이었다.',
+    ended:'솔은 사과를 농담으로 덮지 않았다. 두 사람은 마지막 커피를 각자의 자리에서 마셨다.'},
+  jun:{partner:'준은 마지막 영상의 이름을 정하기 전에 물었다. 이번에는 둘이 기억하고 싶은 장면만 남겼다.',
+    rival:'은퇴복을 본 준이 웃었다. “이제 점수표 없어도 한 판 할 수 있지? 네 경기는 아직 내 최애야.”',
+    friend:'두 사람은 옛 영상을 정리하며 같이 웃었다. 카메라 밖에서 남은 인사가 가장 길었다.'},
+  ha:{partner:'하린은 시계를 집에 두고 왔다. 둘은 누가 먼저 도착했는지 세지 않고 강변 끝까지 걸었다.',
+    rival:'은퇴식이 끝나자 하린이 손목시계를 들었다. “그럼 이제 한 판 더 할 시간은 있지?”',
+    friend:'하린은 먼저 가라고 해 놓고 네가 보드를 챙길 때까지 기다렸다. 그날 둘 다 제일 느린 속도로 강변을 탔다.'},
+  noa:{partner:'네온 불이 꺼지자 노아는 화면을 확인하는 대신 앞으로 원하는 연락 간격을 먼저 물었다. 둘은 다음에 탈 날을 잡았다.',
+    friend:'조명이 꺼진 뒤에도 노아는 편하게 인사했다. 문자가 오지 않아도 다음 연습은 각자 잘 해낼 걸 알았다.',
+    ended:'마지막 메시지는 지울 필요가 없었다. 서로의 공간을 남겨 둔 채 각자 다른 출구로 걸어갔다.'},
+  yu:{partner:'마지막 박자가 끝나자 첫 강변에서 만난 유리가 손을 내밀었다. 다음 스텝은 한 사람씩 정하기로 했다.',
+    rival:'유리가 자신과 다른 라인에 제일 먼저 박수쳤다. 두 사람의 박자는 달라도 마지막 결승의 관중은 함께 일어섰다.',
+    friend:'유리와 처음 탄 강변 장면을 다시 보고 웃었다. 누가 먼저 웃기 시작했는지 아직도 정확히는 몰랐다.'},
+};
 export function relationshipEpilogues(r:CareerRelationships){
-  return (Object.keys(arcs) as ArcId[]).flatMap(npc=>{
+  return STORY_NPCS.flatMap(npc=>{
     const state=relationshipWith(r,npc)?.state;
-    return state&&state!=='undecided'?[{npc,state,text:arcs[npc].epilogues[state]}]:[];
+    if(!state||state==='undecided')return [];
+    const old=npc==='yu'||npc==='jun'?arcs[npc].epilogues[state]:undefined;
+    const expanded=r.extras?.relationships?.story?.some(entry=>entry.npcs.includes(npc));
+    const text=(expanded?EXPANDED_ENDINGS[npc]?.[state]:undefined)??old
+      ??(state==='ended'?'마지막 인사는 짧았다. 함께 탔던 기억을 간직하고 서로의 다음 시즌을 존중했다.':'함께 연습하던 길과 대회장에서 건넨 인사가 그해의 기록에 남았다.');
+    return [{npc,state,text}];
   });
+}
+
+export function crewEpilogue(r:CareerRelationships){
+  if(chosen(r,'cross-12',2))return '함께 탔던 이들에게 마지막으로 인사를 건넸다. 대회 결과와 더불어, 돌아온 박수와 고갯짓이 그 날의 기억에 남았다.';
+  if(chosen(r,'cross-12',1))return '경기가 끝난 뒤 미뤄 둔 말을 전했다. 답을 원하지 않는 사람에게는 다시 묻지 않기로 했다.';
+  if(chosen(r,'cross-12',0))return '마지막 날 기억에 남은 건 무대 소음보다 첫 스텝이었다. 보드에 남은 흠집 하나하나가 네 편이었다.';
+  if(r.extras?.choices['cross-01'])return '크루 단체 사진은 결국 따로 찍었다. 사과를 받은 사람들은 각자의 속도로 다음 인사를 준비했다.';
+  return undefined;
 }

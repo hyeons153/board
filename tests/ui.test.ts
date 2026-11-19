@@ -111,7 +111,8 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await click('자동 육성 설정');
     assert.doesNotMatch(win.document.querySelector('.auto-settings')!.textContent!,/훈련 강도|안전형|집중형/);
     assert.ok(win.document.querySelector('.console-panel-settings'));
-    assert.equal(win.document.querySelectorAll('.auto-settings input[type="checkbox"]').length,0);
+    assert.deepEqual([...win.document.querySelectorAll('.auto-settings input[type="checkbox"]')].map(node=>node.parentElement?.textContent),
+      ['이벤트 선택지 직접 고르기','대회 진행 건너뛰고 결과 보기']);
     const entryRadios=[...win.document.querySelectorAll<HTMLInputElement>('.auto-settings input[type="radio"]')];assert.equal(entryRadios.filter(input=>input.checked).length,1);
     await act(async()=>entryRadios[1].click());await settle();await act(async()=>{await Promise.all([...pendingRequests]);});
     assert.equal(win.document.querySelectorAll('.auto-settings input[type="radio"]:checked').length,1);
@@ -134,7 +135,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       if(menu==='상점'){
         assert.equal(win.document.querySelectorAll('.equipment-choice').length,8);
         assert.equal(win.document.querySelectorAll('.equipment-loadout > div').length,6);
-        await click('액세서리');assert.equal(win.document.querySelectorAll('.equipment-choice').length,36);
+        await click('액세서리');assert.equal(win.document.querySelectorAll('.equipment-choice').length,42);
         await click('튼튼한 헬멧 상세');assert.ok(win.document.querySelector('[aria-label="튼튼한 헬멧 착용 미리보기"]'));
         await click('구매 ₩12,000');await click('장착');
         assert.match(win.document.querySelector('.equipment-panel .workshop-rider')!.textContent!,/액세서리 1\/3/);
@@ -295,12 +296,25 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await act(async()=>root.render(createElement(Rivals,{r:story,send:sendStory,saving:false})));
     assert.equal(win.document.querySelectorAll('.rival').length,6);
     assert.match(win.document.querySelector('.relationship-episodes')!.textContent!,/영상에 남지 않은 말|함께 춤추는 친구/);
+    story.settings.mode='manual';submitted=undefined;
+    await act(async()=>root.render(createElement(GameStage,{...storyProps,pendingEvent:{
+      key:'observation-ui',eventId:'happening-yu-1',title:'간식은 여덟 명분',kind:'해프닝',choice:'',details:[],year:3,week:9,npc:'yu',dialogue:'유리가 간식을 건넸다.',happening:true,
+    }})));
+    assert.equal(win.document.querySelector('[aria-label="짧은 해프닝"]')?.querySelectorAll('button').length,1);
+    assert.equal(win.document.querySelector('[aria-label="짧은 해프닝"] button')?.textContent,'닫기');
+    await settle(3300);
+    assert.deepEqual(submitted,{type:'continue-event',record:'observation-ui'});
 
     rider.week=7;rider.phase='meet';rider.settings={mode:'auto',strategy:'balanced',entries:['dance','trick']};
     const career={rider,hall:[]};
     assert.throws(()=>command(career,{type:'entry',disciplines:['dance','trick']},()=>({id:'automatic-ui',seed:71})),/1종목/);
     rider.records.push({year:1,id:'regular-1',division:'rookie',results:simulateMeet(rider,(await import('../src/game/data')).CALENDAR[0],['dance','trick']).results});
     const record=structuredClone(rider.records[0]);
+    rider.settings.skipMeets=true;
+    await act(async()=>root.render(createElement(GameStage,{r:rider,send:async()=>true,saving:false,remaining:0,weekMs:2000,fastForward:false,spot:'river',motion:'ride',record,onDone:()=>{}})));
+    assert.ok(win.document.querySelector('[aria-label="대회 시상식"]'));
+    assert.equal(win.document.querySelector('[aria-label="대회 스킵"]'),null);
+    delete rider.settings.skipMeets;
     rider.year=2;rider.week=52;rider.phase='meet';
     let selectedEntry:unknown;
     await act(async()=>root.render(createElement(GameStage,{r:rider,send:async action=>{selectedEntry=action;return true;},saving:false,remaining:0,weekMs:2000,fastForward:false,spot:'river',motion:'ride',onDone:()=>{}})));

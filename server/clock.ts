@@ -2,12 +2,14 @@ import { command, currentMeet, divisionFor, GameError, prepareWeek, processWeek,
 import { extras } from '../src/game/economy.js';
 import { AUTO_FLOW, RULES } from '../src/game/data.js';
 import { eventFor } from '../src/game/events.js';
+import { happeningDuration } from '../src/game/happenings.js';
 import type { Career, EventOutcome, GameAction, TrainingSetup } from '../src/game/types.js';
 
 export type Save = { format:1; career:Career; clock:{credit:number; stamp:number; tabs:Record<string,number>; readyAt?:number; fastForward?:boolean; pendingChoice?:string; pendingMeet?:string; pendingTraining?:string; pendingEvent?:EventOutcome; trainingSetup?:TrainingSetup; stateVersion?:number; background?:{tab:string;at:number}} };
 export const blankSave=():Save=>({format:1,career:{rider:null,hall:[]},clock:{credit:0,stamp:0,tabs:{}}});
 export const remaining=(save:Save,weekMs:number,now=Date.now())=>!save.clock.pendingChoice&&!save.clock.pendingEvent&&!save.clock.pendingMeet&&!save.clock.pendingTraining&&save.career.rider?.phase==='plan'&&!!save.career.rider.plan?Math.max(0,(save.clock.readyAt??now+weekMs)-now):0;
-const awaitingDecision=(rider:Save['career']['rider'])=>rider?.phase==='event'&&eventFor(rider,rider.event??'')?.decision;
+const awaitingDecision=(rider:Save['career']['rider'])=>rider?.phase==='event'&&(rider.settings.manualEvents||eventFor(rider,rider.event??'')?.decision);
+const visibleEvent=(clock:Save['clock'])=>clock.pendingMeet&&clock.pendingEvent?.afterMeet?undefined:clock.pendingEvent;
 
 export function advance(prev:Save,a:GameAction,tab:string,now:number,weekMs:number,identity:()=>{id:string;seed:number},official=false,account=false):Save {
   const run=(save:Save,action:GameAction,time:number)=>advanceOne(save,action,tab,time,weekMs,identity,official,account);
@@ -37,7 +39,8 @@ export function advance(prev:Save,a:GameAction,tab:string,now:number,weekMs:numb
 
 function backgroundAction({clock}:Save):GameAction{
   if(clock.pendingTraining)return {type:'continue-training',record:clock.pendingTraining};
-  if(clock.pendingEvent)return {type:'continue-event',record:clock.pendingEvent.key};
+  const event=visibleEvent(clock);
+  if(event)return {type:'continue-event',record:event.key};
   if(clock.pendingMeet)return {type:'continue-meet',record:clock.pendingMeet};
   if(clock.pendingChoice)return {type:'start-training',record:clock.pendingChoice};
   return {type:'pulse'};
@@ -45,10 +48,12 @@ function backgroundAction({clock}:Save):GameAction{
 
 function backgroundDeadline(save:Save,now:number){
   const {clock,career:{rider}}=save;
-  if(clock.pendingTraining||clock.pendingEvent)return now+AUTO_FLOW.resultMs;
+  if(clock.pendingTraining)return now+AUTO_FLOW.resultMs;
+  const event=visibleEvent(clock);
+  if(event)return now+(event.happening?happeningDuration(event.dialogue??''):AUTO_FLOW.resultMs);
   if(clock.pendingMeet){
     const runs=rider?.records.findLast(record=>rider.id+':'+record.year+':'+record.id===clock.pendingMeet)?.results.length??0;
-    const runMs=AUTO_FLOW.entryMs+RULES.runSeconds*1000+AUTO_FLOW.exitMs+AUTO_FLOW.ceremonyMs;
+    const runMs=rider?.settings.skipMeets?AUTO_FLOW.ceremonyMs:AUTO_FLOW.entryMs+RULES.runSeconds*1000+AUTO_FLOW.exitMs+AUTO_FLOW.ceremonyMs;
     return now+(runs?runs*runMs:AUTO_FLOW.resultMs);
   }
   if(!rider||rider.phase==='retired'||awaitingDecision(rider))return undefined;
@@ -89,16 +94,16 @@ function advanceOne(prev:Save,a:GameAction,tab:string,now:number,weekMs:number,i
     delete clock.pendingTraining;if(!clock.pendingEvent&&!clock.pendingMeet)queueAction();return revise();
   }
   if(a.type==='continue-training')throw new GameError('이미 확인한 행동 결과입니다.');
-  if(clock.pendingEvent){
+  if(visibleEvent(clock)){
     if(a.type==='pulse')return prev;
-    if(a.type!=='continue-event'||a.record!==clock.pendingEvent.key)throw new GameError('이벤트 결과를 먼저 확인해 주세요.');
+    if(a.type!=='continue-event'||a.record!==clock.pendingEvent?.key)throw new GameError('이벤트 결과를 먼저 확인해 주세요.');
     delete clock.pendingEvent;if(!clock.pendingMeet)queueAction();return revise();
   }
   if(a.type==='continue-event')throw new GameError('이미 확인한 이벤트 결과입니다.');
   if(clock.pendingMeet){
     if(a.type==='pulse')return prev;
     if(a.type!=='continue-meet'||a.record!==clock.pendingMeet)throw new GameError('게임 화면에서 대회 결과를 확인하고 계속해 주세요.');
-    delete clock.pendingMeet;queueAction();return revise();
+    delete clock.pendingMeet;if(!clock.pendingEvent)queueAction();return revise();
   }
   if(a.type==='continue-meet')throw new GameError('이미 확인한 대회 결과입니다.');
   if(clock.pendingChoice&&r){

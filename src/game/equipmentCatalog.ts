@@ -64,6 +64,12 @@ const ORIGINAL_GEAR:Gear[]=[
   accessory('acc_jun_friend','노컷 아카이브 핀','epic',0,{trickMastery:.04},'준과 함께 만든 실패 영상 보관함의 작은 표식.','sticker',{unlock:'relationship'}),
   accessory('acc_jun_rival','재대결 마커','epic',0,{trickMastery:.04},'다음 승부의 출발선을 표시하는 마커.','led',{unlock:'relationship'}),
   accessory('acc_jun_partner','필름 스트랩','epic',0,{trickMastery:.04},'준이 처음으로 촬영을 쉬기로 한 날 건네준 스트랩.','camera',{unlock:'relationship'}),
+  accessory('acc_min_checklist','접힌 체크리스트 키링','epic',0,{rest:1},'훈련 계획보다 먼저 쉬는 날에 표시하던 작은 노트.','dance-note',{unlock:'relationship'}),
+  accessory('acc_sol_badge','선배의 보온병 배지','epic',0,{rest:2},'커피가 식어도 자리를 지켜 준 날을 기억하는 배지.','bottle',{unlock:'relationship'}),
+  accessory('acc_ha_band','페이스 밴드','epic',0,{cost:1},'하린이 시간을 재는 대신 네 페이스를 기억하라고 건넨 밴드.','wrists',{unlock:'relationship'}),
+  accessory('acc_noa_neon','네온 팔찌','epic',0,{},'야간 광장에서 노아와 조명을 점검하는 이야기가 열려요.','led',{unlock:'relationship',event:'crew-neon-warmup'}),
+  accessory('acc_crew_contract','구겨진 커플 계약서','rare',0,{},'콘셉트란에 이제는 라이벌이라고 적혀 있다.','invitation',{unlock:'relationship'}),
+  accessory('acc_crew_photo','삼자대면 기념 사진','rare',0,{},'나중에 보면 웃을 수 있을지도 몰라 남긴 사진.','camera',{unlock:'relationship'}),
 ];
 
 // These IDs and their original effects are immutable inputs to older competition proofs.

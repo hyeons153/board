@@ -24,7 +24,7 @@ const searchPrefix=(value:string)=>[...normalized(value)].map(char=>['%','_','\\
 
 type PublicRow<P=PublicProfile>={id:string;profile:P;mine:boolean};
 type RankRow=PublicRow<PublicSummary>&{score:number;rank:number;representative:MeetHighlight;ownedRow:boolean};
-const summaryKeys=['name','look','title','year','week','complete','division','wins','podiums','meets','best','ending','official','historic','honors'] as const satisfies readonly (keyof PublicSummary)[];
+const summaryKeys=['name','look','title','representativeTitle','year','week','complete','division','wins','podiums','meets','best','ending','official','historic','honors'] as const satisfies readonly (keyof PublicSummary)[];
 const publicSummary=`jsonb_build_object(${summaryKeys.map(key=>`'${key}',p.profile->'${key}'`).join(',')})`;
 
 async function actorAt(db:Query,hash:string):Promise<Actor|undefined>{

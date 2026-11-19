@@ -1,13 +1,18 @@
-import { RULES, SKILL } from './data.js';
+import { calendarFor, RULES, SKILL } from './data.js';
 import { RIVAL } from './content.js';
 import { equipmentEvents as itemEvents, extras, freshExtras, gearBonuses } from './economy.js';
 import { EXTRA_EVENTS } from './extraEvents.js';
 import { RELATIONSHIP_EVENTS, relationshipChoiceAvailable, type RelationshipChoice } from './relationships.js';
+import { STORY_ARCS } from './storyArcs.js';
+import { CREW_STORIES } from './crewStories.js';
+import { CAREER_STORIES } from './careerStories.js';
+import { elapsed, type StoryImpact } from './storyState.js';
+import { pickHappening, type Happening } from './happenings.js';
 import type { Family, Rider, Stat, Strategy } from './types.js';
 
 type Effect = { energy?:number; money?:number; fame?:number; relation?:number; skill?:string; study?:number; stat?:Stat; gain?:number; item?:string };
-type Choice = { label:string; effect:Effect; tags:Strategy[]; dialogue?:string; relationship?:RelationshipChoice };
-export type EventDef = { id:string; kind:string; title:string; body:string|((r:Rider)=>string); npc?:string; story?:boolean; important?:boolean; decision?:boolean; repeat?:boolean; special?:boolean; when:(r:Rider)=>boolean; choices:Choice[] };
+type Choice = { label:string; effect:Effect; tags:Strategy[]; dialogue?:string; relationship?:RelationshipChoice; story?:(r:Rider)=>StoryImpact };
+export type EventDef = { id:string; kind:string; title:string; body:string|((r:Rider)=>string); npc?:string; cast?:(r:Rider)=>string[]; story?:boolean; chapter?:boolean; finale?:boolean; afterMeet?:boolean; important?:boolean; decision?:boolean; repeat?:boolean; special?:boolean; when:(r:Rider)=>boolean; choices:Choice[] };
 const option=(label:string,effect:Effect,...tags:Strategy[]):Choice=>({label,effect,tags});
 export const EVENTS:EventDef[] = [
   {id:'crew-sticker',kind:'장비 선물',npc:'sol',title:'떼어도 남는 응원',body:'선배가 낡은 스티커를 건넸다. 접힌 귀퉁이마다 함께 탄 날의 흔적이 남아 있다.',story:true,when:r=>r.week>=8&&Math.max(0,...Object.values(r.relations))>=15,choices:[
@@ -20,7 +25,8 @@ export const EVENTS:EventDef[] = [
   {id:'scarf-epilogue',kind:'라이벌 후속 이야기',npc:'yu',title:'빨간 선을 따라',body:'새 라이더가 머플러를 보고 길을 물었다. 유리는 오늘은 네가 먼저 설명해 보라고 눈짓했다.',story:true,important:true,when:r=>r.year>=6&&itemEvents(r).includes('scarf-epilogue'),choices:[option('첫 발부터 함께 연습한다',{relation:10,fame:4},'dance','balanced'),option('서로 다른 라인을 하나로 잇는다',{relation:8,stat:'link',gain:3},'trick','freestyle')]},
   {id:'first',kind:'성장',title:'강바람의 첫인사',body:'유리가 네 보드에 붙은 가격표를 떼 주었다. “첫 연습이지? 넘어지면 강물 탓 하면 돼.”',npc:'yu',story:true,when:r=>r.year===1,choices:[
     option('함께 스텝을 맞춰 본다',{skill:'mango',study:42,energy:-4,relation:8},'dance','freestyle'),
-    option('균형 잡는 요령을 묻는다',{stat:'balance',gain:3,relation:4},'balanced','trick')]},
+    option('균형 잡는 요령을 묻는다',{stat:'balance',gain:3,relation:4},'balanced','trick'),
+    option('다음에도 만나 줄래?',{relation:6})]},
   {id:'juns-clip',kind:'기술 습득',title:'강준의 3초 영상',body:'준이 착지 장면만 슬로모션으로 반복한다. 화면 밖에서 들리는 비명은 못 들은 척해 주자.',npc:'jun',story:true,when:r=>r.week>=3&&r.spot==='plaza',choices:[
     option('프론트 팝의 자세를 따라 한다',{skill:'front-pop',study:100,energy:-7,relation:8},'trick','freestyle'),
     option('링크만 받아 저장한다',{relation:3,stat:'link',gain:2},'balanced','dance')]},
@@ -50,12 +56,23 @@ export const EVENTS:EventDef[] = [
     option('한 바퀴 더 돌고 오기로 한다',{stat:'carve',gain:3,relation:4,energy:-6},'trick','freestyle')]},
   ...EXTRA_EVENTS,
   ...RELATIONSHIP_EVENTS,
+  ...STORY_ARCS,
+  ...CREW_STORIES,
+  ...CAREER_STORIES,
+  {id:'crew-neon-warmup',kind:'스팟 이야기',title:'불이 켜지는 순서',npc:'noa',special:true,
+    body:'네온 팔찌가 먼저 반짝였다. 노아는 점등이 끝날 때까지 오늘 연습할 동작을 같이 골랐다.',
+    when:r=>r.spot==='night'&&itemEvents(r).includes('crew-neon-warmup'),
+    choices:[option('조명이 켜질 때까지 몸을 푼다',{energy:5},'balanced'),option('조명이 닿는 경계에서 스텝을 밟는다',{relation:2},'dance','freestyle'),option('착지 위치를 먼저 확인한다',{relation:2},'trick')]},
 ];
 export const EVENT = Object.fromEntries(EVENTS.map(e=>[e.id,e])) as Record<string,EventDef|undefined>;
 export const canStudy=(r:Rider,id:string)=>SKILL[id]?.requires.every(pre=>(r.skills[pre]?.study??0)>=100)??false;
-export const eventNpc=(e:EventDef,r?:Rider)=>e.npc==='mentor'?r?.mentor:e.npc?RIVAL.get(e.npc):undefined;
-export const eventPaused=(r:Rider,e:EventDef)=>e.decision||r.settings.mode==='manual'||!!(r.settings.pauseStory&&e.important);
+export const eventNpc=(e:EventDef,r?:Rider)=>{
+  const id=e.npc??(r&&eventCast(r,e)[0]);
+  return id==='mentor'?r?.mentor:id?RIVAL.get(id):undefined;
+};
+export const eventPaused=(r:Rider,e:EventDef)=>e.decision||r.settings.mode==='manual'||r.settings.manualEvents||!!(r.settings.pauseStory&&e.important);
 export const eventBody=(r:Rider,e:EventDef)=>typeof e.body==='string'?e.body:e.body(r);
+export const eventCast=(r:Rider,e:EventDef)=>[...new Set(e.cast?.(r)??(e.npc?[e.npc]:[]))];
 export const eventChoiceAvailable=(r:Rider,e:EventDef,index:number)=>
   relationshipChoiceAvailable(r,e.npc,e.choices[index]?.relationship?.state);
 function mentorEvents(r:Rider):EventDef[]{
@@ -77,12 +94,13 @@ function mentorEvents(r:Rider):EventDef[]{
   ];
 }
 export const eventFor=(r:Rider,id:string)=>EVENT[id]??mentorEvents(r).find(e=>e.id===id);
-export function pickEvent(r:Rider,rng:()=>number) {
+export function pickEvent(r:Rider,rng:()=>number,afterMeet=false):EventDef|Happening|undefined {
   const choices=extras(r).choices;
+  const meetWeek=calendarFor(r.year).some(meet=>meet.week===r.week);
   const eligible=[...EVENTS,...mentorEvents(r)].filter(e=>{
     const last=choices[e.id];
     const cooldown=last ? (r.year-last.year)*RULES.weeks+r.week-last.week : Infinity;
-    return (!r.events[e.id]||(e.repeat&&cooldown>=8))&&e.when(r);
+    return (afterMeet?e.afterMeet:!e.afterMeet||!meetWeek)&&(!r.events[e.id]||(e.repeat&&cooldown>=8))&&e.when(r);
   });
   const stories=eligible.filter(e=>e.story);
   if(stories.length){
@@ -91,10 +109,19 @@ export function pickEvent(r:Rider,rng:()=>number) {
     const now=(r.year-1)*RULES.weeks+r.week;
     for(const story of stories)ready[story.id]??=now;
     const recent=progress.lastEvent?.npc;
-    return stories.sort((a,b)=>ready[a.id]!-ready[b.id]!||Number(!!recent&&a.npc===recent)-Number(!!recent&&b.npc===recent))[0];
+    const lastChapter=progress.relationships?.story?.findLast(entry=>entry.choice!==undefined);
+    const gap=lastChapter?elapsed(r,lastChapter.id):Infinity;
+    const finale=stories.find(story=>story.finale&&r.year===RULES.years&&r.week>=50);
+    if(finale)return finale;
+    const available=stories.filter(story=>!story.chapter||gap>=3||r.year===RULES.years&&r.week>=47);
+    if(available.length)return available.sort((a,b)=>ready[a.id]!-ready[b.id]!||Number(!!recent&&a.npc===recent)-Number(!!recent&&b.npc===recent))[0];
   }
-  const fresh=eligible.filter(e=>!r.events[e.id]);
-  const pool=fresh.length?fresh:eligible;
+  const happening=pickHappening(r,afterMeet);
+  if(happening)return happening;
+  const casual=eligible.filter(event=>!event.story);
+  const fresh=casual.filter(e=>!r.events[e.id]);
+  const recentCasual=Object.keys(choices).some(id=>EVENT[id]&&!EVENT[id]?.story&&elapsed(r,id)<21);
+  const pool=fresh.length?fresh:recentCasual?[]:casual;
   const effects=gearBonuses(r);
   if(!pool.length||rng()>=.35+effects.eventChance)return;
   const weights=pool.map(event=>event.special||event.kind==='스팟'?1+effects.specialWeight:1);

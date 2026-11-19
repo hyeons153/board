@@ -362,6 +362,9 @@
 .meet-list-row .date-block { flex-direction:column; min-width:0; padding:3px; gap:2px; white-space:nowrap; }
 .meet-list-row .date-block span { font-size:.7rem; }
 .meet-list-row .date-block b { font-size:1rem; }
+.game-console .happening-card { width:min(480px,calc(100% - 28px)); }
+.happening-card > button { float:right; }
+.auto-settings .auto-presentation-options { display:grid; gap:.45rem; }
 .meet-list-name { display:grid; gap:2px; line-height:1.35; }
 .meet-list-name strong { font-size:.91rem; overflow-wrap:anywhere; }
 .meet-list-name small,.meet-results-inline { color:#526457; font-size:.76rem; }

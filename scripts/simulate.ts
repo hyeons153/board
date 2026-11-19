@@ -1,28 +1,40 @@
 import { command, newRider, processWeek } from '../src/game/career';
 import { DEFAULT_LOOK, RULES } from '../src/game/data';
 import { chooseEnding, summarize } from '../src/game/legacy';
+import { eventFor } from '../src/game/events';
 import { DISCIPLINES, STATS, STRATEGIES, type Career } from '../src/game/types';
 
 const count=Number(process.argv[2]??12);
 if(!Number.isInteger(count)||count<1||count>100) throw new Error('Choose between 1 and 100 seeds.');
+const nonRomance:Record<string,number>={
+  'story-jun-2':1,'story-min-4':1,'story-sol-4':1,'story-jun-4':1,'story-ha-4':1,'story-noa-4':1,'story-yu-4':0,
+};
 
 for(const strategy of STRATEGIES){
   const endings:Record<string,number>={};
-  const totals={rankedMeets:0,wins:0,maxed:0,statTotal:0,scoreSum:0,runs:0};
+  const totals={rankedMeets:0,wins:0,maxed:0,statTotal:0,scoreSum:0,runs:0,decisions:0,personal:0,crew:0,happenings:0,chapters:0,casual:0};
   for(let seed=1;seed<=count;seed++){
     const rider=newRider('internal-'+seed,seed,'Simulation Rider',DEFAULT_LOOK);
     const career:Career={rider,hall:[]};
     rider.settings={mode:'auto',strategy,entries:[strategy==='balanced'?'dance':strategy]};
     for(let week=0;week<RULES.weeks*RULES.years;week++){
       if(!processWeek(career)) throw new Error('Automatic progression stalled on seed '+seed);
-      // This batch run measures competition balance using the friendship choices.
-      if(rider.phase==='event'&&rider.event)command(career,{type:'event',eventId:rider.event,index:0},()=>({id:rider.id,seed}));
+      if(rider.phase==='event'&&rider.event){
+        totals.decisions++;
+        command(career,{type:'event',eventId:rider.event,index:nonRomance[rider.event]??0},()=>({id:rider.id,seed}));
+      }
     }
     const [archive]=career.hall;
     if(!archive||archive.records.length!==48||!archive.records.every(meet=>meet.id.startsWith('international-')?meet.results.length===3:meet.results.length<=1)) throw new Error('Incomplete retirement ledger');
     const outcome=chooseEnding(archive).kind;
     endings[outcome]=(endings[outcome]??0)+1;
     const summary=summarize(archive);
+    const ids=Object.keys(archive.events??{});
+    totals.personal+=ids.filter(id=>id.startsWith('story-')).length+Number(ids.includes('first'));
+    totals.crew+=ids.filter(id=>id.startsWith('cross-')||id==='crew-npc-pair').length;
+    totals.happenings+=ids.filter(id=>id.startsWith('happening-')).length;
+    totals.chapters+=ids.filter(id=>id.startsWith('career-')).length;
+    totals.casual+=Object.entries(archive.events??{}).filter(([id])=>!eventFor(rider,id)?.story&&!id.startsWith('happening-')).reduce((n,[,seen])=>n+seen,0);
     totals.rankedMeets+=summary.meets;
     totals.wins+=summary.wins;
     totals.maxed+=STATS.filter(stat=>archive.stats[stat]===RULES.statCap).length;
@@ -37,5 +49,6 @@ for(const strategy of STRATEGIES){
     complete:count,endings,averageMeets:Math.round(totals.rankedMeets/count*10)/10,
     averageWins:Math.round(totals.wins/count*10)/10,averageStat:Math.round(totals.statTotal/count/4*10)/10,
     cappedStats:totals.maxed,averageScore:Math.round(totals.scoreSum/totals.runs*10)/10,
+    eventsPerCareer:Object.fromEntries((['decisions','personal','crew','happenings','chapters','casual'] as const).map(key=>[key,Math.round(totals[key]/count*10)/10])),
   }));
 }

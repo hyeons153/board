@@ -110,7 +110,7 @@ function RankCard({row,onSelect}:{row:PublicCard<PublicSummary>;onSelect:()=>voi
   return <article className="global-rank-card" data-podium={row.rank&&row.rank<=3?row.rank:undefined}>
     <b className="rank-place">{row.rank}<small>위</small></b>
     <PixelRider look={p.look}/>
-    <div className="rank-rider"><strong>{p.name}{row.mine&&<small> 내 선수</small>}</strong><span>{p.title}</span></div>
+    <div className="rank-rider"><strong>{p.name}{row.mine&&<small> 내 선수</small>}</strong><span>{p.representativeTitle??p.title}</span></div>
     <div className="rank-record">{record&&<><strong>{record.year}년차 · {meetName(record)}</strong><span>{DIVISION_NAMES[record.division]} · {resultText(record)}</span></>}
       <small>{p.wins}승 · {p.podiums}회 입상{p.honors?.length?' · '+p.honors.at(-1):''}</small></div>
     <strong className="rank-rp">{formatRP(row.score??0)}</strong>
@@ -147,7 +147,7 @@ function PublicDetail({card,view,metric}:{card:PublicCard;view:View;metric?:Metr
   const representative=p.representatives?.[metric??'career'];
   return <>
     <div className="public-hero"><PixelRider look={p.look} label={p.name+' 도트 캐릭터'}/><div><h2>{p.name}</h2><p>{p.title}</p><div className="pill-row">
-      <Tag>{formatCareerDate(p)} 은퇴 · {DIVISION_NAMES[p.division]}</Tag>{p.official&&<Tag kind="lime"><ShieldCheck size={14}/> 검증 경기 보유</Tag>}
+      <Tag>{formatCareerDate(p)} 은퇴 · {DIVISION_NAMES[p.division]}</Tag>{p.representativeTitle&&<Tag kind="lilac">{p.representativeTitle}</Tag>}{p.official&&<Tag kind="lime"><ShieldCheck size={14}/> 검증 경기 보유</Tag>}
     </div></div></div>
     <div className="archive-stats"><span><Trophy size={16}/> {p.wins}승 · {p.podiums}회 입상</span><span><Flag size={16}/> {p.meets}개 대회</span>{p.fame!==undefined&&<span>명성 {p.fame.toLocaleString('ko-KR')}</span>}</div>
     {p.rp?<div className="rp-overview">

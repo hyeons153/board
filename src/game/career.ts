@@ -1,6 +1,6 @@
 import { ACTION_NAMES, ACTION_STORIES, calendarFor, DISCIPLINE_NAMES, LOCATIONS, RULES, SKILL, SKILLS, START_SKILLS, STAT_NAMES } from './data.js';
 import { generateRoutine, learned, simulateMeet, validRoutine } from './competition.js';
-import { autoChoice, canStudy, eventChoiceAvailable, eventFor, eventPaused, pickEvent } from './events.js';
+import { autoChoice, canStudy, eventCast, eventChoiceAvailable, eventFor, eventPaused, pickEvent } from './events.js';
 import { chooseEnding, honors, mentorFrom } from './legacy.js';
 import { RUN_PROOF_VERSION } from './public.js';
 import { meetRP } from './rp.js';
@@ -8,6 +8,8 @@ import { RIVALS, SPOT_GATE, spotUnlocked } from './content.js';
 import { ECONOMY, effectiveStats, eligibleSponsor, equipmentReaction, equipmentUnlocked, extras, freshExtras, gearBonuses, ITEM, maintainedSponsor, milestone, playerPlace, resaleValue, SPONSOR, STARTER_IDS, supply, unlockEquipment, upgradeEquipment } from './economy.js';
 import { clamp, round, seeded } from './random.js';
 import { RELATIONSHIP_NAMES, RELATIONSHIP_TITLES, rooftopUnlocked } from './relationships.js';
+import { applyStoryImpact, name as storyNpcName, storyAffinity } from './storyState.js';
+import type { Happening } from './happenings.js';
 import { statAfter, trainingCost, trainingFactor, trainingStatGains, trainingSuccess } from './training.js';
 import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family, type Settings } from './types.js';
 
@@ -211,6 +213,8 @@ function applyEvent(r:Rider,index:number){
   if(!e||!choice) throw new GameError('선택할 수 없는 이벤트예요.');
   if(!eventChoiceAvailable(r,e,index))throw new GameError('이 커리어에서 이미 연애 상대를 선택했어요. 다른 선택지를 골라 주세요.');
   const fx=choice.effect;
+  const cast=e.chapter?eventCast(r,e):undefined;
+  const impact=choice.story?.(r);
   const details:string[]=[];
   const progress=r.extras??=freshExtras();
   const energyBefore=r.energy,moneyBefore=r.money;
@@ -223,7 +227,8 @@ function applyEvent(r:Rider,index:number){
     const before=r.stats[fx.stat];stat(r,fx.stat,fx.gain??0);
     if(r.stats[fx.stat]>before) details.push(`${STAT_NAMES[fx.stat]} +${round(r.stats[fx.stat]-before)}`);
   }
-  const relation=(fx.relation??0)+(e.npc&&(fx.relation??0)>0?gearBonuses(r).relation:0);
+  const affinity=fx.relation??(e.npc?storyAffinity(impact,e.npc):0);
+  const relation=affinity+(e.npc&&affinity>0?gearBonuses(r).relation:0);
   if(e.npc){
     const before=r.relations[e.npc]??0;r.relations[e.npc]=clamp(before+relation);
     const change=round(r.relations[e.npc]-before);
@@ -247,6 +252,7 @@ function applyEvent(r:Rider,index:number){
     const history=progress.relationships??={npcs:{},titles:[]};
     const story=history.npcs[e.npc]??={state:'undecided',flags:[]};
     if(branch.state){
+      if(story.state==='partner'&&branch.state!=='partner'&&!story.flags.includes('former-partner'))story.flags.push('former-partner');
       story.state=branch.state;
       details.push('관계 · '+RELATIONSHIP_NAMES[branch.state]);
     }
@@ -263,14 +269,48 @@ function applyEvent(r:Rider,index:number){
     }
   }
   if(r.money!==moneyBefore)details.push(`보유금 ${r.money>moneyBefore?'+':''}${(r.money-moneyBefore).toLocaleString('ko-KR')}원`);
+  const dialogue=impact?.dialogue??choice.dialogue;
+  if(impact){
+    const spotWasOpen=rooftopUnlocked(r);
+    const history=progress.relationships??={npcs:{},titles:[]};
+    for(const update of impact.changes??[]){
+      if(update.state&&update.state!==(history.npcs[update.npc]?.state??'undecided'))
+        details.push(storyNpcName(update.npc)+' · '+RELATIONSHIP_NAMES[update.state]);
+    }
+    applyStoryImpact(history,impact,progress.inventory,RELATIONSHIP_TITLES,details);
+    if(!spotWasOpen&&rooftopUnlocked(r))details.push('스팟 해금 · '+LOCATIONS.rooftop.name);
+    (history.story??=[]).push({id:e.id,year:r.year,week:r.week,choice:index,npcs:cast??[],dialogue,details:[...details]});
+  }
   r.events[e.id]=(r.events[e.id]??0)+1;
   progress.choices[e.id]={index,year:r.year,week:r.week};
   if(progress.storyReadyAt)delete progress.storyReadyAt[e.id];
-  progress.lastEvent={key:`${r.id}:${r.year}:${r.week}:${e.id}`,eventId:e.id,title:e.title,kind:e.kind,choice:choice.label,details:[...details],year:r.year,week:r.week,npc:e.npc,dialogue:choice.dialogue};
+  progress.lastEvent={key:`${r.id}:${r.year}:${r.week}:${e.id}`,eventId:e.id,title:e.title,kind:e.kind,choice:choice.label,details:[...details],year:r.year,week:r.week,npc:e.npc??cast?.[0],dialogue,participants:cast,afterMeet:scoredThisWeek(r)};
   r.event=null;
   const description=`${choice.label}${details.length?' · '+details.join(' / '):''}`;
   note(r,'event',`${e.title} · ${description}`);
   if(e.story||e.npc) milestone(r,e.title,description);
+}
+function applyHappening(r:Rider,event:Happening){
+  const progress=r.extras??=freshExtras();
+  const history=progress.relationships??={npcs:{},titles:[]};
+  const dialogue=typeof event.text==='string'?event.text:event.text(r);
+  const participants=[...new Set(event.cast(r))];
+  const details:string[]=[];
+  if(event.relation){
+    const {npc,points}=event.relation;
+    const before=r.relations[npc]??0;
+    r.relations[npc]=clamp(before+points);
+    if(r.relations[npc]>before)details.push('관계 +'+(r.relations[npc]-before));
+  }
+  if(event.energy){
+    const before=r.energy;
+    r.energy=round(clamp(before+event.energy));
+    if(r.energy>before)details.push('체력 +'+round(r.energy-before));
+  }
+  r.events[event.id]=1;
+  (history.story??=[]).push({id:event.id,year:r.year,week:r.week,npcs:participants,dialogue,details});
+  progress.lastEvent={key:`${r.id}:${r.year}:${r.week}:${event.id}`,eventId:event.id,title:event.title,kind:'해프닝',choice:'',details,year:r.year,week:r.week,npc:participants[0],participants,dialogue,happening:true,afterMeet:scoredThisWeek(r)};
+  note(r,'event',event.title+' · '+dialogue.split(/(?<=[.?!])\s/u)[0]);
 }
 function finishWeek(c:Career,r:Rider) {
   if(r.week===RULES.weeks){
@@ -327,10 +367,16 @@ function runMeet(c:Career,r:Rider,disciplines:Discipline[],official:boolean) {
   }
   unlockEquipment(r);
   note(r,'meet',`${meet.name} · ${results.length?results.map(x=>`${DISCIPLINE_NAMES[x.discipline]} ${x.standings.find(s=>s.id==='player')!.place}위`).join(' / '):'불참'}`);
+  const last=r.extras?.lastEvent;
+  if(results.length&&(last?.year!==r.year||last.week!==r.week)&&playWeekEvent(r,true))return;
   finishWeek(c,r);
 }
+function scoredThisWeek(r:Rider){
+  const meet=currentMeet(r);
+  return !!meet&&r.records.some(record=>record.year===r.year&&record.id===meet.id);
+}
 function afterTraining(c:Career,r:Rider,official:boolean) {
-  if(currentMeet(r)){
+  if(currentMeet(r)&&!scoredThisWeek(r)){
     r.phase='meet';
     if(r.settings.mode==='auto'){
       if(!r.settings.pauseMeet) runMeet(c,r,r.entries??r.settings.entries,official);
@@ -352,15 +398,18 @@ export function processWeek(c:Career,official=false,setup?:import('./types.js').
   finishTraining(c,r,official);
   return true;
 }
+function playWeekEvent(r:Rider,afterMeet=false){
+  const event=pickEvent(r,seeded(r.seed,r.year,r.week,afterMeet?'meet-event':'event'),afterMeet);
+  if(!event)return false;
+  if('happening' in event){applyHappening(r,event);return false;}
+  r.phase='event';
+  r.event=event.id;
+  if(eventPaused(r,event))return true;
+  applyEvent(r,autoChoice(r,event));
+  return false;
+}
 function finishTraining(c:Career,r:Rider,official:boolean){
-  const event=pickEvent(r,seeded(r.seed,r.year,r.week,'event'));
-  if(event){
-    r.phase='event';
-    r.event=event.id;
-    if(eventPaused(r,event)) return;
-    applyEvent(r,autoChoice(r,event));
-  }
-  afterTraining(c,r,official);
+  if(!playWeekEvent(r))afterTraining(c,r,official);
 }
 function retire(c:Career,r:Rider,reason:'complete'|'early'){
   r.phase='retired'; r.reason=reason; r.plan=null; r.event=null; r.entries=null;

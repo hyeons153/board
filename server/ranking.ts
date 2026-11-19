@@ -2,6 +2,7 @@ import { calendarFor, meetById, RULES } from '../src/game/data.js';
 import { simulateRun } from '../src/game/competition.js';
 import { equippedLook, freshExtras } from '../src/game/economy.js';
 import { chooseEnding, endingName, honors, summarize } from '../src/game/legacy.js';
+import { representativeTitle } from '../src/game/relationships.js';
 import { divisionFor } from '../src/game/career.js';
 import { DISCIPLINES, type Archive, type MeetRecord, type Result } from '../src/game/types.js';
 import { METRICS, RANKING_VERSION, RUN_PROOF_VERSION, type MeetHighlight, type Metric, type PublicProfile } from '../src/game/public.js';
@@ -76,7 +77,7 @@ export function publicationFor(archive:Archive):{profile:PublicProfile;entries:R
     const best=scores.find(x=>x.result.discipline===d)?.result;
     return best?[[d,best.proof?.routine??best.run.log.map(frame=>frame.id)]]:[];
   }));
-  return {entries,profile:{name:archive.name,look:equippedLook(archive),title:endingName(ending),year:archive.year,week:archive.week,
+  return {entries,profile:{name:archive.name,look:equippedLook(archive),title:endingName(ending),representativeTitle:representativeTitle(archive)??null,year:archive.year,week:archive.week,
     complete,division:divisionFor(archive.year),stats:archive.stats,
     skills:summary.learned.map(skill=>({id:skill.id,mastery:archive.skills[skill.id].mastery})),signature:summary.favorite?.id,
     wins:summary.wins,podiums:summary.podiums,meets:summary.meets,best:summary.best,fame:archive.fame,

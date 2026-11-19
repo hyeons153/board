@@ -17,10 +17,10 @@ function give(c:Career,ids:string[]){for(const id of ids){const r=c.rider!;r.ext
 function equip(c:Career,id:string){command(c,{type:'trade',operation:'equip',item:id},identity);}
 const week=(c:Career,plan:Plan)=>{c.rider!.week=3;c.rider!.phase='plan';command(c,{type:'plan',plan},identity);assert.ok(processWeek(c));};
 
-test('catalog preserves the 22 base items, 30 original accessories and six additional relationship gifts',()=>{
+test('catalog preserves the 22 base items, 30 original accessories and all twelve relationship gifts',()=>{
   assert.equal(NEW_GEAR.filter(item=>item.slot!=='accessory').length,22);
   assert.equal(NEW_GEAR.filter(item=>item.slot==='accessory'&&item.unlock!=='relationship').length,30);
-  assert.equal(NEW_GEAR.filter(item=>item.slot==='accessory'&&item.unlock==='relationship').length,6);
+  assert.equal(NEW_GEAR.filter(item=>item.slot==='accessory'&&item.unlock==='relationship').length,12);
   assert.equal(new Set(GEAR.map(item=>item.id)).size,GEAR.length);
   assert.equal(ITEM.get('deck_008')!.price,3200000);assert.equal(ITEM.get('truck_007')!.stats.carve,7);assert.equal(ITEM.get('wheel_007')!.stats.speed,7);
   for(const item of NEW_GEAR){

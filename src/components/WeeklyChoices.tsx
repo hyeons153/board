@@ -65,6 +65,10 @@ export function AutoSettings({r,send,saving}:{r:Rider;send:Submit;saving:boolean
     <p id="auto-strategy-description" aria-label="자동 육성 전략 설명">{STRATEGY_DETAILS[r.settings.strategy]} 전략은 훈련·이벤트 선택에 적용되며 출전 종목은 아래에서 별도로 정합니다.</p>
     <fieldset><legend>자동 출전 종목 · 1개 선택</legend>{DISCIPLINES.map(id=><label key={id}><input type="radio" name={'auto-entry-'+r.id} checked={r.settings.entries[0]===id} disabled={saving} onChange={()=>void send({type:'settings',settings:{...r.settings,entries:[id]}})}/>{DISCIPLINE_NAMES[id]}</label>)}<label><input type="radio" name={'auto-entry-'+r.id} checked={!r.settings.entries.length} disabled={saving} onChange={()=>void send({type:'settings',settings:{...r.settings,entries:[]}})}/>일반 대회 불참</label></fieldset>
     <p>일반 대회에 적용합니다. 2·4·6·8년차 국제대회는 설정과 관계없이 3종목 모두 출전합니다.</p>
+    <fieldset className="auto-presentation-options"><legend>이벤트와 경기</legend>
+      <label><input type="checkbox" checked={!!r.settings.manualEvents} disabled={saving} onChange={e=>void send({type:'settings',settings:{...r.settings,manualEvents:e.target.checked}})}/>이벤트 선택지 직접 고르기</label>
+      <label><input type="checkbox" checked={!!r.settings.skipMeets} disabled={saving} onChange={e=>void send({type:'settings',settings:{...r.settings,skipMeets:e.target.checked}})}/>대회 진행 건너뛰고 결과 보기</label>
+    </fieldset>
     <button className="button primary" disabled={saving} onClick={()=>void send({type:'settings',settings:{...r.settings,entries:r.settings.entries.slice(0,1),mode:r.settings.mode==='auto'?'manual':'auto',pauseStory:false,pauseMeet:false,pauseInjury:false}})}>{r.settings.mode==='auto'?'자동 육성 끄기':'자동 육성 시작'} <ArrowRight size={16}/></button>
   </section>;
 }

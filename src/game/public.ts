@@ -10,6 +10,7 @@ export const RANK_LABELS:Record<Metric,string>={career:'종합',dance:'댄싱',t
 export type MeetHighlight={id:string;year:number;division:Division;discipline:Discipline;score:number;place:number;rp?:number};
 export type PublicSummary={
   name:string;look:Look;title:string;year:number;week:number;complete:boolean;division:Division;
+  representativeTitle?:string|null;
   wins:number;podiums:number;meets:number;best:Record<Discipline,number>;ending:Ending;official:boolean;historic:boolean;honors?:string[];
 };
 export type PublicProfile=PublicSummary&{

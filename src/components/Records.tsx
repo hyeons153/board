@@ -4,7 +4,9 @@ import { formatCareerDate, formatMonthWeek, meetById, DISCIPLINE_NAMES, DIVISION
 import { NAMES, competitor, learned } from '../game/competition';
 import { RIVALS, lineTerms } from '../game/content';
 import { equippedLook, extras, ITEM, playerPlace } from '../game/economy';
-import { EVENTS } from '../game/events';
+import { EVENT, EVENTS } from '../game/events';
+import { HAPPENING } from '../game/happenings';
+import { storyLog } from '../game/storyState';
 import { PixelRider } from './Appearance';
 import { divisionFor } from '../game/career';
 import { DISCIPLINES, STATS, type Archive, type Rider, type View } from '../game/types';
@@ -65,6 +67,8 @@ export function Profile({r,send,saving,onHall,onNew}:{r:Rider;send:Submit;saving
 }
 export function Rivals({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
   const {choices,relationships}=extras(r);
+  const log=storyLog(r);
+  const crewLog=log.filter(entry=>entry.npcs.length>1||entry.id.startsWith('cross-')||entry.id.startsWith('crew-')||entry.id.startsWith('happening-crew-'));
   const when=(id:string)=>(choices[id]?.year??0)*RULES.weeks+(choices[id]?.week??0);
   return <section className="panel content-panel">
     {!!relationships?.titles.length&&<label className="relationship-title">
@@ -74,9 +78,14 @@ export function Rivals({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
         {relationships.titles.map(id=><option key={id} value={id}>{RELATIONSHIP_TITLES.get(id)}</option>)}
       </select>
     </label>}
+    {!!crewLog.length&&<details className="past-meets relationship-episodes">
+      <summary>크루 사건과 해프닝 {crewLog.length}개 <ChevronDown size={14}/></summary>
+      <ul className="hall-history">{crewLog.toReversed().map(entry=><StoryLogItem key={entry.id+':'+entry.year+':'+entry.week} entry={entry}/>)}</ul>
+    </details>}
     <div className="rival-grid">{RIVALS.map(n=>{
       const progress=competitor(n,r.year,r.week);
-      const episodes=EVENTS.filter(e=>e.npc===n.id&&(r.events[e.id]||choices[e.id])).sort((a,b)=>when(b.id)-when(a.id));
+      const here=log.filter(entry=>entry.npcs.includes(n.id)).toReversed();
+      const episodes=EVENTS.filter(e=>e.npc===n.id&&(r.events[e.id]||choices[e.id])&&!here.some(entry=>entry.id===e.id)).sort((a,b)=>when(b.id)-when(a.id));
       const rewards=(n.id==='yu'||n.id==='jun'?Object.values(RELATIONSHIP_REWARDS[n.id]):[]).filter(reward=>relationships?.titles.includes(reward.titleId));
       const relation=r.relations[n.id]??0;
       const phase=relationshipWith(r,n.id)?.state??'undecided';
@@ -92,9 +101,9 @@ export function Rivals({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
         {rewards.map(reward=><div className="relationship-reward" key={reward.titleId}>
           <Tag kind="lime"><Medal size={13}/> {reward.title}</Tag><small>{ITEM.get(reward.item)?.name}</small>
         </div>)}
-        {!!episodes.length&&<details className="past-meets relationship-episodes">
-          <summary>개인 에피소드 {episodes.length}개 <ChevronDown size={14}/></summary>
-          <ul className="hall-history">{episodes.map(episode=>{
+        {!!(episodes.length+here.length)&&<details className="past-meets relationship-episodes">
+          <summary>에피소드와 해프닝 {episodes.length+here.length}개 <ChevronDown size={14}/></summary>
+          <ul className="hall-history">{here.map(entry=><StoryLogItem key={entry.id+':'+entry.year+':'+entry.week} entry={entry}/>)}{episodes.map(episode=>{
             const choice=choices[episode.id],outcome=choice&&episode.choices[choice.index];
             return <li key={episode.id}>
               <b>{choice&&<>{formatCareerDate(choice)} · </>}{episode.title}</b>
@@ -105,6 +114,15 @@ export function Rivals({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
       </article>;
     })}</div>
   </section>;
+}
+function StoryLogItem({entry}:{entry:ReturnType<typeof storyLog>[number]}){
+  const event=EVENT[entry.id];
+  return <li>
+    <b>{formatCareerDate(entry)} · {event?.title??HAPPENING.get(entry.id)?.title}</b>
+    {event&&entry.choice!==undefined&&<span>{event.choices[entry.choice]?.label}</span>}
+    {entry.dialogue&&<span>{entry.dialogue}</span>}
+    {entry.choice!==undefined&&!!entry.details.length&&<small>{entry.details.join(' · ')}</small>}
+  </li>;
 }
 function RetirementSummary({r}:{r:Rider}){
   const stats=summarize(r);
@@ -219,6 +237,10 @@ function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNod
       <div className="pill-row">{summary.learned.map(skill=><Tag key={skill.id}>{skill.name} {a.skills[skill.id].mastery}%</Tag>)}</div>
       {relationships.length>0&&<><h4>라이벌</h4><div className="pill-row">{relationships.map(rival=><Tag key={rival.id}>{rival.name} 관계 {a.relations[rival.id]??0}</Tag>)}</div></>}
       <RelationshipEpilogues archive={a}/>
+      {storyLog(a).length>0&&<details className="past-meets relationship-episodes">
+        <summary>커리어 이야기와 해프닝 <ChevronDown size={14}/></summary>
+        <ul className="hall-history">{storyLog(a).toReversed().map(entry=><StoryLogItem key={entry.id+':'+entry.year+':'+entry.week} entry={entry}/>)}</ul>
+      </details>}
       {!!a.extras?.relationships?.titles.length&&<><h4>관계 칭호</h4><div className="pill-row">{a.extras.relationships.titles.map(id=><Tag key={id}>{RELATIONSHIP_TITLES.get(id)}</Tag>)}</div></>}
       <h4>통산 종목별 RP</h4><RPDisciplines points={rp.disciplines}/>
       {years.length>0&&<><h4>연차별 성장과 대회</h4>{years.map(year=>{

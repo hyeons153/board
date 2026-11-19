@@ -50,7 +50,7 @@ export default function App(){
   const [replay,setReplay]=useState<MeetRecord>();
   const [replayLoading,setReplayLoading]=useState(false);
   const replayRequest=useRef(0);
-  const previous=useRef<{id:string;phase:string}|undefined>(undefined);
+  const previous=useRef<{id:string;phase:string;held:boolean}|undefined>(undefined);
   const panel=useRef<HTMLDivElement>(null);
   const view=game.view,r=view?.career.rider;
   const weekKey=r?r.id+':'+r.year+':'+r.week:'';
@@ -60,14 +60,15 @@ export default function App(){
   useEffect(()=>{if(r?.plan)setSpotMap(false);},[r?.plan]);
   const autoChoice=view?.pendingChoice;
   useEffect(()=>{
+    const held=!!(pending||trainingResult||eventResult);
     if(r&&previous.current&&previous.current.id!==r.id){
       replayRequest.current++;setReplayLoading(false);setScreen('home');setTrail([]);setReplay(undefined);
       setLineDraft(undefined);setMeetSelection(undefined);setLookDraft(undefined);
     }
-    if(r?.phase==='retired'&&!pending&&!trainingResult&&!eventResult&&previous.current?.id===r.id&&previous.current.phase!=='retired'){
+    if(r?.phase==='retired'&&!held&&previous.current?.id===r.id&&(previous.current.phase!=='retired'||previous.current.held)){
       setEndingId(r.id);setTrail([]);setScreen('ending');
     }
-    previous.current=r?{id:r.id,phase:r.phase}:undefined;
+    previous.current=r?{id:r.id,phase:r.phase,held}:undefined;
   },[r?.id,r?.phase,pending,trainingResult,eventResult?.key,autoChoice]);
   useEffect(()=>{
     if(screen==='home')return;
@@ -115,7 +116,7 @@ export default function App(){
   const archive=view.career.hall.find(a=>a.id===endingId);
   const finishMeet=async()=>{
     if(replay){back();return;}
-    if(pending){if(await game.send({type:'continue-meet',record:pending})){if(r?.phase==='retired'){setEndingId(r.id);setScreen('ending');}}}
+    if(pending)await game.send({type:'continue-meet',record:pending});
     else setReplay(undefined);
   };
   const openReplay=async(record:MeetRecord)=>{
