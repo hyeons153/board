@@ -63,6 +63,7 @@
 .swatch-grid fieldset > div { flex-wrap:wrap; }
 .swatch-grid .gender-options button { min-height:32px; padding:5px 15px; border:1px solid #a6b89a; border-radius:6px; background:#f8f4e8; color:#344d46; font-size:.78rem; }
 .swatch-grid .gender-options button[aria-pressed=true] { background:#deedc8; border-color:#678a60; font-weight:750; }
+.look-gender-note { margin-inline-start:4px; font-weight:400; }
 .swatch-grid .swatch { flex:none; border-color:#8c9b8d; }
 .swatch-grid .look-presets { grid-column:1/-1; }
 .swatch-grid .look-presets > div { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; }

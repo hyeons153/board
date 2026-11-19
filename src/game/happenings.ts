@@ -1,4 +1,5 @@
 import { calendarFor, meetById } from './data.js';
+import { rivalCanJoinEvent } from './content.js';
 import { activePartners, elapsed, formerPartners, hasFlag, name, STORY_NPCS, storyLog, storyProgress, type StoryNpc } from './storyState.js';
 import type { Rider } from './types.js';
 
@@ -71,8 +72,8 @@ export function pickHappening(r:Rider,afterMeet=false){
   if(!afterMeet&&calendarFor(r.year).some(meet=>meet.week===r.week))return undefined;
   const seen=storyLog(r).filter(entry=>HAPPENING.has(entry.id));
   if(seen.length&&elapsed(r,seen.at(-1)!.id)<5)return undefined;
-  const candidates=HAPPENINGS.filter(event=>!r.events[event.id]&&event.when(r)&&
-    event.cast(r).every(npc=>!seen.some(entry=>entry.npcs.includes(npc)&&elapsed(r,entry.id)<8)));
+  const candidates=HAPPENINGS.filter(event=>!r.events[event.id]&&event.when(r)&&event.cast(r).every(npc=>
+    rivalCanJoinEvent(r,npc)&&!seen.some(entry=>entry.npcs.includes(npc)&&elapsed(r,entry.id)<8)));
   const count=(event:Happening)=>event.cast(r).reduce((n,npc)=>n+seen.filter(entry=>entry.npcs.includes(npc)).length,0);
   return candidates.sort((a,b)=>count(a)-count(b))[0];
 }

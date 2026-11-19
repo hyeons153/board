@@ -100,11 +100,14 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     const map=win.document.querySelector('[aria-label="스팟 지도"]')!;
     assert.equal(map.querySelectorAll('.spot-map-card').length,7);
     assert.match(map.textContent!,/성장 \+|자주 오는 라이더|한유리|강준/);
+    const plazaVisitor=map.querySelector('[aria-label="도심 광장 이동"] .spot-map-extra')?.textContent?.replace('이번 주 방문 · ','');
+    assert.ok(plazaVisitor);
     assert.equal(map.querySelector<HTMLButtonElement>('[aria-label="야간 광장 이동"]')!.disabled,true);
     assert.equal(map.querySelector<HTMLButtonElement>('[aria-label="노을 옥상 이동"]')!.disabled,true);
     await click('도심 광장 이동');
     assert.equal(win.document.querySelector('[aria-label="스팟 지도"]'),null);
     assert.match(win.document.querySelector('.spot-map-trigger')!.textContent!,/도심 광장/);
+    assert.equal(win.document.querySelector('.console-visitor')?.textContent,plazaVisitor);
     assert.equal(win.document.querySelector('.console-rider b')!.textContent,'1년차 · 1월 첫째 주');
     await click('스팟 지도 열기');await click('강변 스팟 이동');
     assert.ok(![...win.document.querySelectorAll('.console-dock button')].some(button=>button.textContent==='훈련'));
@@ -151,11 +154,16 @@ test('one game frame previews choices on the existing HUD before confirmation, t
         const rarity=win.document.querySelector<HTMLSelectElement>('[aria-label="희귀도 필터"]')!;
         await act(async()=>{rarity.value='legendary';rarity.dispatchEvent(new win.Event('change',{bubbles:true}));});
         assert.equal(win.document.querySelectorAll('.equipment-choice').length,3);
+        await click('외형');
+        assert.equal(win.document.querySelector('.makeover-options .gender-options'),null);
+        assert.equal(win.document.querySelectorAll('.makeover-options .look-presets button').length,5);
       }
       await click('메뉴 닫기');
     }
     assert.ok(!win.document.querySelector('.console-field-links .console-visitor'));
-    await click('한유리 · 라이벌 보기');
+    const visitorLink=win.document.querySelector('.console-visitor')?.getAttribute('aria-label');
+    assert.ok(visitorLink);
+    await click(visitorLink);
     assert.equal(win.document.querySelectorAll('.console-panel[aria-label="라이벌"] .rival-grid .rival').length,6);
     await click('메뉴 닫기');
     for(const name of ['선수 정보','라이벌','시즌 랭킹','명예의 전당']){

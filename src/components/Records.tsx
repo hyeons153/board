@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { readArchiveTicket } from '../browserSaves';
 import { formatCareerDate, formatMonthWeek, meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, RULES, SKILL, STAT_NAMES, STYLE_NAMES } from '../game/data';
 import { NAMES, competitor, learned } from '../game/competition';
-import { RIVALS, lineTerms } from '../game/content';
+import { RIVALS, lineTerms, rivalCanJoinEvent } from '../game/content';
 import { equippedLook, extras, ITEM, playerPlace } from '../game/economy';
 import { EVENT, EVENTS } from '../game/events';
 import { HAPPENING } from '../game/happenings';
@@ -86,11 +86,11 @@ export function Rivals({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
     <div className="rival-grid">{RIVALS.map(n=>{
       const progress=competitor(n,r.year,r.week);
       const here=log.filter(entry=>entry.npcs.includes(n.id)).toReversed();
-      const episodes=EVENTS.filter(e=>e.npc===n.id&&(r.events[e.id]||choices[e.id])&&!here.some(entry=>entry.id===e.id)).sort((a,b)=>when(b.id)-when(a.id));
+      const episodes=EVENTS.filter(e=>(choices[e.id]?.npc??e.npc)===n.id&&(r.events[e.id]||choices[e.id])&&!here.some(entry=>entry.id===e.id)).sort((a,b)=>when(b.id)-when(a.id));
       const rewards=(n.id==='yu'||n.id==='jun'?Object.values(RELATIONSHIP_REWARDS[n.id]):[]).filter(reward=>relationships?.titles.includes(reward.titleId));
       const relation=r.relations[n.id]??0;
       const phase=relationshipWith(r,n.id)?.state??'undecided';
-      const hint=r.phase!=='retired'&&relationshipHint(r,n.id);
+      const hint=r.phase!=='retired'&&rivalCanJoinEvent(r,n.id)&&relationshipHint(r,n.id);
       return <article className="inner-card rival" key={n.id}>
         <PixelRider look={n.look}/><strong>{n.name} <small>· {n.age}세</small></strong><Tag>{n.style} · {STYLE_NAMES[n.tactic]}</Tag>
         <p>{n.personality}</p><p>{n.line}</p>

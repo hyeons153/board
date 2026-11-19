@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Flag, Footprints, ListOrdered, Menu, NotebookText, Settings, ShoppingBag, Trophy, UserRound, UsersRound, X } from 'lucide-react';
 import { useGame } from './useGame';
-import { ACTION_NAMES, DEFAULT_LOOK, DIVISION_NAMES, formatCareerDate, LOCATIONS } from './game/data';
+import { ACTION_NAMES, DEFAULT_LOOK, DIVISION_NAMES, formatCareerDate } from './game/data';
 import { divisionFor, nextMeet } from './game/career';
-import { lineTerms, RIVAL } from './game/content';
+import { lineTerms, spotVisitor } from './game/content';
 import { previewTraining } from './game/training';
 import { equippedLook, extras } from './game/economy';
 import { Brand, ENGLISH_GAME_NAME } from './components/Brand';
@@ -121,7 +121,7 @@ export default function App(){
   const trainingScene=!!r&&!pending&&!replay&&!replayLoading&&(!!trainingResult||!eventResult&&r.phase==='plan');
   const trainingVisible=screen==='home'&&!spotMap;
   const upcoming=active?nextMeet(r!):undefined;
-  const visitor=r?RIVAL.get(LOCATIONS[r.spot].npc):undefined;
+  const visitor=r?spotVisitor(r,r.plan?.spot??r.spot):undefined;
   const dockPage=replay||replayLoading?replayFrom:
     dock.some(([id])=>id===screen)?screen:trail.findLast(route=>dock.some(([id])=>id===route));
   const archive=view.career.hall.find(a=>a.id===endingId);
@@ -209,7 +209,7 @@ function NewRider({saving,onCreate}:{saving:boolean;onCreate:(name:string,look:L
   return <form className="console-create" onSubmit={submit}>
     <div className="console-create-preview"><LookPreview look={look} label="새 라이더 외형"/></div>
     <div className="console-create-options">
-      <LookFields look={look} onChange={setLook}>
+      <LookFields look={look} onChange={setLook} chooseGender>
         <label className="console-create-name">라이더 이름
           <input aria-label="라이더 이름" value={name} onChange={e=>setName(e.target.value)} required minLength={1} maxLength={16} autoComplete="off"/>
         </label>

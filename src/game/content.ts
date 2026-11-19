@@ -1,6 +1,7 @@
 import { NPC_NAMES, type Discipline, type Look, type Rider, type RoutineStyle, type Spot, type Stats } from './types.js';
 
 import { rooftopUnlocked } from './relationships.js';
+import { seeded } from './random.js';
 
 export type Rival = {
   id:string; name:string; age:number; style:string; personality:string; line:string; stats:Stats; favorite:Discipline;
@@ -21,6 +22,19 @@ export const RIVALS: Rival[] = [
     stats:{speed:15,carve:14,link:16,balance:15},favorite:'trick',color:'#7254a7',look:{gender:'female',hair:9,hairColor:0,skin:2,shirt:11,pants:0,shoes:3,board:2,deckDesign:2,outfit:0,bottom:2,footwear:1,eyes:1},spots:['plaza','night','studio'],signature:'treflip',tactic:'score',growth:{speed:7,carve:6,link:8,balance:10},mastery:9.4},
 ];
 export const RIVAL = new Map(RIVALS.map(npc => [npc.id, npc]));
+export function rivalCanJoinEvent(rider:Pick<Rider,'look'>,npc:string){
+  const gender=RIVAL.get(npc)?.look.gender;
+  return gender===undefined||gender!==(rider.look.gender??'male');
+}
+
+export const spotRegulars=(spot:Spot)=>RIVALS.filter(npc=>npc.spots.includes(spot));
+
+export function spotVisitor(rider:Pick<Rider,'id'|'year'|'week'|'spot'>,spot=rider.spot){
+  const rng=seeded(0,rider.id,rider.year,rider.week,spot,'visitor');
+  const candidates=rng()<.8?spotRegulars(spot):RIVALS.filter(npc=>!npc.spots.includes(spot));
+  return candidates[Math.floor(rng()*candidates.length)]!;
+}
+
 export const SPOT_GATE: Partial<Record<Spot,{hint:string; ready:(r:Rider)=>boolean}>> = {
   rooftop:{hint:'라이벌의 개인 에피소드 칭호 획득',ready:rooftopUnlocked},
   night:{hint:'명성 12 또는 노아의 초대',ready:r=>r.fame>=12||!!r.events['neon-invite']},

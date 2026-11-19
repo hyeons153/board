@@ -24,7 +24,7 @@ export const nextMeet=(r:Rider)=>calendarFor(r.year).find(m=>m.week>=r.week);
 const makeSeason=(year:number):Season=>({year,division:divisionFor(year),scores:{dance:{},trick:{},freestyle:{}}});
 export function newRider(id:string,seed:number,name:string,look:Look):Rider {
   return {
-    id,seed,name,look,year:1,week:1,calendarVersion:2,stats:{...RULES.startStats},energy:100,money:RULES.startMoney,fame:0,injury:null,
+    id,seed,name,look:{...look,gender:look.gender??'male'},year:1,week:1,calendarVersion:2,stats:{...RULES.startStats},energy:100,money:RULES.startMoney,fame:0,injury:null,
     skills:structuredClone(START_SKILLS),relations:Object.fromEntries(RIVALS.map(n=>[n.id,0])),events:{},extras:freshExtras(),
     settings:{mode:'manual',strategy:'balanced',entries:['dance']},plan:null,spot:'river',phase:'plan',event:null,
     entries:null,routines:{dance:[],trick:[],freestyle:[]},records:[],season:makeSeason(1),seasons:[],
@@ -225,7 +225,9 @@ function applyEvent(r:Rider,index:number){
   if(!e||!choice) throw new GameError('선택할 수 없는 이벤트예요.');
   if(!eventChoiceAvailable(r,e,index))throw new GameError('이 커리어에서 이미 연애 상대를 선택했어요. 다른 선택지를 골라 주세요.');
   const fx=choice.effect;
-  const cast=e.chapter?eventCast(r,e):undefined;
+  const participants=eventCast(r,e);
+  const npc=participants[0];
+  const cast=e.chapter||e.cast?participants:undefined;
   const impact=choice.story?.(r);
   const details:string[]=[];
   const progress=r.extras??=freshExtras();
@@ -239,11 +241,11 @@ function applyEvent(r:Rider,index:number){
     const before=r.stats[fx.stat];stat(r,fx.stat,fx.gain??0);
     if(r.stats[fx.stat]>before) details.push(`${STAT_NAMES[fx.stat]} +${round(r.stats[fx.stat]-before)}`);
   }
-  const affinity=fx.relation??(e.npc?storyAffinity(impact,e.npc):0);
-  const relation=affinity+(e.npc&&affinity>0?gearBonuses(r).relation:0);
-  if(e.npc){
-    const before=r.relations[e.npc]??0;r.relations[e.npc]=clamp(before+relation);
-    const change=round(r.relations[e.npc]-before);
+  const affinity=fx.relation??(e.npc&&npc?storyAffinity(impact,npc):0);
+  const relation=affinity+(npc&&affinity>0?gearBonuses(r).relation:0);
+  if(npc&&(e.npc||affinity)){
+    const before=r.relations[npc]??0;r.relations[npc]=clamp(before+relation);
+    const change=round(r.relations[npc]-before);
     if(change)details.push(`관계 ${change>0?'+':''}${change}`);
   }
   if(fx.skill&&canStudy(r,fx.skill)){
@@ -294,9 +296,9 @@ function applyEvent(r:Rider,index:number){
     (history.story??=[]).push({id:e.id,year:r.year,week:r.week,choice:index,npcs:cast??[],dialogue,details:[...details]});
   }
   r.events[e.id]=(r.events[e.id]??0)+1;
-  progress.choices[e.id]={index,year:r.year,week:r.week};
+  progress.choices[e.id]={index,year:r.year,week:r.week,...(e.npc&&npc!==e.npc?{npc}:{})};
   if(progress.storyReadyAt)delete progress.storyReadyAt[e.id];
-  progress.lastEvent={key:`${r.id}:${r.year}:${r.week}:${e.id}`,eventId:e.id,title:e.title,kind:e.kind,choice:choice.label,details:[...details],year:r.year,week:r.week,npc:e.npc??cast?.[0],dialogue,participants:cast,afterMeet:scoredThisWeek(r)};
+  progress.lastEvent={key:`${r.id}:${r.year}:${r.week}:${e.id}`,eventId:e.id,title:e.title,kind:e.kind,choice:choice.label,details:[...details],year:r.year,week:r.week,npc,dialogue,participants:cast,afterMeet:scoredThisWeek(r)};
   r.event=null;
   const description=`${choice.label}${details.length?' · '+details.join(' / '):''}`;
   note(r,'event',`${e.title} · ${description}`);
@@ -561,9 +563,11 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
       if(item) milestone(r,'장비 해제',item.name);
     }
     if(a.type==='makeover'){
+      const gender=r.look.gender??'male';
+      if(a.look.gender!==undefined&&a.look.gender!==gender)throw new GameError('등록한 성별은 바꿀 수 없어요.');
       if(r.money-reserve<ECONOMY.makeover) throw new GameError('외형 변경 비용이 부족해요.');
       r.money-=ECONOMY.makeover;
-      r.look=a.look;
+      r.look={...a.look,gender};
     }
     if(a.type==='sponsor'){
       const brand=SPONSOR.get(a.id);

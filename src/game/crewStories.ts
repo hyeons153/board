@@ -48,9 +48,9 @@ export const CREW_STORIES:EventDef[]=[
   ],{kind:'크루 이야기',decision:true,cast:r=>newPair(r)??[]}),
 
   cross(1,'강변의 삼자대면',r=>{
-    const [a,b]=activePartners(r);return name(a)+'와 '+name(b)+'가 같은 강변 약속에 나왔다. 각자 둘만 만나기로 한 줄 알고 있었다. 준이 카메라 대신 휴대폰을 내려놓았다.';
+    const [a,b]=activePartners(r);return name(a)+'와 '+name(b)+'가 같은 강변 약속에 나왔다. 각자 둘만 만나기로 한 줄 알았다. 둘은 휴대폰을 내려놓고 네 말을 기다렸다.';
   },r=>activePartners(r).length===2&&hidden(r)&&elapsed(r,'crew-overlap')>=3,
-  r=>[...activePartners(r),'jun'],[
+  activePartners,[
     option('두 사람에게 사실을 인정하고 사과한다.','두 사람은 사실을 듣고 각자 시간을 갖기로 했다.',r=>({title:'crew-exposed',item:'acc_crew_photo',changes:activePartners(r).map(npc=>change(npc,'ended','betrayed'))})),
     option('우연히 겹친 약속이라며 둘러댄다.','말이 달라진 사실까지 드러났다. 두 사람은 자신들의 뜻으로 관계를 끝냈다.',r=>({title:'crew-exposed',item:'acc_crew_photo',changes:activePartners(r).map(npc=>change(npc,'ended','exposed-lie'))}),{fame:2}),
     option('두 관계를 모두 정리하고 답할 시간을 준다.','누구도 답장을 재촉하지 않았다. 다음 크루 모임은 별도로 열렸다.',r=>({title:'crew-exposed',item:'acc_crew_photo',changes:activePartners(r).map(npc=>change(npc,'ended','apology-offered'))})),
@@ -66,7 +66,7 @@ export const CREW_STORIES:EventDef[]=[
   r=>r.year>=5&&!!outOfTouch(r),r=>[outOfTouch(r)!],[
     option('경기 뒤 따로 만나 이유를 묻는다.','차분히 이야기할 장소를 정하고 서로 답을 기다리기로 했다.',r=>({title:'noa-missed',...record(outOfTouch(r)!,'asked-after')})),
     option('나도 연락을 멈추고 관계를 마무리한다.','두 사람은 대회장에서 인사할 수 있도록 이별의 뜻을 분명히 했다.',r=>({title:'noa-missed',...record(outOfTouch(r)!,'contact-ended','ended')})),
-    option('공통 친구에게 안부만 확인한다.','솔은 상대가 무사하다는 사실만 전했다. 다른 사정은 본인에게 맡겼다.',r=>record(outOfTouch(r)!,'checked-welfare')),
+    option('공통 친구에게 안부만 확인한다.','친구는 상대가 무사하다는 사실만 전했다. 다른 사정은 본인에게 맡겼다.',r=>record(outOfTouch(r)!,'checked-welfare')),
   ]),
   cross(4,'심사위원석의 전 애인',r=>'스폰서의 비공식 초청 시범전 객원 심사위원은 '+name(formerPartners(r)[0])+'였다. 진행자가 두 사람이 아는 사이인지 물었다.',
   r=>r.year>=5&&!!r.extras?.contract&&formerPartners(r).length>0,r=>[formerPartners(r)[0]],[
@@ -107,7 +107,7 @@ export const CREW_STORIES:EventDef[]=[
   r=>[...activePartners(r),'sol'],[
     option('당사자와 먼저 상의하고 모두 동의할 때만 검토한다.','브랜드는 동의받은 사람의 경기 장면을 중심으로 제안서를 수정했다.'),
     option('예능 대신 훈련과 대회 준비를 담자고 제안한다.','촬영팀은 연습실로 와서 첫 라인이 만들어지는 모습을 찍었다.',{},{fame:2}),
-    option('몰래 내 이름으로 출연 신청서를 낸다.','촬영비를 받았지만 브랜드는 사전 동의 문제로 크루 단체 촬영을 보류했다.',r=>record(lead(r),'sponsor-distance'),{money:20_000}),
+    option('몰래 내 이름으로 출연 신청서를 낸다.','촬영비를 받았지만 브랜드는 사전 동의 문제로 크루 단체 촬영을 보류했다.',r=>activePartners(r).length?record(lead(r),'sponsor-distance'):{},{money:20_000}),
   ]),
   cross(10,'애인의 비밀 계정',r=>name(reviewLead(r)??'jun')+'가 운영한 기술 리뷰에는 “들어갈 때는 급하고, 끝에서는 버틴다 ★☆☆☆☆”라고 적혀 있었다.',
   r=>r.year>=5&&!!reviewLead(r)&&r.relations[reviewLead(r)!]>=12,r=>[reviewLead(r)!],[

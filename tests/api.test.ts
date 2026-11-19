@@ -79,8 +79,14 @@ test('guest snapshots survive reopening storage; concurrent tournament submissio
     assert.deepEqual(restored.career.rider!.look,appearance,'New colors and gender must persist across reload');
     assert.equal(restored.fastForward,false);
     assert.equal(restored.weekMs,1000);
-    const restyled={...appearance,gender:'male' as const,board:4};
-    const makeover=await post({type:'makeover',look:restyled},save.version);
+    const rejectedMakeover=await post({type:'makeover',look:{...appearance,gender:'male',board:4}},save.version);
+    assert.equal(rejectedMakeover.status,422);
+    assert.match((await rejectedMakeover.json()).error,/성별은 바꿀 수 없어요/);
+    const afterRejected:View=await (await handler(new Request(base,{headers:{cookie}}))).json();
+    assert.deepEqual(afterRejected.career.rider!.look,appearance);
+    assert.equal(afterRejected.career.rider!.money,save.career.rider!.money);
+    const restyled={...appearance,board:4};
+    const makeover=await post({type:'makeover',look:{...restyled,gender:undefined}},save.version);
     assert.equal(makeover.status,200);save=await makeover.json();
     assert.deepEqual(save.career.rider!.look,restyled);
     const heartbeat=await post({type:'pulse'},save.version);

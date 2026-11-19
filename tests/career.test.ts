@@ -5,8 +5,8 @@ import { command, divisionFor, GameError, newRider, prepareWeek, processWeek } f
 import { chance, generateRoutine, learned, routineTime, simulateMeet, simulateRun, validRoutine } from '../src/game/competition';
 import { ECONOMY, equippedLook, extras, gearBonuses, playerPlace, SPONSOR } from '../src/game/economy';
 import { previewTraining, randomSpecialTraining, statAfter, trainingFactor, trainingSuccess } from '../src/game/training';
-import { EVENTS, eventBody, eventChoiceAvailable, eventFor, pickEvent } from '../src/game/events';
-import { RIVALS, spotUnlocked } from '../src/game/content';
+import { EVENTS, eventBody, eventCast, eventChoiceAvailable, eventFor, pickEvent } from '../src/game/events';
+import { RIVALS, spotRegulars, spotUnlocked, spotVisitor } from '../src/game/content';
 import { HAPPENINGS, pickHappening } from '../src/game/happenings';
 import { CREW_STORIES } from '../src/game/crewStories';
 import { STORY_ARCS } from '../src/game/storyArcs';
@@ -15,7 +15,7 @@ import { RELATIONSHIP_REWARDS, relationshipEpilogues, relationshipWith, represen
 import { seeded } from '../src/game/random';
 import { meetRP, rankingPoints } from '../src/game/rp';
 import { advance, blankSave, remaining } from '../server/clock';
-import { DISCIPLINES, STATS, TRAINING_ACTIONS, type Career, type Plan } from '../src/game/types';
+import { DISCIPLINES, SPOTS, STATS, TRAINING_ACTIONS, type Career, type Plan } from '../src/game/types';
 
 const identity=()=>({id:'rider-1',seed:5411});
 const career=():Career=>({rider:newRider(identity().id,identity().seed,'리버',{...DEFAULT_LOOK}),hall:[]});
@@ -193,6 +193,25 @@ test('main map movement persists freely and exposes the actual spot growth bonus
   save=advance(JSON.parse(JSON.stringify(save)),{type:'plan',plan:{action:'trick',spot:'plaza'}},'first',0,RULES.weekMs,identity);
   assert.equal(save.career.rider!.plan!.spot,'plaza');
   assert.throws(()=>advance(save,{type:'spot',spot:'river'},'first',1,RULES.weekMs,identity),GameError);
+});
+
+test('every spot favors its regulars while all six rivals can visit',()=>{
+  const r=career().rider!;
+  for(const spot of SPOTS){
+    const regularIds=new Set(spotRegulars(spot).map(npc=>npc.id));
+    const visitors=new Set<string>();
+    let regularWeeks=0;
+    for(let year=1;year<=RULES.years;year++)for(let week=1;week<=RULES.weeks;week++){
+      const rider={...r,year,week,spot};
+      const visitor=spotVisitor(rider).id;
+      assert.equal(spotVisitor({...rider}).id,visitor);
+      visitors.add(visitor);
+      if(regularIds.has(visitor))regularWeeks++;
+    }
+    assert.equal(visitors.size,RIVALS.length,spot);
+    const regularShare=regularWeeks/(RULES.years*RULES.weeks);
+    assert.ok(regularShare>=.7&&regularShare<=.9,`${spot}: ${regularShare}`);
+  }
 });
 
 test('international graduation meets require all disciplines in manual and automatic play, including at zero energy',()=>{
@@ -383,14 +402,40 @@ test('specific story choices pause auto mode and unlock follow-up dialogue',()=>
   assert.equal(pickEvent(r,()=>.99)?.id,'yu-film');
 });
 
-test('all six relationship routes grant an exclusive gift and a selectable title independent of player gender',()=>{
+test('NPC stories and affinity scenes select the three opposite-gender rivals',()=>{
+  const openings=['relationship-yu-trust','relationship-jun-trust','story-noa-1','story-min-1','story-ha-1','story-sol-1'];
+  for(const [gender,expected,happening] of [
+    ['male',['ha','noa','yu'],'happening-yu-2'],['female',['jun','min','sol'],'happening-sol-2'],
+  ] as const){
+    const r=newRider('rider-'+gender,5411,'리버',{...DEFAULT_LOOK,gender});
+    const firstEvent=pickEvent(r,()=>.99);
+    assert.ok(firstEvent&&!('happening' in firstEvent));
+    assert.deepEqual(eventCast(r,firstEvent),[gender==='male'?'yu':'sol']);
+    r.year=4;r.week=10;
+    r.events=Object.fromEntries(EVENTS.filter(event=>!openings.includes(event.id)).map(event=>[event.id,1]));
+    const participants=[];
+    for(let i=0;i<3;i++){
+      const event=pickEvent(r,()=>.99);
+      assert.ok(event&&!('happening' in event));
+      participants.push(...eventCast(r,event));
+      r.events[event.id]=1;
+    }
+    assert.deepEqual(participants.sort(),expected);
+    assert.equal(pickEvent(r,()=>.99),undefined);
+    for(const scene of HAPPENINGS)if(!['happening-yu-2','happening-sol-2'].includes(scene.id))r.events[scene.id]=1;
+    r.relations.yu=35;r.relations.sol=35;
+    assert.equal(pickHappening(r)?.id,happening);
+  }
+});
+
+test('유리 and 준’s relationship routes grant an exclusive gift and a selectable title',()=>{
   assert.equal(RIVALS.filter(rival=>rival.look.gender==='female').length,3);
   assert.equal(RIVALS.filter(rival=>rival.look.gender==='male').length,3);
   assert.ok(RIVALS.every(rival=>rival.age>=19));
   for(const npc of ['yu','jun'] as const){
     for(const [index,route] of (['friend','rival','partner'] as const).entries()){
       const c=career(),r=c.rider!;
-      r.year=4;r.week=2;r.look.gender=npc==='yu'?'female':'male';
+      r.year=4;r.week=2;r.look.gender=npc==='yu'?'male':'female';
       r.relations[npc]=100;
       assert.equal(relationshipWith(r,npc),undefined,'Legacy affinity does not choose a route');
       assert.equal(spotUnlocked(r,'rooftop'),false);
@@ -459,7 +504,7 @@ test('one confirmed romance per career, explicit rejection leads to friendship, 
 test('overlapping story opportunities survive to the next week and auto stops at a saved decision in background',()=>{
   const r=career().rider!;
   r.year=6;r.week=25;
-  r.events=Object.fromEntries(EVENTS.filter(e=>!e.id.startsWith('relationship-')&&e.id!=='yu-open-final').map(e=>[e.id,1]));
+  r.events=Object.fromEntries(EVENTS.filter(e=>!e.id.startsWith('relationship-')&&!['yu-open-final','story-ha-1'].includes(e.id)).map(e=>[e.id,1]));
   const first=pickEvent(r,()=>.99)!;
   assert.equal(first.id,'yu-open-final');
   r.events[first.id]=1;r.week++;
@@ -467,8 +512,8 @@ test('overlapping story opportunities survive to the next week and auto stops at
   r.events['relationship-yu-trust']=1;
   r.extras!.choices['relationship-yu-trust']={index:0,year:6,week:26};
   r.week=28;
-  assert.equal(pickEvent(r,()=>.99)?.id,'relationship-jun-trust','The waiting NPC precedes the newly eligible fork');
-  r.events['relationship-jun-trust']=1;
+  assert.equal(pickEvent(r,()=>.99)?.id,'story-ha-1','The waiting NPC precedes the newly eligible fork');
+  r.events['story-ha-1']=1;
   r.settings={mode:'auto',strategy:'freestyle',entries:['trick'],skipEvents:false};
   const start=1_000_000,tab='relationship-tab';
   const save=blankSave();save.career.rider=r;

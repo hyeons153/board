@@ -21,8 +21,9 @@ const fields=[
 ] as const;
 const selectFields=new Set(['hair','outfit','bottom','footwear','deckDesign']);
 
-export function LookFields({look,onChange,children}:{look:Look;onChange:(look:Look)=>void;children?:ReactNode}){
+export function LookFields({look,onChange,children,chooseGender=false}:{look:Look;onChange:(look:Look)=>void;children?:ReactNode;chooseGender?:boolean}){
   const fieldsRoot=useRef<HTMLDivElement>(null);
+  const gender=look.gender??'male';
   useEffect(()=>{
     if(!matchMedia('(max-width:760px)').matches)return;
     fieldsRoot.current?.querySelectorAll<HTMLElement>('.swatch-palette').forEach(row=>{
@@ -35,11 +36,11 @@ export function LookFields({look,onChange,children}:{look:Look;onChange:(look:Lo
   },[look]);
   return <div className="swatch-grid" ref={fieldsRoot}>
     {children}
-    <fieldset className="look-gender"><legend>성별</legend><div className="gender-options" aria-label="성별">
-      {(['male','female'] as const).map(gender=><button key={gender} type="button" aria-pressed={(look.gender??'male')===gender} onClick={()=>onChange({...look,gender})}>{gender==='male'?'남성':'여성'}</button>)}
-    </div></fieldset>
+    {chooseGender&&<fieldset className="look-gender"><legend>성별 <small className="look-gender-note">등록 후 고정</small></legend><div className="gender-options" aria-label="성별">
+      {(['male','female'] as const).map(option=><button key={option} type="button" aria-pressed={gender===option} onClick={()=>onChange({...look,gender:option})}>{option==='male'?'남성':'여성'}</button>)}
+    </div></fieldset>}
     <fieldset className="look-presets"><legend>추천 코디</legend><div>
-      {LOOK_PRESETS[look.gender??'male'].map((preset,index)=><button type="button" key={index} aria-label={'추천 코디 '+(index+1)} onClick={()=>onChange({...preset,skin:look.skin,board:look.board,deckDesign:look.deckDesign})}>
+      {LOOK_PRESETS[gender].map((preset,index)=><button type="button" key={index} aria-label={'추천 코디 '+(index+1)} onClick={()=>onChange({...preset,gender,skin:look.skin,board:look.board,deckDesign:look.deckDesign})}>
         <PixelRider look={preset}/><span>{index+1}</span>
       </button>)}
     </div></fieldset>

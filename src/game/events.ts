@@ -1,5 +1,5 @@
 import { calendarFor, RULES, SKILL } from './data.js';
-import { RIVAL } from './content.js';
+import { RIVAL, rivalCanJoinEvent } from './content.js';
 import { equipmentEvents as itemEvents, extras, freshExtras, gearBonuses } from './economy.js';
 import { EXTRA_EVENTS } from './extraEvents.js';
 import { RELATIONSHIP_EVENTS, relationshipChoiceAvailable, type RelationshipChoice } from './relationships.js';
@@ -14,12 +14,13 @@ type Effect = { energy?:number; money?:number; fame?:number; relation?:number; s
 type Choice = { label:string; effect:Effect; tags:Strategy[]; dialogue?:string; relationship?:RelationshipChoice; story?:(r:Rider)=>StoryImpact };
 export type EventDef = { id:string; kind:string; title:string; body:string|((r:Rider)=>string); npc?:string; cast?:(r:Rider)=>string[]; story?:boolean; chapter?:boolean; finale?:boolean; afterMeet?:boolean; important?:boolean; decision?:boolean; repeat?:boolean; special?:boolean; when:(r:Rider)=>boolean; choices:Choice[] };
 const option=(label:string,effect:Effect,...tags:Strategy[]):Choice=>({label,effect,tags});
+const crewGuide=(r:Rider)=>[rivalCanJoinEvent(r,'sol')?'sol':'yu'];
 export const EVENTS:EventDef[] = [
-  {id:'crew-sticker',kind:'장비 선물',npc:'sol',title:'떼어도 남는 응원',body:'선배가 낡은 스티커를 건넸다. 접힌 귀퉁이마다 함께 탄 날의 흔적이 남아 있다.',story:true,when:r=>r.week>=8&&Math.max(0,...Object.values(r.relations))>=15,choices:[
+  {id:'crew-sticker',kind:'장비 선물',npc:'sol',cast:crewGuide,title:'떼어도 남는 응원',body:'선배가 낡은 스티커를 건넸다. 접힌 귀퉁이마다 함께 탄 날의 흔적이 남아 있다.',story:true,when:r=>r.week>=8&&Math.max(0,...Object.values(r.relations))>=15,choices:[
     option('보드에 붙이고 한 바퀴 더 탄다',{item:'acc_021',relation:5},'dance','trick','freestyle'),option('연습 노트에 소중히 붙인다',{item:'acc_021',energy:8},'balanced')]},
   {id:'red-scarf',kind:'라이벌 선물',npc:'yu',title:'다음 바람에게',body:'유리가 빨간 머플러를 풀어 네게 건넨다. “이제 누군가에게 먼저 손을 흔들 차례야.”',story:true,important:true,when:r=>r.year>=4&&(r.relations.yu??0)>=35&&!!r.events['yu-film'],choices:[
     option('다음 라이더를 함께 맞이한다',{item:'acc_024',relation:8,fame:3},'balanced','dance'),option('우리의 다음 라인을 약속한다',{item:'acc_024',relation:8,stat:'link',gain:2},'trick','freestyle')]},
-  {id:'duck-blessing',kind:'오리의 가호',npc:'sol',title:'꽥, 하고 먼저 응원',body:'고무오리 키링이 흔들릴 때마다 동료들이 웃는다. 오늘의 코치는 말 대신 꽥을 고집한다.',repeat:true,special:true,when:r=>itemEvents(r).includes('duck-blessing'),choices:[option('오리 코치에게 인사한다',{energy:8,relation:3},'balanced','dance'),option('오리와 출발 박자를 맞춘다',{stat:'link',gain:2},'trick','freestyle')]},
+  {id:'duck-blessing',kind:'오리의 가호',npc:'sol',cast:crewGuide,title:'꽥, 하고 먼저 응원',body:'고무오리 키링이 흔들릴 때마다 동료들이 웃는다. 오늘의 코치는 말 대신 꽥을 고집한다.',repeat:true,special:true,when:r=>itemEvents(r).includes('duck-blessing'),choices:[option('오리 코치에게 인사한다',{energy:8,relation:3},'balanced','dance'),option('오리와 출발 박자를 맞춘다',{stat:'link',gain:2},'trick','freestyle')]},
   {id:'cactus-groove',kind:'선인장 잼',title:'박자가 조금 달라도',body:'내 스텝은 엇박인데 선인장은 당당하게 춤춘다. 누구도 음악을 끄지 않았다.',repeat:true,special:true,when:r=>itemEvents(r).includes('cactus-groove'),choices:[option('같이 스텝을 밟는다',{stat:'carve',gain:2,energy:4},'dance','freestyle'),option('작은 무대의 관객이 된다',{energy:10,fame:1},'balanced','trick')]},
   {id:'snail-day',kind:'느긋한 오후',title:'빠르지 않아도 한 바퀴',body:'달팽이는 한 바퀴를 다 돌 때까지 풍경을 놓치지 않았다. 오늘만큼은 기록계도 쉬어 간다.',repeat:true,special:true,when:r=>itemEvents(r).includes('snail-day'),choices:[option('달팽이 속도로 스팟을 돈다',{energy:10},'balanced','dance'),option('가장 좋아하는 코너를 알려 준다',{stat:'carve',gain:2},'trick','freestyle')]},
   {id:'scarf-epilogue',kind:'라이벌 후속 이야기',npc:'yu',title:'빨간 선을 따라',body:'새 라이더가 머플러를 보고 길을 물었다. 유리는 오늘은 네가 먼저 설명해 보라고 눈짓했다.',story:true,important:true,when:r=>r.year>=6&&itemEvents(r).includes('scarf-epilogue'),choices:[option('첫 발부터 함께 연습한다',{relation:10,fame:4},'dance','balanced'),option('서로 다른 라인을 하나로 잇는다',{relation:8,stat:'link',gain:3},'trick','freestyle')]},
@@ -27,6 +28,10 @@ export const EVENTS:EventDef[] = [
     option('함께 스텝을 맞춰 본다',{skill:'mango',study:42,energy:-4,relation:8},'dance','freestyle'),
     option('균형 잡는 요령을 묻는다',{stat:'balance',gain:3,relation:4},'balanced','trick'),
     option('다음에도 만나 줄래?',{relation:6})]},
+  {id:'first-sol',kind:'성장',title:'첫 푸시와 식어 가는 커피',body:'솔이 난간에 커피를 내려놓았다. “첫날엔 멀리 갈 필요 없어. 저 가로등까지만 같이 가 볼래?”',npc:'sol',story:true,when:r=>r.year===1&&!r.events.first,choices:[
+    option('솔의 발 위치를 따라 해 본다',{skill:'mango',study:42,energy:-4,relation:8},'dance','freestyle'),
+    option('첫 푸시에서 균형 잡는 법부터 묻는다',{stat:'balance',gain:3,relation:4},'balanced','trick'),
+    option('가로등까지 탄 뒤 커피도 마시자고 한다',{relation:6})]},
   {id:'juns-clip',kind:'기술 습득',title:'강준의 3초 영상',body:'준이 착지 장면만 슬로모션으로 반복한다. 화면 밖에서 들리는 비명은 못 들은 척해 주자.',npc:'jun',story:true,when:r=>r.week>=3&&r.spot==='plaza',choices:[
     option('프론트 팝의 자세를 따라 한다',{skill:'front-pop',study:100,energy:-7,relation:8},'trick','freestyle'),
     option('링크만 받아 저장한다',{relation:3,stat:'link',gain:2},'balanced','dance')]},
@@ -67,7 +72,7 @@ export const EVENTS:EventDef[] = [
 export const EVENT = Object.fromEntries(EVENTS.map(e=>[e.id,e])) as Record<string,EventDef|undefined>;
 export const canStudy=(r:Rider,id:string)=>SKILL[id]?.requires.every(pre=>(r.skills[pre]?.study??0)>=100)??false;
 export const eventNpc=(e:EventDef,r?:Rider)=>{
-  const id=e.npc??(r&&eventCast(r,e)[0]);
+  const id=r?eventCast(r,e)[0]:e.npc;
   return id==='mentor'?r?.mentor:id?RIVAL.get(id):undefined;
 };
 export const skipsEventChoices=(settings:Settings)=>settings.skipEvents??!settings.manualEvents;
@@ -101,7 +106,8 @@ export function pickEvent(r:Rider,rng:()=>number,afterMeet=false):EventDef|Happe
   const eligible=[...EVENTS,...mentorEvents(r)].filter(e=>{
     const last=choices[e.id];
     const cooldown=last ? (r.year-last.year)*RULES.weeks+r.week-last.week : Infinity;
-    return (afterMeet?e.afterMeet:!e.afterMeet||!meetWeek)&&(!r.events[e.id]||(e.repeat&&cooldown>=8))&&e.when(r);
+    return (afterMeet?e.afterMeet:!e.afterMeet||!meetWeek)&&(!r.events[e.id]||(e.repeat&&cooldown>=8))&&e.when(r)&&
+      eventCast(r,e).every(npc=>rivalCanJoinEvent(r,npc));
   });
   const stories=eligible.filter(e=>e.story);
   if(stories.length){
@@ -115,7 +121,7 @@ export function pickEvent(r:Rider,rng:()=>number,afterMeet=false):EventDef|Happe
     const finale=stories.find(story=>story.finale&&r.year===RULES.years&&r.week>=50);
     if(finale)return finale;
     const available=stories.filter(story=>!story.chapter||gap>=3||r.year===RULES.years&&r.week>=47);
-    if(available.length)return available.sort((a,b)=>ready[a.id]!-ready[b.id]!||Number(!!recent&&a.npc===recent)-Number(!!recent&&b.npc===recent))[0];
+    if(available.length)return available.sort((a,b)=>ready[a.id]!-ready[b.id]!||Number(!!recent&&eventCast(r,a)[0]===recent)-Number(!!recent&&eventCast(r,b)[0]===recent))[0];
   }
   const happening=pickHappening(r,afterMeet);
   if(happening)return happening;

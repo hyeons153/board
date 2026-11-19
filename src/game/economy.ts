@@ -31,7 +31,7 @@ export type CareerExtras = {
   contract: { id:string; year:number } | null;
   signedYear: number;
   achievements: string[];
-  choices: Record<string, { index:number; year:number; week:number }>;
+  choices: Record<string, { index:number; year:number; week:number; npc?:string }>;
   relationships?:RelationshipHistory;
   storyReadyAt?:Partial<Record<string,number>>;
   timeline: { year:number; week:number; title:string; text:string }[];

@@ -44,7 +44,7 @@ export const STORY_ARCS:EventDef[]=[
     ]),
 
   episode('sol',1,'커피 두 잔의 이유','솔이 커피 두 잔을 가져왔다. “한 잔은 내 거, 한 잔은 미래의 내 애인 거.” 네가 잔을 받자 솔이 눈을 피했다.',
-    r=>met(r,2,['park-tea','studio-rain','registration']),[
+    r=>met(r,2,['first-sol','park-tea','studio-rain','registration']),[
       option('그럼 네 미래 애인에게 양보할게.','솔은 두 잔을 든 채 자기 농담에 처음으로 당황했다.',record('sol','banter'),{},['trick','freestyle']),
       option('그 애인 나 하면 안 돼?','솔이 답을 고르느라 커피가 다 식었다.',record('sol','flirt','interested')),
       option('커피만 마시고 연습하자.','솔은 보온병을 열고 오늘의 첫 코스를 추천했다.',record('sol','coffee-friend'),{},['balanced','dance']),
