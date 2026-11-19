@@ -1,22 +1,34 @@
 import type { Discipline, Division, Ending, Look, Stats } from './types.js';
-export const METRICS=['career','dance','trick','freestyle','wins','skills'] as const;
+
+export const METRICS=['career','dance','trick','freestyle'] as const;
 export type Metric=typeof METRICS[number];
-export type Scope='all'|Division;
-export const RANKING_VERSION=1;
-export const RANK_INFO:Record<Metric,{label:string;rule:string}> = {
-  career:{label:'종합 커리어',rule:'8년 완주. 대회별 점수와 입상 가치에 부문 가중치(뉴비 1·일반 1.5·오픈 2.25·마스터 3)와 메이저 가중치(1.5)를 적용합니다. 시즌 챔피언은 부문별 보너스를 받습니다.'},
-  dance:{label:'댄싱',rule:'서버 검증을 통과한 댄싱 경기의 최고점.'},
-  trick:{label:'트릭',rule:'서버 검증을 통과한 트릭 경기의 최고점.'},
-  freestyle:{label:'프리스타일',rule:'서버 검증을 통과한 프리스타일 경기의 최고점.'},
-  wins:{label:'통산 우승',rule:'서버 검증을 통과한 종목별 1위 횟수.'},
-  skills:{label:'기술 마스터',rule:'습득 기술당 10점, 숙련도 합계의 10%, 숙련도 82 이상 고급 기술당 15점.'},
+export const RANKING_VERSION=2;
+export const RUN_PROOF_VERSION=1;
+export const RANK_COMPONENTS={competition:'대회 성적',personalBest:'개인 최고점',skills:'기술 습득·숙련도',stats:'최종 능력치',seasons:'시즌 우승'} as const;
+type Component=keyof typeof RANK_COMPONENTS;
+export const RANK_INFO={
+  career:{label:'종합',weights:{competition:350,personalBest:250,skills:200,stats:150,seasons:50}},
+  dance:{label:'댄싱',weights:{competition:600,personalBest:300,skills:100}},
+  trick:{label:'트릭',weights:{competition:600,personalBest:300,skills:100}},
+  freestyle:{label:'프리스타일',weights:{competition:600,personalBest:300,skills:100}},
+} satisfies Record<Metric,{label:string;weights:Partial<Record<Component,number>>}>;
+export const HONOR_RULES={
+  division:{rookie:1,regular:1.5,open:2.25,master:3},major:1.5,
+  places:[1,.72,.52,.32,.23,.16,.10],meetLimit:5,
+  runWeight:.6,levelWeight:.2,repeatWeight:.18,masteryWeight:.65,
+} as const;
+
+export type MeetHighlight={id:string;year:number;division:Division;discipline:Discipline;score:number;place:number};
+export type HonorScore={total:number;components:Partial<Record<Component,number>>;representative:MeetHighlight;verifiedMeets:number};
+export type PublicSummary={
+  name:string;look:Look;title:string;year:number;week:number;complete:boolean;division:Division;
+  wins:number;podiums:number;meets:number;best:Record<Discipline,number>;ending:Ending;official:boolean;historic:boolean;honors?:string[];
 };
-export type PublicProfile = {
-  name:string; look:Look; title:string; year:number; week:number; complete:boolean; division:Division;
-  stats:Stats; skills:{id:string;mastery:number}[]; signature?:string; wins:number; podiums:number; meets:number;
-  best:Record<Discipline,number>; points:number; careerPoints:number|null; ending:Ending;
-  routines:Partial<Record<Discipline,string[]>>; official:boolean; historic:boolean;
+export type PublicProfile=PublicSummary&{
+  stats:Stats;skills:{id:string;mastery:number}[];signature?:string;points:number;careerPoints:number|null;
+  routines:Partial<Record<Discipline,string[]>>;meetHistory?:MeetHighlight[];
+  honorScores?:Partial<Record<Metric,HonorScore>>;rankingVersion?:number;
 };
-export type PublicCard = {id:string;profile:PublicProfile;rank?:number;score?:number;mine?:boolean};
-export type Directory = {rows:PublicCard[];page:number;hasMore:boolean;mine:PublicCard[]};
-export type Publication = {archiveId:string; id:string; active:boolean; moderated:boolean};
+export type PublicCard<P=PublicProfile>={id:string;profile:P;rank?:number;score?:number;honor?:HonorScore;mine?:boolean};
+export type Directory={rows:PublicCard<PublicSummary>[];page:number;hasMore:boolean;mine:PublicCard<PublicSummary>[]};
+export type Publication={archiveId:string;id:string;active:boolean;moderated:boolean};

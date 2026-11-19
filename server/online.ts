@@ -22,7 +22,6 @@ const list=z.object({
   search:z.string().trim().max(40).default(''),
   division:z.enum(['all',...DIVISIONS]).default('all'),
   ending:z.enum(['','legend','champion','technician','veteran','early']).default(''),
-  complete:z.enum(['0','1']).default('0').transform(value=>value==='1'),
   metric:z.enum(METRICS).optional(),
 });
 const matchUuid=z.uuid();

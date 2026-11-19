@@ -2,7 +2,7 @@ import { ACTION_NAMES, ACTION_STORIES, calendarFor, DISCIPLINE_NAMES, LOCATIONS,
 import { generateRoutine, learned, simulateMeet, validRoutine } from './competition.js';
 import { autoChoice, canStudy, eventFor, eventPaused, pickEvent } from './events.js';
 import { chooseEnding, honors, mentorFrom } from './legacy.js';
-import { RANKING_VERSION } from './public.js';
+import { RUN_PROOF_VERSION } from './public.js';
 import { RIVALS, SPOT_GATE, spotUnlocked } from './content.js';
 import { ECONOMY, effectiveStats, eligibleSponsor, equipmentReaction, equipmentUnlocked, extras, freshExtras, gearBonuses, ITEM, maintainedSponsor, milestone, playerPlace, resaleValue, SPONSOR, STARTER_IDS, supply, unlockEquipment, upgradeEquipment } from './economy.js';
 import { clamp, round, seeded } from './random.js';
@@ -351,7 +351,7 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
     if(r&&r.phase!=='retired') throw new GameError('이미 진행 중인 커리어가 있어요.');
     const {id,seed}=identity();
     c.rider=newRider(id,seed,a.name,a.look);
-    if(official) c.rider.rankedStart=RANKING_VERSION;
+    if(official) c.rider.rankedStart=RUN_PROOF_VERSION;
     const previous=c.hall.at(-1);
     if(account&&previous) c.rider.mentor=mentorFrom(previous);
     return;

@@ -2,16 +2,18 @@ import { randomUUID } from 'node:crypto';
 import { blankSave, type Save } from './clock.js';
 import type { Database, Query } from './database.js';
 import { mergeCareers } from '../src/game/legacy.js';
-import { RANKING_VERSION, type Directory, type Metric, type Publication, type PublicCard, type PublicProfile, type Scope } from '../src/game/public.js';
+import { RANKING_VERSION, type Directory, type HonorScore, type Metric, type Publication, type PublicCard, type PublicProfile, type PublicSummary } from '../src/game/public.js';
+import type { Division } from '../src/game/types.js';
 import type { Row, Store } from './store.js';
 import { publicationFor } from './ranking.js';
+import { saveHonorEntries } from './hallIndex.js';
 
 export const ACCOUNT_SECONDS=30*24*60*60;
 const GUEST_SECONDS=365*24*60*60;
 const PAGE_SIZE=16;
 export type Actor={id:string;username:string|null};
 export type LoginRecord={id:string;passwordHash:string};
-export type DirectoryFilter={page:number;search:string;division:Scope;ending:string;complete:boolean;metric?:Metric};
+export type DirectoryFilter={page:number;search:string;division:'all'|Division;ending:string;metric?:Metric};
 type LegacyRow={id:string;expires:number;version:number;snapshot:Save};
 type LocalLegacy=(hash:string)=>Promise<LegacyRow|undefined>;
 export class AccessError extends Error {
@@ -20,9 +22,10 @@ export class AccessError extends Error {
 const normalized=(value:string)=>value.normalize('NFKC').toLocaleLowerCase('ko-KR');
 const searchPrefix=(value:string)=>[...normalized(value)].map(char=>['%','_','\\'].includes(char)?'\\'+char:char).join('')+'%';
 
-type PublicRow={id:string;profile:PublicProfile;ownerId:string};
-type RankRow=PublicRow&{score:number};
-type MineRow=RankRow&{rank:number};
+type PublicRow<P=PublicProfile>={id:string;profile:P;mine:boolean};
+type RankRow=PublicRow<PublicSummary>&{score:number;rank:number;honor:HonorScore;ownedRow:boolean};
+const summaryKeys=['name','look','title','year','week','complete','division','wins','podiums','meets','best','ending','official','historic','honors'] as const satisfies readonly (keyof PublicSummary)[];
+const publicSummary=`jsonb_build_object(${summaryKeys.map(key=>`'${key}',p.profile->'${key}'`).join(',')})`;
 
 async function actorAt(db:Query,hash:string):Promise<Actor|undefined>{
   const [actor]=await db.query<Actor>(`
@@ -176,14 +179,10 @@ export function databaseStore(db:Database,kind:Store['kind'],legacy?:LocalLegacy
         await tx.query(`
           INSERT INTO public_riders (id,owner_id,archive_id,profile,search_name,complete,division,ending)
           VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8)
-          ON CONFLICT(owner_id,archive_id) DO UPDATE SET active=true`,
+          ON CONFLICT(owner_id,archive_id) DO UPDATE SET active=true,profile=EXCLUDED.profile,search_name=EXCLUDED.search_name,
+            complete=EXCLUDED.complete,division=EXCLUDED.division,ending=EXCLUDED.ending`,
           [id,owner.id,archiveId,JSON.stringify(profile),normalized(profile.name),profile.complete,profile.division,profile.ending.kind]);
-        if(entries.length){
-          await tx.query(`INSERT INTO rider_rankings(public_id,metric,scope,version,score)
-            SELECT $1,entry.metric,entry.scope,$2,entry.score
-            FROM jsonb_to_recordset($3::jsonb) AS entry(metric text,scope text,score double precision)
-            ON CONFLICT DO NOTHING`,[id,RANKING_VERSION,JSON.stringify(entries)]);
-        }
+        await saveHonorEntries(tx,id,entries);
         return {id,archiveId,active:true,moderated:false};
       });
     },
@@ -197,43 +196,44 @@ export function databaseStore(db:Database,kind:Store['kind'],legacy?:LocalLegacy
       });
     },
     async profile(id:string,owner?:string):Promise<PublicCard|undefined>{
-      const [row]=await db.query<PublicRow>(`SELECT id,profile,owner_id AS "ownerId" FROM public_riders
-        WHERE id=$1 AND active AND NOT hidden`,[id]);
-      return row?{id:row.id,profile:row.profile,mine:row.ownerId===owner}:undefined;
+      const [row]=await db.query<PublicRow>(`SELECT id,profile,COALESCE(owner_id=$2,false) AS mine FROM public_riders
+        WHERE id=$1 AND active AND NOT hidden`,[id,owner??null]);
+      return row;
     },
     async directory(filter:DirectoryFilter,owner?:string):Promise<Directory>{
       const offset=(filter.page-1)*PAGE_SIZE;
       const visibility='p.active AND NOT p.hidden';
-      const toCard=(row:PublicRow)=>({id:row.id,profile:row.profile,mine:row.ownerId===owner});
       if(!filter.metric){
         const conditions=[visibility];
-        const values:unknown[]=[];
+        const values:unknown[]=[owner??null];
         if(filter.search){ values.push(searchPrefix(filter.search)); conditions.push(`p.search_name LIKE $${values.length}`); }
         if(filter.division!=='all'){ values.push(filter.division); conditions.push(`p.division=$${values.length}`); }
         if(filter.ending){ values.push(filter.ending); conditions.push(`p.ending=$${values.length}`); }
-        if(filter.complete) conditions.push('p.complete');
-        const rows=await db.query<PublicRow>(`SELECT p.id,p.profile,p.owner_id AS "ownerId" FROM public_riders p
+        const rows=await db.query<PublicRow<PublicSummary>>(`SELECT p.id,${publicSummary} AS profile,COALESCE(p.owner_id=$1,false) AS mine FROM public_riders p
           WHERE ${conditions.join(' AND ')} ORDER BY p.published_at DESC,p.id LIMIT $${values.length+1} OFFSET $${values.length+2}`,
           [...values,PAGE_SIZE+1,offset]);
-        return {rows:rows.slice(0,PAGE_SIZE).map(toCard),page:filter.page,hasMore:rows.length>PAGE_SIZE,mine:[]};
+        return {rows:rows.slice(0,PAGE_SIZE),page:filter.page,hasMore:rows.length>PAGE_SIZE,mine:[]};
       }
-      const completeOnly=filter.complete?' AND p.complete':'';
-      const keys=[filter.metric,filter.division,RANKING_VERSION];
-      const rows=await db.query<RankRow>(`SELECT p.id,p.profile,p.owner_id AS "ownerId",r.score
-        FROM rider_rankings r JOIN public_riders p ON p.id=r.public_id
-        WHERE r.metric=$1 AND r.scope=$2 AND r.version=$3 AND ${visibility}${completeOnly}
-        ORDER BY r.score DESC,r.public_id LIMIT $4 OFFSET $5`,[...keys,PAGE_SIZE+1,offset]);
-      const myRows=owner?await db.query<MineRow>(`SELECT p.id,p.profile,p.owner_id AS "ownerId",r.score,1+(
-          SELECT count(*)::int FROM rider_rankings ranked JOIN public_riders other ON ranked.public_id=other.id
-          WHERE ranked.metric=$1 AND ranked.scope=$2 AND ranked.version=$3 AND other.active AND NOT other.hidden
-            ${filter.complete?' AND other.complete':''}
-            AND (ranked.score>r.score OR (ranked.score=r.score AND ranked.public_id<r.public_id))
-        ) AS rank FROM rider_rankings r JOIN public_riders p ON p.id=r.public_id
-        WHERE r.metric=$1 AND r.scope=$2 AND r.version=$3 AND ${visibility}${completeOnly} AND p.owner_id=$4
-        ORDER BY rank LIMIT 50`,[...keys,owner]):[];
+      const ranked=await db.query<RankRow>(`WITH representatives AS (
+          SELECT DISTINCT ON (p.owner_id) p.id,p.owner_id,r.score
+          FROM rider_rankings r JOIN public_riders p ON p.id=r.public_id
+          WHERE r.metric=$1 AND r.scope='all' AND r.version=$2 AND ${visibility}
+          ORDER BY p.owner_id,r.score DESC,p.id
+        ), ranks AS (
+          SELECT id,owner_id,score,rank() OVER (ORDER BY score DESC)::int AS rank FROM representatives
+        ), selected AS (
+          (SELECT id,score,rank,false AS owned_row FROM ranks ORDER BY rank,id LIMIT $3 OFFSET $4)
+          UNION ALL
+          SELECT id,score,rank,true AS owned_row FROM ranks WHERE owner_id=$5
+        )
+        SELECT p.id,${publicSummary} AS profile,COALESCE(p.owner_id=$5,false) AS mine,
+          s.score,s.rank,p.profile->'honorScores'->$1 AS honor,s.owned_row AS "ownedRow"
+        FROM selected s JOIN public_riders p ON p.id=s.id ORDER BY s.owned_row,s.rank,p.id`,[filter.metric,RANKING_VERSION,PAGE_SIZE+1,offset,owner??null]);
+      const {page,mine}=ranked.reduce<{page:PublicCard<PublicSummary>[];mine:PublicCard<PublicSummary>[]}>((groups,{ownedRow,...card})=>{
+        groups[ownedRow?'mine':'page'].push(card);return groups;
+      },{page:[],mine:[]});
       return {
-        rows:rows.slice(0,PAGE_SIZE).map((row,index)=>({...toCard(row),score:row.score,rank:offset+index+1})),
-        page:filter.page,hasMore:rows.length>PAGE_SIZE,mine:myRows.map(row=>({...toCard(row),rank:row.rank,score:row.score})),
+        rows:page.slice(0,PAGE_SIZE),page:filter.page,hasMore:page.length>PAGE_SIZE,mine,
       };
     },
   };

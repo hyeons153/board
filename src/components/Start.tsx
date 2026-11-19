@@ -5,14 +5,13 @@ import type { Look } from '../game/types';
 import Scene from './Scene';
 import { Brand, ENGLISH_GAME_NAME, Tag } from './Brand';
 import { LookFields, LookPreview } from './Appearance';
-export default function Start({onCreate,onHall,onOnline,onAccount,username,hasHall,saving}:{onCreate:(name:string,look:Look)=>Promise<boolean>;onHall:()=>void;onOnline:()=>void;onAccount:()=>void;username?:string;hasHall:boolean;saving:boolean}){
+export default function Start({onCreate,onHall,onAccount,username,saving}:{onCreate:(name:string,look:Look)=>Promise<boolean>;onHall:()=>void;onAccount:()=>void;username?:string;saving:boolean}){
   const [creating,setCreating]=useState(false);
   const [name,setName]=useState('');
   const [look,setLook]=useState<Look>(DEFAULT_LOOK);
   return <div className="start-page">
     <header className="start-header"><Brand/><div className="start-top">
-      {hasHall&&<button className="button quiet small" onClick={onHall}><Trophy size={15}/> 내 명예의 전당</button>}
-      <button className="button quiet small" onClick={onOnline}>온라인 명예의 전당</button>
+      <button className="button quiet small" onClick={onHall}><Trophy size={15}/> 명예의 전당</button>
       <button className="button secondary small" onClick={onAccount}>{username?'내 계정':'계정·로그인'}</button>
     </div></header>
     <main className="start-main">

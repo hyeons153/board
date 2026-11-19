@@ -1,6 +1,6 @@
-import { ArrowLeft, ArrowUpRight, ChevronDown, Flag, Medal, Shield, Star, Trophy, UserRound } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, Flag, Medal, Play, Shield, Star, Trophy, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, SKILL, SKILLS, STAT_NAMES, STYLE_NAMES } from '../game/data';
+import { meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, RULES, SKILL, STAT_NAMES, STYLE_NAMES } from '../game/data';
 import { NAMES, competitor, learned } from '../game/competition';
 import { RIVALS, lineTerms } from '../game/content';
 import { equippedLook, extras, playerPlace } from '../game/economy';
@@ -10,7 +10,7 @@ import { divisionFor } from '../game/career';
 import { DISCIPLINES, STATS, type Archive, type Rider, type View } from '../game/types';
 import { chooseEnding, endingName, honors, summarize } from '../game/legacy';
 import type { Publication } from '../game/public';
-import { Brand, SectionTitle, Tag } from './Brand';
+import { SectionTitle, Tag } from './Brand';
 import { RiderCard, StatCards, type Submit } from './Overview';
 import { service } from './Account';
 
@@ -106,7 +106,7 @@ function CareerLog({r}:{r:Rider}){
     </div></details>}
   </section>;
 }
-export function Hall({hall,view,onEnding,onAccount,standalone=false,onBack}:{hall:Archive[];view:View;onEnding:(id:string)=>void;onAccount:()=>void;standalone?:boolean;onBack?:()=>void}){
+export function PrivateHall({hall,view,onEnding,onAccount,onPublic}:{hall:Archive[];view:View;onEnding:(id:string)=>void;onAccount:()=>void;onPublic:(id:string)=>void}){
   const [publications,setPublications]=useState<Publication[]>([]);
   const [pending,setPending]=useState('');
   const [error,setError]=useState('');
@@ -127,36 +127,71 @@ export function Hall({hall,view,onEnding,onAccount,standalone=false,onBack}:{hal
     }catch(error){setError(error instanceof Error?error.message:'공개 상태를 저장하지 못했어요.');}
     finally{setPending('');}
   };
-  const content=<section className="panel content-panel hall">
-    <SectionTitle code="HALL OF FAME" title="개인 명예의 전당" detail="은퇴 기록은 기본적으로 비공개입니다. 선택한 선수만 온라인에 공개할 수 있습니다."/>
+  return <section className="panel content-panel hall" aria-label="내 선수 기록">
     {error&&<p className="form-error" role="alert">{error}</p>}
     {!hall.length?<div className="hall-empty"><Trophy size={40}/><h3>아직 보관된 선수가 없어요</h3><p>은퇴하면 성장 기록과 대회 성적이 이곳에 남습니다.</p></div>:<div className="stack">{[...hall].reverse().map(a=>{
       const p=publications.find(row=>row.archiveId===a.id);
       return <ArchiveCard key={a.id} archive={a} actions={<>
-        <button className="button secondary small" onClick={()=>onEnding(a.id)}>엔딩 보기</button>
+        <button className="button secondary small" onClick={()=>onEnding(a.id)}><Play size={15}/> 엔딩 다시 보기</button>
         {!view.username?<button className="button quiet small" onClick={onAccount}>계정 연결</button>:
           p?.moderated?<Tag kind="orange">운영 검토로 비공개</Tag>:
           <button className={`button ${p?.active?'quiet':'primary'} small`} disabled={!available||!!pending}
             onClick={()=>void change(a.id,!p?.active)}>{p?.active?'공개 취소':'온라인에 공개'}</button>}
-        {p?.active&&!p.moderated&&<a className="text-button" href={'?rider='+p.id}>공개 프로필 보기</a>}
+        {p?.active&&!p.moderated&&<a className="button quiet small" href={'?rider='+p.id} onClick={event=>{
+          if(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+          event.preventDefault();onPublic(p.id);
+        }}>공개 프로필 보기 <ArrowUpRight size={14}/></a>}
       </>}/>;
     })}</div>}
   </section>;
-  return standalone?<div className="start-page hall-page"><header className="start-header"><Brand/><button className="button secondary" onClick={onBack}><ArrowLeft size={17}/> 돌아가기</button></header>{content}</div>:content;
 }
 function ArchiveCard({archive:a,actions}:{archive:Archive;actions:React.ReactNode}){
-  const results=a.records.flatMap(x=>x.results);
-  const wins=results.filter(x=>x.standings[0]?.id==='player').length;
-  const best=results.reduce((m,x)=>Math.max(m,x.run.score),0);
+  const summary=summarize(a);
+  const earned=a.honors??honors(a);
+  const ending=a.ending??chooseEnding(a);
+  const time=(a.year-1)*RULES.weeks+a.week;
+  const history=a.extras?.timeline??[];
+  const choices=EVENTS.flatMap(event=>{
+    const choice=a.extras?.choices[event.id];
+    if(!choice)return [];
+    return [{year:choice.year,week:choice.week,title:event.title,text:event.choices[choice.index]?.label??''}];
+  });
+  const timeline=[...history,...choices.filter(choice=>!history.some(item=>item.year===choice.year&&item.week===choice.week&&item.title===choice.title))];
+  const years=[...new Set([...a.seasons,...a.records,...timeline].map(item=>item.year))].sort((x,y)=>x-y);
+  const relationships=RIVALS.filter(rival=>a.relations[rival.id]||ending.friends?.includes(rival.id));
+  const achievements=[[Trophy,summary.wins+'회','우승'],[Star,summary.meets?Math.max(...Object.values(summary.best)).toFixed(1)+'점':'—','개인 최고점'],
+    [Flag,summary.meets+'개','출전 대회'],[Shield,summary.learned.length+'개','습득 기술']] as const;
   return <article className="archive-card">
-    <div className="archive-title"><PixelRider look={equippedLook(a)}/><div><h3>{a.name}</h3><span>{a.year}년차 {a.week}주 · 명성 {a.fame}</span></div><Tag kind={a.reason==='complete'?'lime':'muted'}>{endingName(a.ending??chooseEnding(a))}</Tag></div>
-    <div className="archive-stats"><span><Trophy size={16}/> <b>{wins}</b> 우승</span><span><Star size={16}/> <b>{best.toFixed(1)}</b> 최고점</span><span><Flag size={16}/> <b>{results.length}</b> 종목 완주</span><span><Shield size={16}/> <b>{SKILLS.filter(s=>learned(a.skills,s.id)).length}</b> 기술 습득</span></div>
+    <div className="archive-cover">
+      <PixelRider look={equippedLook(a)} label={a.name+' 은퇴 당시 외형'}/>
+      <div><Tag kind={a.reason==='complete'?'lime':'muted'}>{a.reason==='complete'?'8년 완주':'조기 은퇴'}</Tag><h3>{a.name}</h3><p>{endingName(ending)}</p>
+      <small>{a.year}년차 {a.week}주 은퇴 · 활동 {time}주 · 명성 {a.fame.toLocaleString('ko-KR')}</small></div>
+    </div>
+    <div className="archive-achievements">
+      {achievements.map(([Icon,value,label])=><div key={label}>
+        <Icon size={16} aria-hidden="true"/><strong>{value}</strong><small>{label}</small>
+      </div>)}
+    </div>
+    {!!earned.length&&<div className="pill-row archive-honors">{earned.slice(-3).reverse().map(title=><Tag key={title} kind="lime"><Medal size={14}/> {title}</Tag>)}</div>}
     <details className="past-meets"><summary>커리어 상세 보기 <ChevronDown size={16}/></summary><div className="archive-details">
-      <div className="pill-row">{(a.honors??honors(a)).map(title=><Tag kind="lilac" key={title}>{title}</Tag>)}</div>
-      <div className="pill-row">{STATS.map(s=><Tag key={s}>{STAT_NAMES[s]} {a.stats[s]}</Tag>)}</div>
-      <div className="pill-row">{RIVALS.map(n=><Tag key={n.id}>{n.name} 관계 {a.relations[n.id]??0}</Tag>)}</div>
-      <div className="pill-row">{SKILLS.filter(s=>learned(a.skills,s.id)).map(s=><Tag key={s.id}>{s.name} {a.skills[s.id].mastery}%</Tag>)}</div>
-      {[...a.records].reverse().map(m=><div key={m.year+m.id}><span>{m.year}년차 · {meetById(m.id)?.name}</span><span>{m.results.map(res=>`${DISCIPLINE_NAMES[res.discipline]} ${res.standings.find(s=>s.id==='player')?.place}위 / ${res.run.score}점`).join(' · ')||'불참'}</span></div>)}
+      <h4>최종 능력치</h4>
+      <div className="archive-final-stats">{STATS.map(stat=><div key={stat}><b>{STAT_NAMES[stat]}</b><span>{a.stats[stat]} / {RULES.statCap}</span>
+        <meter min={0} max={RULES.statCap} value={a.stats[stat]} aria-label={STAT_NAMES[stat]}/></div>)}</div>
+      {!!earned.length&&<><h4>업적·칭호</h4><div className="pill-row">{earned.map(title=><Tag kind="lilac" key={title}>{title}</Tag>)}</div></>}
+      <h4>기술과 숙련도</h4>
+      <div className="pill-row">{summary.learned.map(skill=><Tag key={skill.id}>{skill.name} {a.skills[skill.id].mastery}%</Tag>)}</div>
+      {relationships.length>0&&<><h4>라이벌</h4><div className="pill-row">{relationships.map(rival=><Tag key={rival.id}>{rival.name} 관계 {a.relations[rival.id]??0}</Tag>)}</div></>}
+      {years.length>0&&<><h4>연차별 성장과 대회 · 시즌 포인트 {summary.points.toLocaleString('ko-KR')}</h4>{years.map(year=>{
+        const season=a.seasons.find(item=>item.year===year);
+        const matches=a.records.filter(item=>item.year===year);
+        const events=timeline.filter(item=>item.year===year).sort((left,right)=>left.week-right.week);
+        const division=season?.division??matches[0]?.division;
+        const seasonPoints=season&&DISCIPLINES.flatMap(d=>season.scores[d].player===undefined?[]:[`${DISCIPLINE_NAMES[d]} ${season.scores[d].player}P`]);
+        return <details className="past-meets archive-year" key={year}><summary>{year}년차{division?' · '+DIVISION_NAMES[division]:''}{seasonPoints?.length?' · '+seasonPoints.join(' / '):''}</summary>
+          <ul className="hall-history">{matches.map(meet=><li key={meet.id}><b>{meetById(meet.id)?.name??meet.id}</b><span>{meet.results.map(result=>`${DISCIPLINE_NAMES[result.discipline]} ${playerPlace(result)}위 · ${result.run.score.toFixed(1)}점`).join(' / ')||'불참'}</span></li>)}</ul>
+          <ul className="hall-history">{events.map((event,i)=><li key={`${event.week}:${event.title}:${i}`}><b>{event.week}주 · {lineTerms(event.title)}</b><span>{lineTerms(event.text)}</span></li>)}</ul>
+        </details>;
+      })}</>}
     </div></details>
     <div className="bottom-actions">{actions}</div>
   </article>;

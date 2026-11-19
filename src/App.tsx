@@ -11,10 +11,10 @@ import { LookFields, LookPreview } from './components/Appearance';
 import { NewsCard } from './components/Overview';
 import { Skills, Routines, type LineDraft } from './components/Skills';
 import { Meets, type MeetSelection } from './components/Meets';
-import { Hall, Profile, Rankings, Rivals } from './components/Records';
+import { Profile, Rankings, Rivals } from './components/Records';
 import Workshop from './components/Workshop';
 import Account from './components/Account';
-import OnlineHall from './components/OnlineHall';
+import HallOfFame from './components/HallOfFame';
 import Ceremony from './components/Ceremony';
 import GameStage from './components/GameStage';
 import Scene from './components/Scene';
@@ -23,21 +23,21 @@ import { AutoSettings, WeeklyChoices } from './components/WeeklyChoices';
 import { RiderHud } from './components/RiderHud';
 import type { Look, MeetRecord, Plan } from './game/types';
 
-type Screen='home'|'training'|'skills'|'routine'|'meets'|'rank'|'workshop'|'profile'|'rivals'|'hall'|'online'|'account'|'menu'|'new'|'ending'|'journal';
-const names:Record<Screen,string>={home:'육성',training:'자동 육성 설정',skills:'기술 도감',routine:'라인 편집',meets:'대회',rank:'시즌 랭킹',workshop:'장비·스폰서',profile:'선수 정보',rivals:'라이벌',hall:'명예의 전당',online:'온라인 명예의 전당',account:'계정',menu:'전체 메뉴',new:'라이더 등록',ending:'커리어 엔딩',journal:'라이더 일지'};
+type Screen='home'|'training'|'skills'|'routine'|'meets'|'rank'|'workshop'|'profile'|'rivals'|'hall'|'account'|'menu'|'new'|'ending'|'journal';
+const names:Record<Screen,string>={home:'육성',training:'자동 육성 설정',skills:'기술 도감',routine:'라인 편집',meets:'대회',rank:'시즌 랭킹',workshop:'장비·스폰서',profile:'선수 정보',rivals:'라이벌',hall:'명예의 전당',account:'계정',menu:'전체 메뉴',new:'라이더 등록',ending:'커리어 엔딩',journal:'라이더 일지'};
 const dock=[['home','육성',Footprints],['skills','기술',BookOpen],['meets','대회',Flag],['workshop','상점',ShoppingBag],['menu','메뉴',Menu]] as const;
 const menuGroups=[
   {name:'커리어',items:[['routine',ListOrdered],['profile',UserRound],['rivals',UsersRound],['rank',Flag]]},
-  {name:'기록',items:[['hall',Trophy],['online',Trophy]]},
+  {name:'기록',items:[['hall',Trophy]]},
 ] as const;
 const panelStyle:Partial<Record<Screen,string>>={
   journal:'sidebar',account:'sidebar',training:'settings',new:'create',menu:'menu',
-  skills:'wide',meets:'wide',workshop:'wide',routine:'wide',ending:'wide',
+  skills:'wide',meets:'wide',workshop:'wide',routine:'wide',ending:'wide',hall:'wide',
 };
 
 export default function App(){
   const game=useGame();
-  const [screen,setScreen]=useState<Screen>(()=>new URLSearchParams(location.search).has('rider')?'online':'home');
+  const [screen,setScreen]=useState<Screen>(()=>new URLSearchParams(location.search).has('rider')?'hall':'home');
   const [trail,setTrail]=useState<Screen[]>([]);
   const [lineDraft,setLineDraft]=useState<{rider:string;value:LineDraft}>();
   const [meetSelection,setMeetSelection]=useState<{rider:string;value:MeetSelection}>();
@@ -74,8 +74,14 @@ export default function App(){
     panel.current?.focus({preventScroll:true});
     panel.current?.scrollTo(0,0);
   },[screen]);
+  const selectPublic=(id?:string)=>{
+    setPublicId(id);const url=new URL(location.href);
+    if(id)url.searchParams.set('rider',id);else url.searchParams.delete('rider');
+    history.replaceState(null,'',url);
+  };
   const go=(next:Screen,child=false)=>{
     if(next===screen&&!replay&&!replayLoading&&!spotMap)return;
+    if(screen==='hall'&&next!=='hall'&&publicId)selectPublic(undefined);
     replayRequest.current++;setReplayLoading(false);setReplay(undefined);setSpotMap(false);
     setTrail(history=>child&&screen!=='home'?[...history,screen]:[]);
     setScreen(next);
@@ -85,6 +91,7 @@ export default function App(){
     if(replay||replayLoading){
       replayRequest.current++;setReplay(undefined);setReplayLoading(false);setScreen(replayFrom);return;
     }
+    if(screen==='hall'&&publicId)selectPublic(undefined);
     setScreen(trail.at(-1)??'home');
     setTrail(trail.slice(0,-1));
   };
@@ -92,12 +99,7 @@ export default function App(){
     const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')back();};
     window.addEventListener('keydown',escape);
     return ()=>window.removeEventListener('keydown',escape);
-  },[trail,spotMap,replay,replayLoading,replayFrom]);
-  const selectPublic=(id?:string)=>{
-    setPublicId(id);const url=new URL(location.href);
-    if(id)url.searchParams.set('rider',id);else url.searchParams.delete('rider');
-    history.replaceState(null,'',url);
-  };
+  },[trail,spotMap,replay,replayLoading,replayFrom,screen,publicId]);
   if(!view)return <main className="boot"><Brand/><p role="status">{game.error||'라이더 기록을 불러오는 중…'}</p>{game.error&&<button className="button primary" onClick={()=>void game.load()}>다시 연결</button>}</main>;
   const stageRecord=replay??r?.records.find(m=>r.id+':'+m.year+':'+m.id===pending);
   const busyFlow=!!r&&(!!pending||!!trainingResult||!!eventResult||['event','meet','injury'].includes(r.phase));
@@ -128,8 +130,8 @@ export default function App(){
   let content:ReactNode;
   if(screen==='new')content=<NewRider saving={game.saving} onCreate={async(name,look)=>{const ok=await game.send({type:'create',name,look});if(ok)go('home');return ok;}}/>;
   else if(screen==='account')content=<Account key={view.scope} view={view} send={game.send} onSwitch={playHome} onSessionChange={game.load}/>;
-  else if(screen==='online')content=<OnlineHall view={view} initialId={publicId} onSelect={selectPublic}/>;
-  else if(screen==='hall')content=<Hall hall={view.career.hall} view={view} onEnding={id=>{setEndingId(id);go('ending',true);}} onAccount={()=>go('account',true)}/>;
+  else if(screen==='hall')content=<HallOfFame view={view} selectedId={publicId} onSelect={selectPublic}
+    onEnding={id=>{setEndingId(id);go('ending',true);}} onAccount={()=>go('account',true)}/>;
   else if(screen==='ending'&&archive)content=<Ceremony key={archive.id} archive={archive} onHall={()=>go('hall')} onNew={()=>go('new')}/>;
   else if(screen==='menu')content=<div className="console-menu">
     {menuGroups.filter(group=>r||group.name==='기록').map(group=><section key={group.name}>

@@ -278,11 +278,7 @@ small{color:var(--muted)}
 .rival p{font-size:.78rem;min-height:2.5em}
 .rival-icon{width:36px;height:36px;display:grid;place-items:center;border-radius:7px;background:#32353b;margin-bottom:.2rem}
 .hall-empty{display:grid;justify-items:center;gap:.65rem;min-height:245px;align-content:center;text-align:center}
-.hall-empty svg,.archive-title>svg{color:var(--lime)}
-.archive-title{display:flex;align-items:center;gap:.67rem}
-.archive-title>div{flex:1}
-.archive-title h3{font-size:1.25rem}
-.archive-title div>span{font-size:.77rem;color:var(--muted)}
+.hall-empty svg{color:var(--lime)}
 .archive-stats{display:flex;flex-wrap:wrap;gap:.55rem 1rem;margin:.65rem 0}
 .archive-stats>span{display:inline-flex;align-items:center;gap:.35rem;font-size:.78rem;color:var(--muted)}
 .archive-stats b{color:var(--text)}

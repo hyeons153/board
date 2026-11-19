@@ -1,6 +1,6 @@
 /* Retirement, accounts, and public records */
 .account-form { display: grid; gap: .8rem; width: min(100%, 430px); margin: .8rem 0 0; }
-.account-form label, .search-form label, .online-controls > label:not(.checkbox-line) { display: grid; gap: .3rem; }
+.account-form label, .search-form label, .online-controls > label { display: grid; gap: .3rem; }
 .account-form .button { justify-self: start; }
 .account-page .content-panel > p + p { margin-top: .55rem; }
 .account-tabs { margin-bottom: .75rem; }
@@ -13,15 +13,58 @@
 .retirement-summary { background: #f7ebdc; padding: .8rem; border: 1px solid #e4c9a9; border-radius: 9px; margin-top: .7rem; }
 .retirement-summary p { margin: .35rem 0; font-size: .84rem; }
 .retirement-summary details .pill-row { margin-top: .45rem; }
-.archive-title .pixel-rider { width: 48px; height: 49px; border-radius: 8px; background: #eae7f5; }
+.hall-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin-bottom:12px; }
+.hall-tabs button { min-height:45px; font-weight:750; }
+.hall-of-fame .content-panel { padding:clamp(10px,2vw,20px); }
+.hall-metrics { margin-bottom:10px; }
+.hall-metrics .pill { min-height:40px; }
+.archive-cover { display:flex; align-items:center; gap:clamp(10px,3vw,28px); padding:12px; border:1px solid #c9d4bf; border-radius:9px; background:linear-gradient(120deg,#e4edda,#f2ebdb); }
+.archive-cover .pixel-rider { width:clamp(78px,13vw,128px); height:clamp(98px,16vw,148px); flex:none; object-fit:contain; }
+.archive-cover h3 { margin:.35rem 0 0; font-size:clamp(1.28rem,4vw,2.05rem); overflow-wrap:anywhere; }
+.archive-cover p { margin:.2rem 0; font-weight:750; }
+.archive-cover small { color:#526456; line-height:1.5; }
+.archive-achievements { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; margin:10px 0; }
+.archive-achievements > div { display:grid; gap:4px; min-width:0; padding:10px; border:1px solid #d2d8c3; border-radius:7px; background:#fffdf3; }
+.archive-achievements svg { color:#42725b; }
+.archive-achievements strong { color:#24394e; font:750 clamp(1rem,3vw,1.5rem) var(--mono); }
+.archive-achievements small,.honor-record small { color:#55665a; }
+.archive-honors { margin-bottom:8px; }
+.archive-details h4 { margin:.6rem 0 .3rem; }
+.archive-details .archive-final-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; padding:0; border:0; }
+.archive-final-stats > div { display:grid; padding:8px; gap:4px; background:#eeeede; border:1px solid #d2d8c3; border-radius:6px; font-size:.81rem; }
+.archive-final-stats meter { width:100%; accent-color:#52775d; }
+.archive-year { margin:0 0 6px; }
+.hall-history { display:grid; gap:6px; padding:0; margin:8px 0; list-style:none; }
+.hall-history li { display:flex; flex-wrap:wrap; justify-content:space-between; gap:2px 14px; padding:5px 0; border-bottom:1px solid #dddccb; font-size:.83rem; }
 .online-controls { display: flex; flex-wrap: wrap; align-items: end; gap: .55rem .75rem; margin: .95rem 0; }
 .search-form { display: flex; gap: .45rem; align-items: flex-end; }
 .search-form input { width: min(215px, 44vw); }
-.online-controls .checkbox-line { padding: .5rem .25rem; }
 .online-controls select { min-height: 42px; }
 .rules-note { background: #edf2f6; padding: .65rem .75rem; border: 1px solid #c7d8e7; border-radius: 8px; margin: .65rem 0; font-size: .84rem; }
-.my-ranking { display: grid; gap: .35rem; background: #ecf2df; border: 1px solid #cdd9bc; border-radius: 9px; padding: .6rem .75rem; margin: .7rem 0; }
-.my-ranking p { font-size: .82rem; }
+.my-ranking { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; background:#ecf2df; border:1px solid #cdd9bc; border-radius:9px; padding:.6rem .75rem; margin:.7rem 0; }
+.honor-rules { margin:0 0 10px; }
+.honor-rules ul { margin:8px 0; padding-inline-start:19px; font-size:.82rem; line-height:1.55; }
+.honor-rules li + li { margin-top:4px; }
+.honor-rules > p,.honor-rules > small { margin:0 0 6px 4px; font-size:.8rem; }
+.honor-weights { display:grid; gap:5px; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); margin:8px 0; }
+.honor-weights > div { background:#eef1e2; border-radius:5px; display:grid; gap:4px; padding:6px 8px; font-size:.79rem; }
+.honor-weights dd { margin:0; font:750 .83rem var(--mono); }
+.honor-ranking { display:grid; gap:7px; }
+.honor-rank-card { display:grid; grid-template-columns:42px 60px minmax(0,1.1fr) minmax(0,1.5fr) 82px auto; align-items:center; gap:10px; padding:8px; border:1px solid #d4d8c5; border-radius:8px; background:#fffdf3; }
+.honor-rank-card[data-podium] { border-left:4px solid #a7a886; }
+.honor-rank-card[data-podium="1"] { background:#f1f1db; border-left-color:#a68142; }
+.honor-rank-card[data-podium="2"] { border-left-color:#718598; }
+.honor-rank-card[data-podium="3"] { border-left-color:#a87760; }
+.honor-rank-card .pixel-rider { width:60px; height:64px; object-fit:contain; border-radius:7px; background:#e9efdf; }
+.honor-place { color:#355369; text-align:center; font:750 1.1rem var(--mono); }
+.honor-place small { font-size:.65rem; }
+.honor-rider,.honor-record,.honor-score { min-width:0; display:grid; gap:3px; overflow-wrap:anywhere; }
+.honor-rider span,.honor-record span,.honor-record small,.honor-score small { font-size:.76rem; }
+.honor-rider small { color:#41684d; font-size:.65rem; }
+.honor-record strong { font-size:.86rem; }
+.honor-score { text-align:right; color:#2f5946; }
+.honor-score strong { font:750 1.08rem var(--mono); }
+.honor-view { justify-self:end; }
 .public-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
 .public-card { display: flex; align-items: center; gap: .5rem; min-width: 0; text-align: left; background: #f8f1e4; border: 1px solid #e0d3bd; border-radius: 9px; padding: .5rem; }
 .public-card:hover { background: #e5efe3; border-color: #9cb19c; }
@@ -48,6 +91,20 @@
 @media(max-width:640px){
   .start-top { flex-wrap: wrap; justify-content: flex-end; gap: .3rem; }
   .public-grid { grid-template-columns: 1fr; }
+  .hall-tabs { gap:4px; }
+  .console-panel .hall-tabs .pill { min-height:44px; padding-inline:3px; font-size:.78rem; white-space:nowrap; }
+  .hall-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)) minmax(0,1.55fr); gap:4px; }
+  .console-panel .hall-metrics .pill { min-height:40px; padding-inline:3px; font-size:.78rem; white-space:nowrap; }
+  .honor-rank-card { grid-template-columns:27px 48px minmax(0,1fr) 73px; gap:7px; padding:7px; }
+  .honor-rank-card .pixel-rider { width:48px; height:52px; }
+  .honor-record { grid-column:2/-1; }
+  .honor-score { grid-column:4; grid-row:1; }
+  .honor-view { grid-column:2/-1; min-height:40px; }
+  .archive-achievements,.archive-details .archive-final-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .online-controls { margin-top:0; }
+  .search-form { width:100%; }
+  .search-form label { flex:1; min-width:0; }
+  .search-form input { width:100%; }
 }
 @media(max-width:475px){
   .sidebar nav { grid-template-columns: repeat(9,minmax(0,1fr)); }

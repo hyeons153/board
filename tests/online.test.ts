@@ -9,6 +9,7 @@ import { createHandler } from '../server/http';
 import { blankSave } from '../server/clock';
 import { sessionHash } from '../server/online';
 import { publicationFor, verifiedResult } from '../server/ranking';
+import { refreshPublicHall } from '../server/hallIndex';
 import { command, newRider, processWeek } from '../src/game/career';
 import { simulateRun } from '../src/game/competition';
 import { seeded } from '../src/game/random';
@@ -18,6 +19,7 @@ import { freshExtras } from '../src/game/economy';
 import { chooseEnding } from '../src/game/legacy';
 import { DISCIPLINES, type Career, type GameAction, type View } from '../src/game/types';
 import type { Directory, Publication, PublicCard } from '../src/game/public';
+import { RANKING_VERSION } from '../src/game/public';
 
 const pw='test-account-passphrase-42';
 const base='https://longboard.test/api/game';
@@ -154,16 +156,45 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
     const profile=await (await status(viewer.call('?area=public&id='+publish.id),200)).json() as PublicCard;
     assert.equal(profile.profile.name,archive.name);
     assert.ok(profile.profile.official);
-    assert.equal(profile.profile.careerPoints,null);
+    assert.ok((profile.profile.honorScores?.career?.total??0)>0,'An eligible early retirement earns an overall score');
     assert.equal(profile.mine,false);
     const serialized=JSON.stringify(profile);
     for(const privateValue of [ownerRider.id,ownerId,'river_archive','passwordHash','proof']) assert.ok(!serialized.includes(privateValue));
     const publicList=await (await status(viewer.call('?area=public&search='+encodeURIComponent('리버')),200)).json() as Directory;
     assert.equal(publicList.rows[0]?.id,publish.id);
-    const ranked=await (await status(owner.call('?area=public&metric=dance&division=rookie'),200)).json() as Directory;
+    assert.equal('routines' in publicList.rows[0].profile,false,'List projection omits full profile data');
+    const ranked=await (await status(owner.call('?area=public&metric=dance'),200)).json() as Directory;
     assert.equal(ranked.rows[0]?.rank,1);
     assert.equal(ranked.mine[0]?.rank,1);
-    assert.equal((await (await status(viewer.call('?area=public&metric=career'),200)).json() as Directory).rows.length,0);
+    const overall=async()=>await (await status(viewer.call('?area=public&metric=career'),200)).json() as Directory;
+    assert.equal((await overall()).rows[0].score,profile.profile.honorScores?.career?.total);
+    for(const metric of ['trick','freestyle'])assert.equal((await (await status(viewer.call('?area=public&metric='+metric),200)).json() as Directory).rows.length,0);
+
+    // Recreate the pre-update public projection without altering the authoritative career.
+    const serializedCareer=JSON.stringify((await store.get(ownerId)).snapshot);
+    await pg.db.query('UPDATE public_riders SET profile=profile - \'rankingVersion\' - \'honorScores\' WHERE id=$1',[publish.id]);
+    await pg.db.query('UPDATE rider_rankings SET version=1 WHERE public_id=$1',[publish.id]);
+    assert.deepEqual(await refreshPublicHall(pg.db,false),{checked:1,ranked:1,missing:0,updated:0});
+    assert.equal((await overall()).rows.length,0);
+    assert.deepEqual(await refreshPublicHall(pg.db,true),{checked:1,ranked:1,missing:0,updated:1});
+    assert.deepEqual(await refreshPublicHall(pg.db,true),{checked:0,ranked:0,missing:0,updated:0});
+    assert.equal((await overall()).rows[0].id,publish.id);
+    assert.equal(JSON.stringify((await store.get(ownerId)).snapshot),serializedCareer);
+
+    // Equal verified scores share a rank, with one representative per account.
+    const viewerId=(await store.actor(sessionHash(viewer.token())))!.id;
+    const duplicate=randomUUID(),equalRider=randomUUID();
+    for(const [id,account] of [[duplicate,ownerId],[equalRider,viewerId]]){
+      await pg.db.query(`INSERT INTO public_riders(id,owner_id,archive_id,profile,search_name,complete,division,ending)
+        SELECT $1,$2,$3,profile,search_name,complete,division,ending FROM public_riders WHERE id=$4`,[id,account,randomUUID(),publish.id]);
+      await pg.db.query(`INSERT INTO rider_rankings(public_id,metric,scope,version,score)
+        SELECT $1,metric,scope,version,score FROM rider_rankings WHERE public_id=$2 AND version=$3`,[id,publish.id,RANKING_VERSION]);
+    }
+    const tied=await overall();
+    assert.equal(tied.rows.length,2);
+    assert.deepEqual(tied.rows.map(item=>item.rank),[1,1]);
+    assert.equal(tied.mine[0].id,equalRider);
+    await pg.db.query('DELETE FROM public_riders WHERE id IN ($1,$2)',[duplicate,equalRider]);
     await status(viewer.call('?area=public',{type:'report',id:publish.id,reason:'name'}),200);
     await status(viewer.call('?area=public',{type:'report',id:publish.id,reason:'other'}),200);
     assert.equal((await pg.db.query('SELECT public_id FROM rider_reports')).length,1);
@@ -194,7 +225,7 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
   }finally{await pg.close();}
 });
 
-test('eight official seasons replay from inputs, while edited and unverifiable runs stay outside the complete ranking',()=>{
+test('verified complete and early careers share one score formula; invalid or unverified results stay outside',()=>{
   const c:Career={rider:null,hall:[]};
   command(c,{type:'create',name:'Finalist',look:DEFAULT_LOOK},()=>({id:randomUUID(),seed:981}),true,true);
   const rider=c.rider!;
@@ -207,7 +238,18 @@ test('eight official seasons replay from inputs, while edited and unverifiable r
   const publication=publicationFor(archive);
   assert.ok(publication.entries.some(item=>item.metric==='career'));
   assert.equal(publication.profile.division,'master');
-  assert.ok(publication.entries.some(item=>item.scope==='master'&&item.metric==='dance'));
+  assert.deepEqual(publication.entries.map(item=>item.metric),['career','dance','trick','freestyle']);
+  assert.deepEqual(publicationFor(archive),publication,'The same career reproduces its exact ranking projection');
+  const short=structuredClone(archive);
+  short.reason='early';short.year=1;short.week=21;short.seasons=[];
+  short.records=short.records.filter(meet=>meet.year===1&&['regular-1','regular-2'].includes(meet.id));
+  const early=publicationFor(short);
+  assert.deepEqual(early.entries.map(item=>item.metric),['career','freestyle']);
+  assert.ok(early.profile.honorScores?.career?.verifiedMeets===2);
+  for(const score of Object.values(publication.profile.honorScores??{})){
+    assert.ok(score.total>=0&&score.total<=1000);
+    assert.equal(score.total,Math.round(Object.values(score.components).reduce((sum,points)=>sum+points,0)*10)/10);
+  }
   const incomplete=structuredClone(archive);
   incomplete.records.find(meet=>meet.id==='international-2')!.results.pop();
   assert.equal(publicationFor(incomplete).entries.some(item=>item.metric==='career'),false,'Graduation requires every international discipline');

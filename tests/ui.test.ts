@@ -147,12 +147,22 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await click('한유리 · 라이벌 보기');
     assert.equal(win.document.querySelectorAll('.console-panel[aria-label="라이벌"] .rival-grid .rival').length,6);
     await click('메뉴 닫기');
-    for(const name of ['선수 정보','라이벌','시즌 랭킹','명예의 전당','온라인 명예의 전당']){
+    for(const name of ['선수 정보','라이벌','시즌 랭킹','명예의 전당']){
       await click('메뉴');await click(name);
       const opened=win.document.querySelector('.console-panel[aria-label="'+name+'"]')!;
       assert.ok(opened);
       if(name==='선수 정보')assert.equal(opened.querySelector('.rival-grid'),null);
       if(name==='라이벌')assert.equal(opened.querySelectorAll('.rival-grid .rival').length,6);
+      if(name==='명예의 전당'){
+        assert.deepEqual([...opened.querySelectorAll('.hall-tabs button')].map(button=>button.textContent),['내 선수','글로벌 랭킹','선수 둘러보기']);
+        assert.ok(opened.querySelector('[aria-label="내 선수 기록"]'));
+        await click('글로벌 랭킹');
+        assert.equal(opened.querySelector('.hall-metrics [aria-pressed="true"]')?.textContent,'종합');
+        assert.deepEqual([...opened.querySelectorAll('.hall-metrics button')].map(button=>button.textContent),['종합','댄싱','트릭','프리스타일']);
+        await click('선수 둘러보기');
+        assert.ok(opened.querySelector('.search-form input'));
+        assert.equal(opened.querySelector('input[type="checkbox"]'),null);
+      }
       await click('메뉴 닫기');
       assert.equal(win.document.querySelector('.console-panel'),null);
     }
