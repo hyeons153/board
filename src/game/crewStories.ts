@@ -26,13 +26,13 @@ export const CREW_STORIES:EventDef[]=[
       option('두 사람에게 먼저 알리고 각자의 대답을 기다린다.','가까워진 두 사람 모두 자기 뜻을 말할 시간을 가졌다.',r=>{
         const next=pending(r)!,current=lead(r);
         const accepts=STORY_NPCS.filter(npc=>hasFlag(r,npc,'clear-boundary')||hasFlag(r,npc,'agreed-boundaries')||hasFlag(r,npc,'privacy')||hasFlag(r,npc,'respect')||hasFlag(r,npc,'checked-facts'));
-        if(![current,next].every(npc=>accepts.includes(npc)&&r.relations[npc]>=12))
+        if(![current,next].every(npc=>accepts.includes(npc)))
           return {changes:[change(next,'friend','overlap-declined')],dialogue:'두 사람 중 한 명이 여러 관계에는 동의할 수 없다고 답했다. 새 교제는 시작하지 않았다.'};
         return {...storyProgress(r,next)?.pendingReward,changes:[change(current,'partner','shared-agreement','agreed'),change(next,'partner','shared-agreement','agreed')],dialogue:'두 사람 모두 각자의 조건을 말한 뒤에 동의했다. 누구든 합의를 다시 이야기할 수 있기로 했다.'};
       }),
       option('기존 연인과의 관계를 숨긴 채 새 교제를 시작한다.','새 연인은 네가 다른 교제 약속이 없다고 한 말을 믿었다.',r=>({ ...storyProgress(r,pending(r)!)?.pendingReward,changes:[change(pending(r)!,'partner','concealed-overlap','secret')]})),
       option('새 교제는 시작하지 않고 각자의 관계를 존중한다.','새로 가까워진 사람은 마음을 솔직히 말해 준 데 고마워했다.',r=>record(pending(r)!,'overlap-declined','friend')),
-    ],{kind:'관계 선택',decision:true,cast:r=>[...activePartners(r),...(pending(r)?[pending(r)!]:[])]}),
+    ],{kind:'관계 선택',decision:true,requiresChoice:true,cast:r=>[...activePartners(r),...(pending(r)?[pending(r)!]:[])]}),
   scene('crew-photo-booking','브랜드에서 온 촬영 제안','브랜드가 둘이 보드를 타는 사진을 커플 화보로 쓰고 싶다고 한다. 당사자끼리 먼저 상의할 수 있다.',
     r=>r.year>=4&&!!r.extras?.contract&&activePartners(r).length===1,[
       option('연인과 상의한 뒤 둘이 동의한 화보를 예약한다.','브랜드는 두 사람에게 촬영 일정을 보냈다.',r=>record(lead(r),'photo-booked')),

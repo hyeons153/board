@@ -79,7 +79,7 @@ export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true
 
 export function SpecialTrainingBadge(){return <span className="weekly-special-badge">SPECIAL ×2</span>;}
 function SpecialTrainingForecast(){return <span className="weekly-special-forecast">성공률 100% · 체력 소모 0 · 성장 ×2</span>;}
-const jointBonus=(joint:JointTraining)=>`성장 +${Math.round((joint.growth-1)*100)}% · ${jointEffectLabel(joint)}`;
+const jointBonus=(joint:JointTraining)=>`성장 +${Math.round((joint.growth-1)*100)}% · ${jointEffectLabel(joint)}${joint.promised?' · 약속한 연습':''}`;
 
 export function AutoSettings({r,send,saving,onApplied}:{r:Rider;send:Submit;saving:boolean;onApplied:()=>void}){
   const [draft,setDraft]=useState(()=>({

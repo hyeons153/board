@@ -6,13 +6,14 @@ import { RELATIONSHIP_EVENTS, relationshipChoiceAvailable, type RelationshipChoi
 import { STORY_ARCS } from './storyArcs.js';
 import { CREW_STORIES } from './crewStories.js';
 import { CAREER_STORIES } from './careerStories.js';
+import { NPC_WORKSHOP_EVENTS } from './npcWorkshops.js';
 import { elapsed, storyProgress, type StoryChange, type StoryImpact } from './storyState.js';
 import { pickHappening, type Happening } from './happenings.js';
 import type { Family, Rider, Settings, Stat, Strategy } from './types.js';
 
 type Effect = { energy?:number; money?:number; fame?:number; relation?:number; skill?:string; study?:number; teach?:true; stat?:Stat; gain?:number; item?:string };
 type Choice = { label:string; effect:Effect; tags:Strategy[]; dialogue?:string; relationship?:RelationshipChoice; story?:(r:Rider)=>StoryImpact };
-export type EventDef = { id:string; kind:string; title:string; body:string|((r:Rider)=>string); npc?:string; cast?:(r:Rider)=>string[]; story?:boolean; chapter?:boolean; finale?:boolean; afterMeet?:boolean; important?:boolean; decision?:boolean; repeat?:boolean; special?:boolean; when:(r:Rider)=>boolean; choices:Choice[] };
+export type EventDef = { id:string; kind:string; title:string; body:string|((r:Rider)=>string); npc?:string; cast?:(r:Rider)=>string[]; story?:boolean; chapter?:boolean; anyGender?:true; finale?:boolean; afterMeet?:boolean; important?:boolean; decision?:boolean; requiresChoice?:true; repeat?:boolean; special?:boolean; when:(r:Rider)=>boolean; choices:Choice[] };
 const option=(label:string,effect:Effect,...tags:Strategy[]):Choice=>({label,effect,tags});
 const crewGuide=(r:Rider)=>[rivalCanJoinEvent(r,'sol')?'sol':'yu'];
 export const EVENTS:EventDef[] = [
@@ -64,6 +65,7 @@ export const EVENTS:EventDef[] = [
   ...STORY_ARCS,
   ...CREW_STORIES,
   ...CAREER_STORIES,
+  ...NPC_WORKSHOP_EVENTS,
   {id:'crew-neon-warmup',kind:'스팟 이야기',title:'불이 켜지는 순서',npc:'noa',special:true,
     body:'네온 팔찌가 먼저 반짝였다. 노아는 점등이 끝날 때까지 오늘 연습할 동작을 같이 골랐다.',
     when:r=>r.spot==='night'&&itemEvents(r).includes('crew-neon-warmup'),
@@ -75,7 +77,17 @@ export const eventNpc=(e:EventDef,r?:Rider)=>{
   return id==='mentor'?r?.mentor:id?RIVAL.get(id):undefined;
 };
 export const skipsEventChoices=(settings:Settings)=>settings.skipEvents??!settings.manualEvents;
-export const eventPaused=(r:Rider)=>r.settings.mode==='manual'||!skipsEventChoices(r.settings);
+export function eventPaused(r:Rider){
+  if(r.settings.mode==='manual'||!skipsEventChoices(r.settings))return true;
+  const event=eventFor(r,r.event??'');
+  if(!event)return false;
+  if(event.requiresChoice)return true;
+  if(!event.decision)return false;
+  const choices=event.choices.flatMap((choice,index)=>eventChoiceAvailable(r,event,index)?[{choice,impact:choice.story?.(r)}]:[]);
+  const mutualChoice=choices.some(({impact})=>impact?.romanceAttempt&&impact.changes?.some(change=>
+    change.flag==='overlap-requested'||change.state==='partner'&&storyProgress(r,change.npc)?.state!=='partner'));
+  return mutualChoice||!choices.some(({choice,impact})=>keepsRelationship(r,event,choice,impact));
+}
 export const eventBody=(r:Rider,e:EventDef)=>typeof e.body==='string'?e.body:e.body(r);
 export const eventCast=(r:Rider,e:EventDef)=>[...new Set(e.cast?.(r)??(e.npc?[e.npc]:[]))];
 export const eventChoiceAvailable=(r:Rider,e:EventDef,index:number)=>
@@ -106,7 +118,7 @@ export function pickEvent(r:Rider,rng:()=>number,afterMeet=false):EventDef|Happe
     const last=choices[e.id];
     const cooldown=last ? (r.year-last.year)*RULES.weeks+r.week-last.week : Infinity;
     return (afterMeet?e.afterMeet:!e.afterMeet||!meetWeek)&&(!r.events[e.id]||(e.repeat&&cooldown>=8))&&e.when(r)&&
-      eventCast(r,e).every(npc=>rivalCanJoinEvent(r,npc));
+      (e.chapter||e.anyGender||eventCast(r,e).every(npc=>rivalCanJoinEvent(r,npc)));
   });
   const stories=eligible.filter(e=>e.story);
   if(stories.length){
@@ -134,19 +146,20 @@ export function pickEvent(r:Rider,rng:()=>number,afterMeet=false):EventDef|Happe
   let roll=rng()*weights.reduce((sum,weight)=>sum+weight,0);
   return pool.find((_,index)=>(roll-=weights[index])<0)??pool.at(-1);
 }
-function keepsRelationship(r:Rider,e:EventDef,choice:Choice){
-  const changes:StoryChange[]=[...(choice.story?.(r).changes??[])];
+function keepsRelationship(r:Rider,e:EventDef,choice:Choice,impact:StoryImpact|undefined){
+  if(impact?.romanceAttempt)return false;
+  const changes:StoryChange[]=[...(impact?.changes??[])];
   if(e.npc&&choice.relationship?.state)changes.push({npc:e.npc,state:choice.relationship.state});
   return changes.every(({npc,state,mode})=>{
     const current=storyProgress(r,npc);
     if(mode&&mode!==(current?.mode??'private'))return false;
     if(!state||state===current?.state)return true;
-    return current?.state!=='partner'&&state!=='partner'&&state!=='interested'&&state!=='ended';
+    return current?.state!=='partner'&&current?.state!=='ended'&&state!=='partner'&&state!=='interested'&&state!=='ended';
   });
 }
 export function autoChoice(r:Rider,e:EventDef) {
   const available=e.choices.map((choice,index)=>({choice,index})).filter(({index})=>eventChoiceAvailable(r,e,index));
-  const unchanged=e.decision?available.filter(({choice})=>keepsRelationship(r,e,choice)):[];
+  const unchanged=e.decision?available.filter(({choice})=>keepsRelationship(r,e,choice,choice.story?.(r))):[];
   const options=unchanged.length?unchanged:available;
   if(!options.length)return -1;
   if(r.energy<35||r.injury)return options.reduce((best,item)=>(item.choice.effect.energy??0)>(best.choice.effect.energy??0)?item:best).index;

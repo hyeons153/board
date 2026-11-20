@@ -402,6 +402,15 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await act(async()=>root.render(createElement(Rivals,{r:story,send:sendStory,saving:false})));
     assert.equal(win.document.querySelectorAll('.rival').length,6);
     assert.match(win.document.querySelector('.relationship-episodes')!.textContent!,/영상에 남지 않은 말|함께 춤추는 친구/);
+    story.relations.yu=64;
+    const relationshipHistory=story.extras!.relationships!;
+    relationshipHistory.npcs.yu={state:'interested',flags:['romance-route']};
+    relationshipHistory.titles.push('workshop-title-yu');
+    await act(async()=>root.render(createElement(Rivals,{r:{...story},send:sendStory,saving:false})));
+    const yuri=[...win.document.querySelectorAll('.rival')].find(card=>card.textContent?.includes('한유리'))!;
+    assert.match(yuri.textContent!,/친밀도 64/);
+    assert.match(yuri.textContent!,/바람의 파트너/);
+    assert.doesNotMatch(yuri.textContent!,/애정도|연애 가능/);
     story.settings.mode='manual';submitted=undefined;
     await act(async()=>root.render(createElement(GameStage,{...storyProps,pendingEvent:{
       key:'observation-ui',eventId:'happening-yu-1',title:'간식은 여덟 명분',kind:'해프닝',choice:'',details:[],year:3,week:9,npc:'yu',dialogue:'유리가 간식을 건넸다.',happening:true,

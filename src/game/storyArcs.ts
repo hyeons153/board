@@ -1,4 +1,4 @@
-import { activePartners, change, chosen, elapsed, hasFlag, option, record, romance, scene, storyProgress, type StoryImpact, type StoryNpc } from './storyState.js';
+import { activePartners, change, chosen, elapsed, hasFlag, hasRomanticInterest, option, record, romance, scene, storyProgress, type StoryImpact, type StoryNpc } from './storyState.js';
 import type { Rider } from './types.js';
 import type { EventDef } from './events.js';
 
@@ -6,8 +6,10 @@ const episode=(npc:StoryNpc,part:number,title:string,body:EventDef['body'],when:
   scene('story-'+npc+'-'+part,title,body,when,choices,{npc,kind:'개인 에피소드',decision});
 const met=(r:Rider,year:number,old:string[])=>r.year>year||r.year===year&&old.some(id=>r.events[id]);
 const after=(npc:StoryNpc,part:number,year:number)=>(r:Rider)=>r.year>=year&&elapsed(r,'story-'+npc+'-'+part)>=(r.year===8?1:3);
-const gift=(npc:StoryNpc,state:Parameters<typeof change>[1],flag:string,title:string,item:string):StoryImpact=>
-  ({changes:[change(npc,state,flag)],title,item});
+const gift=(npc:StoryNpc,state:Parameters<typeof change>[1],flag:string,title:string,item:string)=>(r:Rider):StoryImpact=>
+  storyProgress(r,npc)?.state==='ended'&&state!=='ended'
+    ?{dialogue:'지난번에 정한 거리를 그대로 지키기로 했다. 두 사람은 다음 시즌을 응원하고 각자의 길로 돌아갔다.'}
+    :{changes:[change(npc,state,flag)],title,item};
 const finishRomance=(r:Rider,npc:StoryNpc,mutual:boolean,title:string,item:string):StoryImpact=>
   romance(r,npc,mutual,title,item);
 const close=(npc:StoryNpc,flag:string)=>record(npc,flag,'ended');
@@ -63,7 +65,9 @@ export const STORY_ARCS:EventDef[]=[
       option('나도 다른 사람과 데이트하는 척한다.','한 장짜리 장난에 해명을 세 번이나 해야 할 일이 생겼다.',record('sol','fake-date')),
       option('답을 듣기 전까지 거리를 둔다.','솔은 이번에는 웃지 않고 연락을 기다리기로 했다.',record('sol','distance')),
     ]),
-  episode('sol',4,'농담 없는 마지막 커피','마지막 시즌 솔이 보온병을 건넸다. “오늘은 장난 안 칠게. 오래전부터 네가 좋았어.”',
+  episode('sol',4,'농담 없는 마지막 커피',r=>hasRomanticInterest(r,'sol')&&hasFlag(r,'sol','checked-facts')&&(hasFlag(r,'sol','asked-honestly')||hasFlag(r,'sol','apology'))
+    ?'마지막 시즌 솔이 보온병을 건넸다. “오늘은 장난 안 칠게. 네가 좋다는 말을 제대로 하고 싶었어.”'
+    :'마지막 시즌 솔이 보온병을 건넸다. “이번에는 농담 말고, 뜨거운 거 식기 전에 마지막 라인 이야기부터 듣고 싶어.”',
     after('sol',3,8),[
       option('진심을 받아들이고 사귀고 싶다고 말한다.','보온병 위로 있는 그대로의 대답이 돌아왔다.',r=>finishRomance(r,'sol',hasFlag(r,'sol','checked-facts')&&(hasFlag(r,'sol','asked-honestly')||hasFlag(r,'sol','apology')),'sol-honest','acc_sol_badge')),
       option('고마워. 지금은 친구로 커피를 마시고 싶어.','솔은 친구라고 또렷하게 답하고 두 잔을 채웠다.',gift('sol','friend','coffee-friend','sol-coffee','acc_sol_badge')),
@@ -76,13 +80,19 @@ export const STORY_ARCS:EventDef[]=[
       option('나 좋아해?','준은 귀가 빨개진 채 링크를 다시 확인했다.',record('jun','asked-about-crush')),
       option('내 영상은 지우고 착지 영상만 같이 보자.','준은 파일을 지우고 네가 남겨도 좋다고 한 착지 영상만 열었다.',record('jun','clip-deleted'),{},['trick','balanced']),
     ],false),
-  episode('jun',2,'고백도 착지 실패',r=>hasFlag(r,'jun','clip-deleted')?
+  episode('jun',2,'고백도 착지 실패',r=>wasTogether(r,'jun')?
+    '준이 카메라를 두고 뚜벅뚜벅 걸어왔다. “사귀기 전에 연습했던 말이 있어. 지금 와서 들으면 좀 웃길걸.”':hasFlag(r,'jun','clip-deleted')?
     '준이 카메라 없이 기다리고 있었다. “지난번 삭제해 달라고 한 영상은 없앴어. 이번 얘기는 직접 하고 싶었어.”':
     '준이 오래된 3초 영상을 다시 틀었다가 급히 껐다. “사귀… 아니, 다음 대회에 같이…” 밤새 연습했다던 대사는 한 번 더 착지에 실패했다.',
     after('jun',1,3),[
       option('나도 좋아. 우리 사귈래?','준이 숨을 고르고 대답했다.',r=>romance(r,'jun',hasFlag(r,'jun','kept-clip')||hasFlag(r,'jun','asked-about-crush'))),
-      option('고백은 고맙지만 좋은 라이벌로 남자.','준은 대답을 존중하고 다음 경기에서 인사하겠다고 했다.',record('jun','rejected','rival')),
-      option('천천히, 말을 끝까지 해 봐.','준은 고백을 끝까지 했고, 지금 답을 내릴 필요는 없다고 덧붙였다.',r=>record('jun','honest-retry',wasTogether(r,'jun')?'partner':'interested')),
+      option('마음을 전해 줘서 고마워. 경기에서는 라이벌로 만나자.','준은 대답을 존중하고 다음 경기에서 인사하겠다고 했다.',r=>wasTogether(r,'jun')?{dialogue:'준은 트랙에서는 평소처럼 겨루자며 손을 내밀었다.'}:record('jun','rejected',storyProgress(r,'jun')?.state==='ended'?'ended':'rival')),
+      option('천천히, 말을 끝까지 해 봐.','준은 고백을 끝까지 했고, 지금 답을 내릴 필요는 없다고 덧붙였다.',r=>{
+        const state=storyProgress(r,'jun')?.state;
+        if(state==='ended'||state==='partner'||hasFlag(r,'jun','confession-declined')||hasFlag(r,'jun','rejected'))
+          return {dialogue:'준은 지난번 답을 존중한다고 말했다. 이어서 다음 대회에서 보여 줄 착지 이야기를 꺼냈다.'};
+        return record('jun','honest-retry','interested');
+      }),
     ]),
   episode('jun',3,'라이브를 켜지 말랬잖아',r=>hasFlag(r,'jun','clip-deleted')?
     '연습 중 오디오만 켜진 라이브에서 준이 사적인 별명을 부르고 말았다. 예전에 지운 영상은 어디에도 공개되지 않았다.':

@@ -1,6 +1,7 @@
 import type { EventDef } from './events.js';
 import { RULES } from './data.js';
-import { chosen, hasFlag, STORY_NPCS, STORY_TITLES } from './storyState.js';
+import { NPC_WORKSHOPS, workshopTitle } from './npcWorkshops.js';
+import { chosen, hasFlag, hasRomanticInterest, STORY_NPCS, STORY_TITLES } from './storyState.js';
 import type { RelationshipState, Rider } from './types.js';
 
 type CareerRelationships = Pick<Rider,'extras'>;
@@ -20,7 +21,7 @@ export type RelationshipReward = { titleId:string; item:string };
 export type RelationshipChoice = { state?:RelationshipState; flag:string; reward?:RelationshipReward };
 
 export const RELATIONSHIP_NAMES:Record<RelationshipState,string> = {
-  undecided:'관계 미확정',friend:'우정',rival:'경쟁',interested:'연애 가능',partner:'연인',ended:'관계 종료',
+  undecided:'관계 미확정',friend:'우정',rival:'경쟁',interested:'관계 미확정',partner:'연인',ended:'관계 종료',
 };
 export const RELATIONSHIP_REWARDS = {
   yu: {
@@ -35,7 +36,8 @@ export const RELATIONSHIP_REWARDS = {
   },
 } satisfies Record<ArcId,Record<Route,RelationshipReward&{title:string}>>;
 export const RELATIONSHIP_TITLES = new Map(Object.values(RELATIONSHIP_REWARDS).flatMap(routes=>
-  Object.values(routes).map(reward=>[reward.titleId,reward.title] as const)).concat(Object.entries(STORY_TITLES)));
+  Object.values(routes).map(reward=>[reward.titleId,reward.title] as const)).concat(Object.entries(STORY_TITLES),
+    STORY_NPCS.map(npc=>[workshopTitle(npc),NPC_WORKSHOPS[npc].title])));
 
 export const relationshipWith = (r:CareerRelationships,npc:string) => r.extras?.relationships?.npcs[npc];
 export const representativeTitle = (r:CareerRelationships) => {
@@ -174,7 +176,8 @@ function after(r:Rider,id:string,weeks:number){
 function storyFor(npc:ArcId,arc:Arc):EventDef[]{
   const id=(episode:string)=>atArc(npc,episode);
   const scene=(episode:string,content:Pick<EventDef,'title'|'body'|'choices'>,when:EventDef['when'],decision=false):EventDef=>
-    ({...content,id:id(episode),npc,kind:decision?'관계 선택':'개인 에피소드',story:true,decision,when});
+    ({...content,id:id(episode),npc,kind:decision?'관계 선택':'개인 에피소드',story:true,anyGender:true,decision,when,
+      ...(episode==='confession'?{requiresChoice:true}:{})});
   const established=(r:Rider)=>arc.introductions.some(event=>r.events[event]);
   const trust={...arc.trust,body:(r:Rider)=>established(r)?arc.trust.body:arc.reunion};
   const fork={...arc.fork,body:(r:Rider)=>{
@@ -191,8 +194,8 @@ function storyFor(npc:ArcId,arc:Arc):EventDef[]{
   });
   return [
     scene('trust',trust,r=>r.year>=3||r.year>=2&&established(r)),
-    scene('fork',fork,r=>r.year>=3&&after(r,id('trust'),2),true),
-    scene('confession',arc.confession,r=>relationshipWith(r,npc)?.state==='interested'&&after(r,id('fork'),2),true),
+    scene('fork',fork,r=>r.year>=3&&(relationshipWith(r,npc)?.state??'undecided')==='undecided'&&after(r,id('trust'),2),true),
+    scene('confession',arc.confession,r=>relationshipWith(r,npc)?.state==='interested'&&hasRomanticInterest(r,npc)&&after(r,id('fork'),2),true),
     ...followups,
   ];
 }

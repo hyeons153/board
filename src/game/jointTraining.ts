@@ -1,10 +1,11 @@
 import { spotVisitor } from './content.js';
 import { RULES } from './data.js';
+import { trainingPromiseActive } from './npcWorkshops.js';
 import { clamp, seeded } from './random.js';
 import { NPC_NAMES, type Plan, type Rider, type Skill, type Spot, type Stat, type TrainingAction } from './types.js';
 
 export type TrainingNpc = keyof typeof NPC_NAMES;
-export type JointTraining = {npc:TrainingNpc; action:TrainingAction; focus:boolean; growth:number};
+export type JointTraining = {npc:TrainingNpc; action:TrainingAction; focus:boolean; growth:number; promised?:true};
 export type JointTrainingResult = Pick<JointTraining,'npc'|'focus'> & {affinity:number};
 
 const specialties:Record<TrainingNpc,{
@@ -27,11 +28,12 @@ export function jointTrainingOffer(r:Rider,spot:Spot):JointTraining|undefined{
   const affinity=clamp(r.relations[npc]??0);
   const tier=Math.min(4,Math.floor(affinity/20));
   const rng=seeded(0,r.id,r.year,r.week,spot,'joint-training');
-  if(rng()>=.40+tier*.02)return;
+  const promised=trainingPromiseActive(r,npc);
+  if(rng()>=.40+tier*.02+(promised ? .12 : 0))return;
   const actions=specialties[npc].actions;
   const action=actions[Math.floor(rng()*actions.length)]!;
-  const focus=affinity>=35&&(r.extras?.jointSessions?.[npc]??0)>=3&&rng()<.16+Math.max(0,tier-2)*.025;
-  return {npc,action,focus,growth:(105+tier*5+(focus?25:0))/100};
+  const focus=affinity>=35&&(r.extras?.jointSessions?.[npc]??0)>=3&&rng()<.16+Math.max(0,tier-2)*.025+(promised ? .10 : 0);
+  return {npc,action,focus,growth:(105+tier*5+(focus?25:0))/100,...(promised?{promised:true}:{})};
 }
 
 export function jointTrainingFor(r:Rider,p:Plan){

@@ -2,7 +2,8 @@ import { ArrowUpRight, ChevronDown, Flag, Medal, Play, Shield, Star, Trophy, Use
 import { useState } from 'react';
 import { formatCareerDate, formatMonthWeek, meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, RULES, SKILL, STAT_NAMES, STYLE_NAMES } from '../game/data';
 import { NAMES, competitor, learned } from '../game/competition';
-import { RIVALS, affinityTerms, lineTerms, rivalCanJoinEvent } from '../game/content';
+import { RIVALS, affinityTerms, lineTerms } from '../game/content';
+import { NPC_WORKSHOPS, workshopTitle } from '../game/npcWorkshops';
 import { equippedLook, extras, ITEM, playerPlace } from '../game/economy';
 import { EVENT, EVENTS } from '../game/events';
 import { HAPPENING } from '../game/happenings';
@@ -88,7 +89,7 @@ export function Rivals({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
       const rewards=(n.id==='yu'||n.id==='jun'?Object.values(RELATIONSHIP_REWARDS[n.id]):[]).filter(reward=>relationships?.titles.includes(reward.titleId));
       const relation=r.relations[n.id]??0;
       const phase=relationshipWith(r,n.id)?.state??'undecided';
-      const hint=r.phase!=='retired'&&rivalCanJoinEvent(r,n.id)&&relationshipHint(r,n.id);
+      const hint=r.phase!=='retired'&&relationshipHint(r,n.id);
       return <article className="inner-card rival" key={n.id}>
         <PixelRider look={n.look}/><strong>{n.name} <small>· {n.age}세</small></strong><Tag>{n.style} · {STYLE_NAMES[n.tactic]}</Tag>
         <p>{n.personality}</p><p>{n.line}</p>
@@ -97,6 +98,7 @@ export function Rivals({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
         <div className="skill-track"><span>{RELATIONSHIP_NAMES[phase]}</span><b>친밀도 {relation}</b></div>
         <div className="bar"><span style={{width:relation+'%',background:n.color}}/></div>
         {hint&&<p className="relationship-hint">{hint}</p>}
+        {relationships?.titles.includes(workshopTitle(n.id))&&<Tag kind="lime"><Medal size={13}/> {NPC_WORKSHOPS[n.id].title}</Tag>}
         {rewards.map(reward=><div className="relationship-reward" key={reward.titleId}>
           <Tag kind="lime"><Medal size={13}/> {reward.title}</Tag><small>{ITEM.get(reward.item)?.name}</small>
         </div>)}

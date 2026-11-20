@@ -5,14 +5,15 @@ import { awardPodiumGrowth, command, divisionFor, GameError, newRider, prepareWe
 import { chance, competitionStandings, generateRoutine, learned, routineTime, simulateMeet, simulateRun, validRoutine } from '../src/game/competition';
 import { ECONOMY, equippedLook, extras, gearBonuses, playerPlace, SPONSOR } from '../src/game/economy';
 import { previewTraining, randomSpecialTraining, statAfter, trainingFactor, trainingSuccess } from '../src/game/training';
-import { EVENTS, eventBody, eventCast, eventChoiceAvailable, eventFor, pickEvent } from '../src/game/events';
+import { EVENTS, eventBody, eventCast, eventChoiceAvailable, eventFor, eventPaused, pickEvent } from '../src/game/events';
 import { jointDiscovery, jointInjuryFactor, jointMasteryFactor, jointTrainingOffer, type TrainingNpc } from '../src/game/jointTraining';
 import { canStudy, nextSkillTraining } from '../src/game/skillTree';
 import { RIVALS, spotRegulars, spotUnlocked, spotVisitor } from '../src/game/content';
 import { HAPPENINGS, pickHappening } from '../src/game/happenings';
+import { NPC_WORKSHOPS, trainingPromiseActive, workshopId, workshopTitle } from '../src/game/npcWorkshops';
 import { CREW_STORIES } from '../src/game/crewStories';
 import { STORY_ARCS } from '../src/game/storyArcs';
-import { activePartners, formerPartners, storyLog } from '../src/game/storyState';
+import { activePartners, formerPartners, hasRomanticInterest, storyLog, STORY_NPCS } from '../src/game/storyState';
 import { RELATIONSHIP_REWARDS, relationshipEpilogues, relationshipWith, representativeTitle } from '../src/game/relationships';
 import { seeded } from '../src/game/random';
 import { meetRP, rankingPoints, seasonPlace } from '../src/game/rp';
@@ -78,6 +79,9 @@ test('the six stories have their full episode sets and consent changes whether a
     assert.equal(confrontation.when(r),branch===1);
     if(branch===1){
       r.phase='event';r.event=confrontation.id;
+      r.settings={...r.settings,mode:'auto',skipEvents:true};
+      assert.equal(eventPaused(r),true,'The reveal waits for a choice even when routine events are skipped');
+      r.settings.mode='manual';
       command(c,{type:'event',eventId:confrontation.id,index:0},identity);
       assert.equal(activePartners(r).length,0);
       assert.deepEqual(formerPartners(r),['noa','yu']);
@@ -728,11 +732,9 @@ test('specific story choices pause auto mode and unlock follow-up dialogue',()=>
   assert.equal(pickEvent(r,()=>.99)?.id,'yu-film');
 });
 
-test('NPC stories and affinity scenes select the three opposite-gender rivals',()=>{
+test('the first meeting keeps its existing cast and all six personal stories and happenings are accessible',()=>{
   const openings=['relationship-yu-trust','relationship-jun-trust','story-noa-1','story-min-1','story-ha-1','story-sol-1'];
-  for(const [gender,expected,happening] of [
-    ['male',['ha','noa','yu'],'happening-yu-2'],['female',['jun','min','sol'],'happening-sol-2'],
-  ] as const){
+  for(const [gender,happening] of [['male','happening-sol-2'],['female','happening-yu-2']] as const){
     const r=newRider('rider-'+gender,5411,'리버',{...DEFAULT_LOOK,gender});
     const firstEvent=pickEvent(r,()=>.99);
     assert.ok(firstEvent&&!('happening' in firstEvent));
@@ -740,17 +742,108 @@ test('NPC stories and affinity scenes select the three opposite-gender rivals',(
     r.year=4;r.week=10;
     r.events=Object.fromEntries(EVENTS.filter(event=>!openings.includes(event.id)).map(event=>[event.id,1]));
     const participants=[];
-    for(let i=0;i<3;i++){
+    for(let i=0;i<6;i++){
       const event=pickEvent(r,()=>.99);
       assert.ok(event&&!('happening' in event));
       participants.push(...eventCast(r,event));
       r.events[event.id]=1;
     }
-    assert.deepEqual(participants.sort(),expected);
+    assert.deepEqual(participants.sort(),[...STORY_NPCS].sort());
     assert.equal(pickEvent(r,()=>.99),undefined);
-    for(const scene of HAPPENINGS)if(!['happening-yu-2','happening-sol-2'].includes(scene.id))r.events[scene.id]=1;
+    for(const scene of HAPPENINGS)if(scene.id!==happening)r.events[scene.id]=1;
     r.relations.yu=35;r.relations.sol=35;
     assert.equal(pickHappening(r)?.id,happening);
+  }
+});
+
+test('old personal choices restore romance interest for all six NPCs, but affinity alone cannot',()=>{
+  for(const [npc,part,choice,flags] of [
+    ['min',4,0,['agreed-boundaries','accountability']],['sol',4,0,['asked-honestly','checked-facts']],
+    ['jun',2,0,['asked-about-crush']],['ha',4,0,['respect','reassured']],
+    ['noa',4,0,['clear-boundary','supported']],['yu',4,1,['duet']],
+  ] as const){
+    const c=career(),r=c.rider!;
+    r.look.gender=RIVALS.find(rival=>rival.id===npc)!.look.gender;
+    r.year=8;r.week=22;r.relations[npc]=100;
+    const eventId=`story-${npc}-${part}`;
+    r.events=Object.fromEntries(EVENTS.filter(e=>e.id!==eventId).map(e=>[e.id,1]));
+    r.extras!.choices[`story-${npc}-${part-1}`]={year:7,week:36,index:0};
+    assert.equal(hasRomanticInterest(r,npc),false);
+    assert.equal(eventFor(r,eventId)!.choices[choice].story!(r).changes?.[0].state,'friend');
+    r.extras!.relationships={titles:[],npcs:{[npc]:{state:'undecided',flags:[...flags]}}};
+    c.rider=JSON.parse(JSON.stringify(r));
+    const restored=c.rider!;
+    assert.equal(hasRomanticInterest(restored,npc),true);
+    assert.deepEqual(activePartners(restored),[]);
+    assert.equal(pickEvent(restored,()=>.99)?.id,eventId);
+    restored.phase='event';restored.event=eventId;
+    restored.settings={...restored.settings,mode:'auto',skipEvents:true};
+    assert.ok(eventPaused(restored),'A possible mutual relationship requires an answer from the player');
+    restored.settings.mode='manual';
+    restored.relations[npc]=0;
+    command(c,{type:'event',eventId,index:choice},identity);
+    assert.deepEqual(activePartners(restored),[npc]);
+    assert.equal(rankingPoints(restored).total,0);
+  }
+});
+
+test('a prior rejection or breakup survives a later positive scene without re-opening the relationship',()=>{
+  const c=career(),r=c.rider!,eventId='story-jun-4';
+  r.year=7;r.week=15;r.relations.jun=100;
+  r.extras!.relationships={titles:[],npcs:{jun:{state:'ended',flags:['former-partner','honest-retry','kept-clip'],mode:'private'}}};
+  const scene=eventFor(r,eventId)!;
+  assert.equal(hasRomanticInterest(r,'jun'),false);
+  assert.equal(scene.choices[0].story!(r).changes,undefined);
+  r.phase='event';r.event=eventId;
+  command(c,{type:'event',eventId,index:1},identity);
+  assert.equal(relationshipWith(r,'jun')?.state,'ended');
+  assert.deepEqual(formerPartners(r),['jun']);
+  assert.equal(relationshipEpilogues(r)[0].state,'ended');
+  const refusal=career().rider!;
+  refusal.extras!.relationships={titles:[],npcs:{jun:{state:'rival',flags:['rejected','kept-clip','honest-retry']}}};
+  assert.equal(scene.choices[0].story!(refusal).changes?.[0].state,'rival');
+});
+
+test('every workshop offers one technique and one title through a voluntary choice in a non-romantic route',()=>{
+  for(const npc of STORY_NPCS){
+    const c=career(),r=c.rider!,data=NPC_WORKSHOPS[npc],id=workshopId(npc),title=workshopTitle(npc),event=eventFor(r,id)!;
+    r.look.gender=RIVALS.find(rival=>rival.id===npc)!.look.gender;
+    r.year=4;r.week=3;
+    r.relations[npc]=data.affinity;
+    r.extras!.relationships={titles:[],npcs:{[npc]:{state:'rival',flags:[]}}};
+    assert.equal(event.when(r),false,'Affinity alone cannot award a workshop');
+    r.events=Object.fromEntries(EVENTS.filter(e=>e.id!==id).map(e=>[e.id,1]));
+    assert.equal(pickEvent(r,()=>.99)?.id,id);
+    assert.ok(!canStudy(r,data.skill));
+    const skills=structuredClone(r.skills);
+    const decline=structuredClone(c),d=decline.rider!;
+    d.phase='event';d.event=id;
+    d.settings={...d.settings,mode:'auto',skipEvents:true};
+    assert.equal(eventPaused(d),true,'The player chooses even while the season runs on auto');
+    command(decline,{type:'event',eventId:id,index:1},identity);
+    assert.deepEqual(d.skills,skills);
+    assert.deepEqual(d.extras!.relationships!.titles,[]);
+    const previouslyLearned=structuredClone(c),v=previouslyLearned.rider!;
+    v.skills[data.skill]={study:100,mastery:57};v.phase='event';v.event=id;
+    command(previouslyLearned,{type:'event',eventId:id,index:0},identity);
+    assert.deepEqual(v.skills[data.skill],{study:100,mastery:57});
+    assert.deepEqual(v.extras!.relationships!.titles,[title]);
+    r.phase='event';r.event=id;
+    command(c,{type:'event',eventId:id,index:0},identity);
+    assert.equal(r.skills[data.skill].study,100);
+    for(const prerequisite of SKILL[data.skill]!.requires)assert.deepEqual(r.skills[prerequisite],skills[prerequisite]);
+    assert.ok(canStudy(r,data.skill));
+    assert.equal(event.when(r),false);
+    assert.equal(relationshipWith(r,npc)?.state,'rival');
+    assert.deepEqual(r.extras!.relationships!.titles,[title]);
+    assert.ok(trainingPromiseActive(r,npc));
+    r.week+=8;
+    assert.equal(trainingPromiseActive(r,npc),false);
+    command(c,{type:'representative-title',id:title},identity);
+    assert.equal(representativeTitle(r),data.title);
+    assert.equal(rankingPoints(r).total,0);
+    command(c,{type:'retire'},identity);
+    assert.equal(representativeTitle(JSON.parse(JSON.stringify(c.hall[0]))),data.title);
   }
 });
 
@@ -830,7 +923,7 @@ test('one confirmed romance per career, explicit rejection leads to friendship, 
 test('overlapping story opportunities survive to the next week and auto stops at a saved decision in background',()=>{
   const r=career().rider!;
   r.year=6;r.week=25;
-  r.events=Object.fromEntries(EVENTS.filter(e=>!e.id.startsWith('relationship-')&&!['yu-open-final','story-ha-1'].includes(e.id)).map(e=>[e.id,1]));
+  r.events=Object.fromEntries(EVENTS.filter(e=>!['relationship-yu-trust','relationship-yu-fork','yu-open-final','story-ha-1'].includes(e.id)).map(e=>[e.id,1]));
   const first=pickEvent(r,()=>.99)!;
   assert.equal(first.id,'yu-open-final');
   r.events[first.id]=1;r.week++;

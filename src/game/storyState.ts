@@ -17,7 +17,7 @@ export const STORY_TITLES:Record<string,string>={
   'crew-contract':'사랑은 끝나도 계약은 남는다','crew-exes':'전 애인 수집가','crew-comeback':'연애보다 롱보드','crew-repair':'화해의 달인',
 };
 export type StoryChange={npc:string;state?:RelationshipState;flag?:string;mode?:RelationshipMode;pendingReward?:{title?:string;item?:string}};
-export type StoryImpact={changes?:StoryChange[];title?:string;item?:string;couple?:[string,string];dialogue?:string};
+export type StoryImpact={changes?:StoryChange[];title?:string;item?:string;couple?:[string,string];dialogue?:string;romanceAttempt?:true};
 type Progress={extras?:Pick<CareerExtras,'relationships'|'choices'>};
 export const name=(npc:string)=>Object.hasOwn(NPC_NAMES,npc)?NPC_NAMES[npc as StoryNpc]:'크루 동료';
 export const storyProgress=(r:Progress,npc:string)=>r.extras?.relationships?.npcs[npc];
@@ -42,12 +42,40 @@ export function scene(id:string,title:string,body:EventDef['body'],when:EventDef
   return {id,title,body,when,choices,kind:'커리어 이야기',story:true,chapter:true,...settings};
 }
 
+const affectionSignals:Record<StoryNpc,Record<string,number>>={
+  min:{'check-together':1,'agreed-boundaries':2,accountability:3,delegated:-1,overreach:-3,distance:-2},
+  sol:{flirt:2,'asked-honestly':3,'checked-facts':3,apology:2,'fake-date':-3,distance:-2},
+  jun:{'kept-clip':3,'asked-about-crush':4,'honest-retry':3,privacy:1,'hurt-on-camera':-3},
+  ha:{thanked:1,respect:2,noticed:2,reassured:3,'timed':-1},
+  noa:{'first-message':1,'clear-boundary':3,heard:3,supported:2,lied:-3,distance:-2},
+  yu:{'dream-shared':2,'clear-boundary':1,'long-distance':3,duet:3,'jealous-press':-3,distance:-2},
+};
+
+// Choice flags already persist in old saves. Affection can be rebuilt without exposing or migrating a meter.
+export function hasRomanticInterest(r:Progress,npc:StoryNpc){
+  const current=storyProgress(r,npc);
+  if(current?.state==='partner')return true;
+  if(current?.state==='ended'||current?.flags.some(flag=>['former-partner','confession-declined','rejected','overlap-declined'].includes(flag)))return false;
+  const confirmed=hasFlag(r,npc,'romance-route')||chosen(r,`relationship-${npc}-fork`,2);
+  const early=npc==='yu'&&chosen(r,'first',2)||npc==='sol'&&chosen(r,'first-sol',2);
+  const signals=Object.entries(affectionSignals[npc]).reduce((total,[flag,points])=>total+(hasFlag(r,npc,flag)?points:0),0);
+  return (confirmed?4:0)+(early?1:0)+signals>=3;
+}
+
 export function romance(r:Rider,npc:StoryNpc,mutual:boolean,title?:string,item?:string):StoryImpact{
+  return {...romanticAnswer(r,npc,mutual,title,item),romanceAttempt:true};
+}
+
+function romanticAnswer(r:Rider,npc:StoryNpc,mutual:boolean,title?:string,item?:string):StoryImpact{
   const current=activePartners(r);
   const already=current.includes(npc);
+  const previous=storyProgress(r,npc);
+  if(previous?.state==='ended'||formerPartners(r).includes(npc))
+    return {dialogue:name(npc)+'는 지난 이야기를 다시 열기보다 서로 정해 둔 거리를 지키고 싶다고 답했다.'};
   if(!already&&r.extras?.relationships?.couples?.some(pair=>pair.includes(npc)))
-    return {changes:[change(npc,'friend','rejected')],dialogue:name(npc)+'는 지금 맺고 있는 약속을 소중하게 지키고 싶다고 말했다.'};
-  if(!mutual&&!already)return {changes:[change(npc,'friend','rejected')],dialogue:name(npc)+'는 마음을 전해 준 데 고마워하면서도 친구로 남고 싶다고 답했다.'};
+    return {changes:[change(npc,undefined,'rejected')],dialogue:name(npc)+'는 지금 맺고 있는 약속을 소중하게 지키고 싶다고 말했다.'};
+  if(!already&&(!mutual||!hasRomanticInterest(r,npc)))
+    return {changes:[change(npc,previous?.state==='rival'?'rival':'friend','rejected')],dialogue:name(npc)+'는 마음을 전해 준 데 고마워하면서도 지금의 관계를 이어가고 싶다고 답했다.'};
   if(!already&&current.length&&(current.length>=2||r.events['crew-overlap']))
     return {changes:[change(npc,'friend','rejected')],dialogue:'두 사람은 이미 맺은 약속을 존중하며 친구로 남기로 했다.'};
   if(!already&&current.length)return {changes:[{...change(npc,'interested','overlap-requested'),pendingReward:{title,item}}],dialogue:'마음은 서로 같았다. 다만 교제를 시작하기 전에 기존 관계를 어떻게 이야기할지 정해야 한다.'};

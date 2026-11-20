@@ -1,6 +1,5 @@
 import { calendarFor, meetById } from './data.js';
-import { rivalCanJoinEvent } from './content.js';
-import { activePartners, elapsed, formerPartners, hasFlag, name, STORY_NPCS, storyLog, storyProgress, type StoryNpc } from './storyState.js';
+import { activePartners, elapsed, formerPartners, hasFlag, hasRomanticInterest, name, STORY_NPCS, storyLog, storyProgress, type StoryNpc } from './storyState.js';
 import type { Rider } from './types.js';
 
 export type Happening = {
@@ -13,7 +12,7 @@ type Gate=Happening['when'];
 const rank=(level:number)=>[15,35,60,80][level-1];
 function personal(npc:StoryNpc,level:number,title:string,text:Text,when:Gate=()=>true,points=0,energy=0):Happening{
   return {id:'happening-'+npc+'-'+level,happening:true,title,text,cast:()=>[npc],
-    when:r=>(r.relations[npc]??0)>=rank(level)&&when(r),relation:points?{npc,points}:undefined,energy};
+    when:r=>storyProgress(r,npc)?.state!=='ended'&&(r.relations[npc]??0)>=rank(level)&&when(r),relation:points?{npc,points}:undefined,energy};
 }
 const crew=(id:number,title:string,text:Text,when:Gate,cast:Happening['cast'],relation?:Happening['relation']):Happening=>
   ({id:'happening-crew-'+id,happening:true,title,text,when,cast,relation});
@@ -31,13 +30,17 @@ export const HAPPENINGS:Happening[]=[
   personal('min',3,'계획표의 빈칸','민재가 계획표를 보여 줬다. 그날에는 처음으로 ‘네가 원하는 대로’라고 적힌 빈칸이 있었다.',r=>close(r,'min')&&hasFlag(r,'min','agreed-boundaries'),2),
   personal('min',4,'수정테이프 자국','지운 글씨가 옛 체크리스트에 남았다. “예전엔 네 대신 답을 써 놨더라. 이제 묻는 연습을 하는 중이야.”',r=>hasFlag(r,'min','accountability')&&hasFlag(r,'min','agreed-boundaries')),
   personal('sol',1,'커피 두 잔의 미스터리','솔이 두 잔을 내밀었다. “하나는 내 거고, 하나는 내 최애 라이더 거.” 네가 손을 뻗자 묻지도 않는다며 웃었다.',at('park'),1),
-  personal('sol',2,'진짜 웃긴 사람','솔이 보드에서 떨어지는 시늉을 했다. 네가 웃자 “아, 저 표정 보려고 그랬구나”라고 혼잣말하다 들켰다.',undefined,1),
+  personal('sol',2,'진짜 웃긴 사람',r=>hasRomanticInterest(r,'sol')?
+    '솔이 보드에서 떨어지는 시늉을 했다. 네가 웃자 “아, 저 표정 보려고 그랬구나”라고 혼잣말하다 들켰다.':
+    '솔이 보드에서 떨어지는 시늉을 했다. 그 연기가 너무 과해서 옆에서 타던 라이더들까지 웃었다.',undefined,1),
   personal('sol',3,'잠든 선배의 본심','잠깐 졸던 솔이 다치지 말라고 중얼거렸다. 깨어나서는 네가 들은 건 코 고는 소리 아니냐고 능청을 떨었다.',at('studio'),2),
   personal('sol',4,'두 번째 커피의 이름',r=>activePartners(r).includes('sol')?
     '직원이 늘 같이 오는 분의 주문을 묻자 솔이 농담 없이 답했다. “네, 제 연인이 좋아하는 걸로요.”':
     '직원이 늘 같이 오는 분의 주문을 묻자 솔이 웃으며 답했다. “네, 제 친구가 좋아하는 걸로요.”',r=>close(r,'sol')),
   personal('jun',1,'봤지? 봤지?','준이 착지에 성공하고 보드보다 먼저 달려왔다. “봤지? 이번엔 제대로 했지?” 대답을 듣기 전부터 신이 났다.',r=>r.spot==='plaza'||r.spot==='night',1),
-  personal('jun',2,'꼬리 없는 강아지','네가 다른 라이더와 이야기하자 준이 스팟을 세 바퀴 돌았다. “질투? 내가?” 휴대폰은 거꾸로 든 채였다.',undefined,1),
+  personal('jun',2,'꼬리 없는 강아지',r=>hasRomanticInterest(r,'jun')?
+    '네가 다른 라이더와 이야기하자 준이 스팟을 세 바퀴 돌았다. “질투? 내가?” 휴대폰은 거꾸로 든 채였다.':
+    '준이 휴대폰을 거꾸로 든 채 달려왔다. 오늘 찍어 온 착지가 정말 잘 나왔다며 네 의견부터 물었다.',undefined,1),
   personal('jun',3,'영상 제목을 바꿨다','영상 폴더 이름이 ‘오늘 내가 제일 잘함’에서 ‘우리 오늘 제일 잘함’으로 바뀌었다. 준은 협업 영상이라서 그렇다고 얼른 덧붙였다.',undefined,2),
   personal('jun',4,'비밀로 하기로 했잖아','준이 크루 앞에서 도시락을 자랑하다 말을 멈췄다. “이거 우리 애인이…” 준은 아무도 눈치채지 못한 것처럼 다른 반찬을 가리켰다.',r=>activePartners(r).includes('jun')&&storyProgress(r,'jun')?.mode!=='public'),
   personal('ha',1,'남는 물병이라서','하린이 새 물병을 툭 건넸다. “하나 더 샀거든. 너 주려고 산 건 아니고.” 병 옆에 네 이름이 적혀 있었다.',at('river'),0,4),
@@ -49,7 +52,9 @@ export const HAPPENINGS:Happening[]=[
   personal('noa',3,'사진에서 나만 없어?','사진을 보던 노아가 자기는 왜 옆에 없냐고 묻다가 잠깐 멈췄다. “미안, 괜히 신경이 쓰였어.” 이번에는 자리를 바꿔 달라고 하지는 않았다.',r=>friendly(r,15).length>=3,1),
   personal('noa',4,'네온 아래 한 칸','노아가 화면을 끄고 말했다. “모든 걸 바로 확인하지 않아도 괜찮다는 걸 조금씩 배우고 있어.” 둘은 조용히 동시에 보드를 밀었다.',r=>hasFlag(r,'noa','clear-boundary')&&(hasFlag(r,'noa','heard')||hasFlag(r,'noa','supported'))),
   personal('yu',1,'간식은 여덟 명분','유리는 한 명 더 온다며 여덟 명분의 간식을 가져왔다. 온 사람이 일곱인 걸 알자 운동하면 배가 고프니까 괜찮다고 웃었다.',at('river'),0,4),
-  personal('yu',2,'같은 박자에 웃었다','같은 스텝을 밟다 동시에 넘어질 뻔했다. “괜찮아?” 두 사람은 인사까지 박자가 같아서 또 웃었다.',undefined,1),
+  personal('yu',2,'같은 박자에 웃었다',r=>hasRomanticInterest(r,'yu')?
+    '함께 스텝을 밟다 동시에 넘어질 뻔했다. 유리는 손을 내밀고 입을 열었다 닫았다. “다음엔 둘이서도 한 바퀴 더 탈래?”':
+    '같은 스텝을 밟다 동시에 넘어질 뻔했다. “괜찮아?” 두 사람은 인사까지 박자가 같아서 또 웃었다.',undefined,1),
   personal('yu',3,'웃지 않아도 괜찮아','경기가 잘 풀리지 않은 날 유리는 말없이 강물을 봤다. “다들 내가 웃으면 괜찮은 줄 알아.” 오늘은 처음으로 힘든 점도 말해 줬다.',r=>recentMeet(r)&&(latestMeet(r)?.results.every(result=>(result.standings.find(row=>row.id==='player')?.place??0)>3)??false),2),
   personal('yu',4,'먼저 손 흔드는 사람',r=>activePartners(r).includes('yu')?
     '멀리서 유리가 먼저 손을 흔들었다. “오늘은 내가 제일 먼저 찾았지?” 가까워져서는 다음에도 계속 찾아도 되냐고 물었다.':
@@ -73,7 +78,7 @@ export function pickHappening(r:Rider,afterMeet=false){
   const seen=storyLog(r).filter(entry=>HAPPENING.has(entry.id));
   if(seen.length&&elapsed(r,seen.at(-1)!.id)<5)return undefined;
   const candidates=HAPPENINGS.filter(event=>!r.events[event.id]&&event.when(r)&&event.cast(r).every(npc=>
-    rivalCanJoinEvent(r,npc)&&!seen.some(entry=>entry.npcs.includes(npc)&&elapsed(r,entry.id)<8)));
+    !seen.some(entry=>entry.npcs.includes(npc)&&elapsed(r,entry.id)<8)));
   const count=(event:Happening)=>event.cast(r).reduce((n,npc)=>n+seen.filter(entry=>entry.npcs.includes(npc)).length,0);
   return candidates.sort((a,b)=>count(a)-count(b))[0];
 }
