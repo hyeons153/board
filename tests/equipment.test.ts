@@ -98,7 +98,7 @@ test('competition scores use stat gear once and ignore cosmetic and relationship
   assert.deepEqual(simulateRun(r,'dance',ids,()=>.1),original);
   give(c,['truck_007','wheel_007','deck_008']);equip(c,'truck_007');equip(c,'wheel_007');equip(c,'deck_008');
   const improved=simulateRun(r,'dance',ids,()=>.1);assert.ok(improved.parts.carve!>original.parts.carve!);assert.ok(improved.parts.speed!>original.parts.speed!);
-  const meet=simulateMeet(r,CALENDAR[0],['dance'],true).results[0];assert.equal(meet.proof!.rules,5);assert.deepEqual(meet.proof!.stats,r.stats);
+  const meet=simulateMeet(r,CALENDAR[0],['dance'],true).results[0];assert.equal(meet.proof!.rules,6);assert.deepEqual(meet.proof!.stats,r.stats);
   r.week=7;r.phase='meet';command(c,{type:'entry',disciplines:['dance']},identity,true);command(c,{type:'retire'},identity,true);
   assert.ok(verifiedResult(c.hall[0],c.hall[0].records[0],c.hall[0].records[0].results[0]));
 });

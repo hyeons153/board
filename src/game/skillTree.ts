@@ -10,7 +10,7 @@ export function canStudy(r:Pick<Rider,'skills'>,id:string){
 }
 
 const trainingGoals:Record<Family,string[]>={
-  dance:['sidewinder','step-360','back-cross','pirouette-720','v-spin','mango-pendulum','p2p'],
+  dance:['sidewinder','step-360','back-cross','ghostride-kickflip','pirouette-720','v-spin','mango-pendulum','p2p'],
   trick:['kickflip','front-pop','bigger','varial','hardflip','treflip'],
 };
 

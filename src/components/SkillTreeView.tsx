@@ -9,15 +9,25 @@ const rowGap=20;
 const padding=14;
 
 // Vertical lanes keep the main chains straight while leaving room for their branches.
-const lanes=[
-  ['peter-pan','sidewinder','v-spin','pivot','shuvit','no-com-big','bigspin','bigger'],
-  ['step-180','step-360','ollie','kickflip','varial','treflip'],
-  ['piglet','pirouette','pirouette-540','pirouette-720','pop-shuvit','heelflip','hardflip'],
-  ['cross','back-cross','p2p','no-comply','front-pop'],
-  ['wood','pendulum','mango-pendulum'],
-  ['mango'],
-  ['ghost'],
-];
+const lanes={
+  dance:[
+    ['peter-pan','v-spin'],
+    ['sidewinder'],
+    ['step-180','step-360'],
+    ['piglet','pirouette','pirouette-540','pirouette-720'],
+    ['cross','back-cross','p2p'],
+    ['wood','pendulum','mango-pendulum'],
+    ['mango'],
+    ['ghost','ghostride-kickflip'],
+  ],
+  trick:[
+    ['pivot','shuvit','bigspin','bigger'],
+    ['ollie','kickflip','varial','treflip'],
+    ['heelflip','hardflip'],
+    ['pop-shuvit','front-pop'],
+    ['no-comply','no-com-big'],
+  ],
+};
 
 const layers=new Map<string,number>();
 function layer(skill:Skill):number{
@@ -30,7 +40,7 @@ function layer(skill:Skill):number{
 
 const positions=new Map(SKILLS.map(skill=>[skill.id,{
   x:layer(skill)*(cardWidth+columnGap),
-  y:lanes.findIndex(lane=>lane.includes(skill.id))*(cardHeight+rowGap),
+  y:lanes[skill.family].findIndex(lane=>lane.includes(skill.id))*(cardHeight+rowGap),
 }]));
 
 function includePrerequisites(ids:Set<string>,skill:Skill){

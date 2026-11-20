@@ -11,7 +11,8 @@ import { Tag } from './Brand';
 import type { Submit } from './Overview';
 
 const trickSides=[['all','전체 트릭'],['nose','노즈트릭'],['tail','테일트릭']] as const;
-const trickName=(skill:Skill)=>trickSides.find(([id])=>id===skill.trickSide)?.[1]??DISCIPLINE_NAMES[skill.family];
+const skillCategory=(skill:Skill)=>skill.id==='ghostride-kickflip'?'댄싱 트릭':
+  trickSides.find(([id])=>id===skill.trickSide)?.[1]??DISCIPLINE_NAMES[skill.family];
 const prerequisiteStatus=(r:Rider,ids:string[])=>ids.map(id=>{
   const current=learned(r.skills,id)?r.skills[id].mastery:0;
   const remaining=Math.max(0,Math.round((100-current)*10)/10);
@@ -57,11 +58,11 @@ export function Skills({r}:{r:Rider}){
       className={tree?'skill-tree-card':'skill-entry-summary'+(progress.known?' is-known':'')+(progress.state==='locked'?' is-locked':'')}
       data-skill-state={progress.state} data-prerequisite={prerequisite||undefined}
       aria-expanded={open} aria-controls={open?'skill-detail':undefined} aria-label={s.name+' 상세'}
-      aria-description={`${trickName(s)} · ${progress.label} · ${progress.kind} ${progress.value}%${prerequisite?' · 선행 기술':''}`}
+      aria-description={`${skillCategory(s)} · ${progress.label} · ${progress.kind} ${progress.value}%${prerequisite?' · 선행 기술':''}`}
       ref={element=>{if(open&&element)trigger.current=element;}}
       onClick={event=>{trigger.current=event.currentTarget;select(open?undefined:s.id);}}>
       <span className="skill-entry-title"><strong>{s.name}</strong>
-        <small>{trickName(s)} · {DIFFICULTY_NAMES[s.difficulty]}{prerequisite?' · 선행':''}</small>
+        <small>{skillCategory(s)} · {DIFFICULTY_NAMES[s.difficulty]}{prerequisite?' · 선행':''}</small>
       </span>
       <span className="skill-entry-state">{progress.state==='locked'?<LockKeyhole size={13} aria-hidden="true"/>:
         progress.known?<Check size={13} aria-hidden="true"/>:null} {progress.label}</span>
@@ -107,7 +108,7 @@ function SkillDetail({r,skill:s,preview,onPreview,onClose}:{r:Rider;skill:Skill;
     <header><h2>{s.name}</h2><button className="icon-button" aria-label="기술 상세 닫기" onClick={onClose}><X size={17}/></button></header>
     <p>{skillDescription(id)}</p>
     <dl className="game-facts">
-      <div><dt>분류</dt><dd>{DISCIPLINE_NAMES[s.family]}{s.trickSide?' · '+trickName(s):''} · {DIFFICULTY_NAMES[s.difficulty]}</dd></div>
+      <div><dt>분류</dt><dd>{s.trickSide&&DISCIPLINE_NAMES[s.family]+' · '}{skillCategory(s)} · {DIFFICULTY_NAMES[s.difficulty]}</dd></div>
       <div><dt>{progress.kind}</dt><dd>{progress.value}% · {progress.label}</dd></div>
       <div><dt>동작</dt><dd>{KIND_NAMES[s.kind]} · {s.points}점 · {s.seconds}초</dd></div>
       <div><dt>선행 기술</dt><dd>{s.requires.length?prerequisiteStatus(r,s.requires):'없음'}</dd></div>

@@ -299,7 +299,7 @@ test('severe injury restricts training and remains treatable even with no money'
 
 test('three disciplines have reproducible bounded runs, and repeats, failed landings matter without stamina penalties',()=>{
   const r=career().rider!;
-  assert.equal(SKILLS.filter(s=>s.family==='dance').length,17);
+  assert.equal(SKILLS.filter(s=>s.family==='dance').length,18);
   assert.equal(SKILLS.filter(s=>s.family==='trick').length,14);
   for(const d of DISCIPLINES){
     const ids=generateRoutine(r,d,'flow');
@@ -326,9 +326,11 @@ test('the documented tech tree is reachable and requires every prerequisite to b
   assert.equal(SKILL.sidewinder?.difficulty,1);
   for(const [id,requires] of Object.entries({
     pendulum:['wood'],'mango-pendulum':['pendulum','mango'],
-    'v-spin':['peter-pan','sidewinder','step-360'],
+    sidewinder:[],'v-spin':['peter-pan','sidewinder','step-360'],'ghostride-kickflip':['ghost'],
     pirouette:['piglet'],'pirouette-540':['pirouette'],'pirouette-720':['pirouette-540'],p2p:['pirouette'],
-    kickflip:['ollie'],ollie:[],'pop-shuvit':[],
+    'no-com-big':['no-comply','shuvit'],bigspin:['shuvit'],bigger:['bigspin'],
+    kickflip:['ollie'],heelflip:['ollie'],ollie:[],'pop-shuvit':[],'front-pop':['pop-shuvit'],
+    varial:['kickflip'],hardflip:['heelflip'],treflip:['kickflip','bigspin'],
   }))assert.deepEqual(SKILL[id]?.requires,requires,id);
   assert.deepEqual(SKILLS.filter(s=>s.trickSide==='nose').map(s=>s.id),['pivot','shuvit','no-com-big','bigspin','bigger']);
   assert.equal(SKILLS.filter(s=>s.trickSide==='tail').length,9);
@@ -338,7 +340,8 @@ test('the documented tech tree is reachable and requires every prerequisite to b
     assert.ok(skill.requires.every(id=>reached.has(id)),`Invalid, cyclic, or out-of-order prerequisite for ${skill.id}`);
     reached.add(skill.id);
   }
-  assert.equal(reached.size,31);
+  assert.equal(reached.size,32);
+  assert.ok(canStudy(r,'sidewinder'));
   assert.equal(nextSkillTraining(r,'trick')?.id,'ollie');
   assert.ok(canStudy(r,'pop-shuvit'));
   assert.equal(canStudy(r,'kickflip'),false);
@@ -346,16 +349,46 @@ test('the documented tech tree is reachable and requires every prerequisite to b
   assert.equal(canStudy(r,'kickflip'),false);
   r.skills.ollie.mastery=100;
   assert.ok(canStudy(r,'kickflip'));
+  assert.ok(canStudy(r,'heelflip'));
   assert.equal(canStudy(r,'shuvit'),false);
   r.skills.pivot.mastery=100;
   assert.ok(canStudy(r,'shuvit'));
   r.skills.kickflip={study:100,mastery:100};
+  assert.ok(canStudy(r,'varial'));
+  assert.equal(canStudy(r,'front-pop'),false);
   r.skills['pop-shuvit']={study:100,mastery:99.9};
-  assert.equal(canStudy(r,'varial'),false);
+  assert.equal(canStudy(r,'front-pop'),false);
   r.skills['pop-shuvit'].mastery=100;
-  assert.equal(canStudy(r,'varial'),true);
-  r.skills.kickflip.mastery=99.9;
-  assert.equal(canStudy(r,'varial'),false);
+  assert.ok(canStudy(r,'front-pop'));
+  assert.equal(canStudy(r,'no-com-big'),false);
+  r.skills.shuvit={study:100,mastery:100};
+  assert.ok(canStudy(r,'bigspin'));
+  assert.equal(canStudy(r,'no-com-big'),false);
+  r.skills['no-comply'].mastery=100;
+  assert.ok(canStudy(r,'no-com-big'));
+  assert.equal(canStudy(r,'treflip'),false);
+  r.skills.bigspin={study:100,mastery:100};
+  assert.ok(canStudy(r,'treflip'));
+});
+
+test('ghostride kickflip unlocks via self-training and auto tracks its single prerequisite',()=>{
+  const c=career(),r=c.rider!,id='ghostride-kickflip';
+  const p={action:'dance',skill:id,spot:'river'} as const;
+  assert.throws(()=>command(c,{type:'plan',plan:p},identity),GameError);
+  for(const mastered of ['sidewinder','step-360','back-cross'])r.skills[mastered]={study:100,mastery:100};
+  r.skills.ghost={study:100,mastery:99.9};
+  assert.equal(nextSkillTraining(r,'dance')?.id,'ghost');
+  assert.equal(canStudy(r,id),false);
+  r.skills.ghost.mastery=100;
+  assert.equal(nextSkillTraining(r,'dance')?.id,id);
+  r.skills[id]={study:97,mastery:0};r.energy=100;
+  command(c,{type:'plan',plan:p},identity);
+  assert.ok(processWeek(c));
+  assert.ok(learned(r.skills,id));
+  assert.equal(r.skills.kickflip,undefined);
+  assert.ok(validRoutine(r,'dance',[id]));
+  assert.ok(validRoutine(r,'freestyle',[id]));
+  assert.equal(validRoutine(r,'trick',[id]),false);
 });
 
 test('technique practice previews match actual gains and harder moves build mastery more slowly',()=>{
@@ -380,7 +413,7 @@ test('technique practice previews match actual gains and harder moves build mast
   }
 });
 
-test('version 4 run replays retain the old Sidewinder difficulty and only current rules admit the new moves',()=>{
+test('run replays retain recorded skill difficulty and only admit skills available in those rules',()=>{
   const r=career().rider!;
   r.skills.sidewinder={study:100,mastery:35};
   const landing=chance(r,SKILL.sidewinder!)-.03;
@@ -391,25 +424,34 @@ test('version 4 run replays retain the old Sidewinder difficulty and only curren
     assert.throws(()=>simulateRun(r,'freestyle',[id],()=>0,4));
     assert.equal(simulateRun(r,'freestyle',[id],()=>0).log[0].outcome,'great');
   }
+  for(const id of ['bigspin','bigger']){
+    r.skills[id]={study:100,mastery:70};
+    const roll=chance(r,SKILL[id]!)+.04;
+    assert.equal(simulateRun(r,'trick',[id],()=>roll,5).log[0].outcome,'rough');
+    assert.equal(simulateRun(r,'trick',[id],()=>roll).log[0].outcome,'miss');
+  }
+  r.skills['ghostride-kickflip']={study:100,mastery:40};
+  assert.throws(()=>simulateRun(r,'dance',['ghostride-kickflip'],()=>0,5));
+  assert.equal(simulateRun(r,'dance',['ghostride-kickflip'],()=>0).log[0].end,6);
 });
 
 test('NPC instruction grants a skill once, and it stays available in lessons, auto training and lines',()=>{
   const c=career(),r=c.rider!;
-  r.week=3;r.phase='event';r.event='noa-pop';
-  assert.equal(r.skills.shuvit,undefined);
+  r.week=3;r.phase='event';r.event='juns-clip';r.spot='plaza';
+  assert.equal(canStudy(r,'front-pop'),false);
   command(c,{type:'event',index:0},identity);
-  const progress=r.skills['pop-shuvit'];
+  const progress=r.skills['front-pop'];
   assert.equal(progress.study,100);
-  assert.equal(r.skills.shuvit,undefined);
-  assert.equal(canStudy(r,'pop-shuvit'),true);
+  assert.equal(r.skills['pop-shuvit'],undefined);
+  assert.equal(canStudy(r,'front-pop'),true);
   assert.equal(canStudy(r,'heelflip'),false);
-  assert.ok(validRoutine(r,'trick',['pop-shuvit']));
-  r.phase='event';r.event='noa-pop';
+  assert.ok(validRoutine(r,'trick',['front-pop']));
+  r.phase='event';r.event='juns-clip';
   const before={...progress};
   command(c,{type:'event',index:0},identity);
-  assert.deepEqual(r.skills['pop-shuvit'],before);
+  assert.deepEqual(r.skills['front-pop'],before);
   r.energy=100;
-  command(c,{type:'plan',plan:{action:'trick',spot:'studio',skill:'pop-shuvit',lesson:true}},identity);
+  command(c,{type:'plan',plan:{action:'trick',spot:'studio',skill:'front-pop',lesson:true}},identity);
   assert.ok(processWeek(c));
   assert.ok(progress.mastery>before.mastery);
   const focus=career().rider!;

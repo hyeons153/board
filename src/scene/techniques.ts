@@ -11,11 +11,11 @@ export type Pose={
   hip:Point;bodyYaw:number;lean:number;crouch:number;arms:number;
   feet:[Point,Point];fall:number;cheer:boolean;
 };
-type Profile={body?:number;board?:number;flip?:number;air?:number;kind:'step'|'cross'|'turn'|'pirouette'|'carve'|'ghost'|'mango'|'wood'|'piglet'|'pivot'|'pop'|'no-comply'};
+type Profile={body?:number;board?:number;flip?:number;air?:number;kind:'step'|'cross'|'turn'|'pirouette'|'carve'|'ghost'|'ghost-kickflip'|'mango'|'wood'|'piglet'|'pivot'|'pop'|'no-comply'};
 export const TECHNIQUES:Record<string,Profile>={
   'peter-pan':{kind:'step'},'step-180':{kind:'turn',body:.5},'step-360':{kind:'turn',body:1},
   cross:{kind:'cross'},'back-cross':{kind:'cross'},sidewinder:{kind:'carve'},'v-spin':{kind:'turn',body:1},
-  ghost:{kind:'ghost'},piglet:{kind:'piglet'},mango:{kind:'mango'},wood:{kind:'wood'},
+  ghost:{kind:'ghost'},'ghostride-kickflip':{kind:'ghost-kickflip'},piglet:{kind:'piglet'},mango:{kind:'mango'},wood:{kind:'wood'},
   pirouette:{kind:'pirouette',body:1},p2p:{kind:'pirouette',body:1},'mango-pendulum':{kind:'mango'},
   'pirouette-540':{kind:'pirouette',body:1.5},pendulum:{kind:'carve'},'pirouette-720':{kind:'pirouette',body:2},
   pivot:{kind:'pivot',body:.5,board:.5},shuvit:{kind:'pop',board:.5,air:10},
@@ -136,6 +136,31 @@ export function techniquePose(id:string,progress:number,outcome:Outcome='clean',
       const remount=Math.sin(Math.PI*between(p,.66,.91))*8;
       pose.hip.y-=remount;pose.feet.forEach(foot=>foot.y-=remount);
       pose.lean=off*6;pose.arms=run*off*9;
+      break;
+    }
+    case 'ghost-kickflip': {
+      const direction=Math.cos(boardHeading)<0?-1:1;
+      const beside=between(p,.08,.21)*(1-between(p,.50,.80));
+      const stride=Math.sin(TAU*(p-.21)/.12)*(1-between(p,.39,.47));
+      const air=Math.sin(Math.PI*between(p,.46,.80));
+      const pop=Math.sin(Math.PI*between(p,.45,.59));
+      const flick=between(p,.42,.49)*(1-between(p,.50,.58));
+      pose.board.x-=direction*6*beside;
+      pose.board.y-=23*air+7*pop;
+      pose.board.pitch=-.25*pop;
+      pose.board.roll=TAU*between(p,.49,.73);
+      pose.bodyYaw+=direction*.45*beside;
+      pose.hip.x+=direction*34*beside;
+      pose.hip.y+=6*beside-30*air;
+      pose.crouch=5*beside+4*air+7*Math.sin(Math.PI*between(p,.80,.98));
+      pose.arms=10*stride*beside+11*air;
+      pose.lean=direction*(5*beside-4*air);
+      feetOnDeck();
+      const nearFoot={x:64+direction*(23-11*stride),y:109-10*Math.max(0,-stride)-21*air};
+      const farFoot={x:64+direction*(47+11*stride),y:109-10*Math.max(0,stride)-21*air};
+      pose.feet=[mix(pose.feet[0],nearFoot,beside),mix(pose.feet[1],farFoot,beside)];
+      const deckEdge=boardPoint(pose.board,-20*direction,5);
+      pose.feet[0]=mix(pose.feet[0],{x:deckEdge.x,y:deckEdge.y-2},flick);
       break;
     }
     case 'wood': {

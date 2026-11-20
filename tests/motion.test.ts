@@ -228,7 +228,7 @@ test('step turns, shuvits, flips and compound spins keep their prescribed indepe
   const rotations:Record<string,[number,number,number]>={
     'step-180':[180,0,0],'step-360':[360,0,0],pirouette:[360,0,0],p2p:[360,0,0],'pirouette-540':[540,0,0],'pirouette-720':[720,0,0],
     pivot:[180,180,0],shuvit:[0,180,0],'pop-shuvit':[0,180,0],'front-pop':[0,-180,0],
-    ollie:[0,0,0],kickflip:[0,0,360],heelflip:[0,0,-360],bigspin:[180,360,0],bigger:[180,540,0],
+    ollie:[0,0,0],kickflip:[0,0,360],'ghostride-kickflip':[0,0,360],heelflip:[0,0,-360],bigspin:[180,360,0],bigger:[180,540,0],
     'no-com-big':[180,360,0],hardflip:[0,-180,-360],treflip:[0,360,360],varial:[0,180,360],
   };
   for(const [id,[body,board,flip]] of Object.entries(rotations)){
@@ -248,6 +248,15 @@ test('support feet and deck contacts distinguish pivots, pirouettes, ghost, wood
     const spin=techniquePose('pirouette',p);near(spin.board.y,102);near(spin.board.yaw,0);near(spin.feet[1].x,74);near(spin.feet[1].y,100);
   }
   const ghost=techniquePose('ghost',.45);assert.ok(ghost.hip.x>85);near(Math.max(...ghost.feet.map(foot=>foot.y)),109);
+  const firstStride=techniquePose('ghostride-kickflip',.24),secondStride=techniquePose('ghostride-kickflip',.30);
+  assert.ok(firstStride.hip.x>firstStride.board.x+30);
+  near(firstStride.feet[0].y,109);near(secondStride.feet[1].y,109);
+  near(firstStride.board.roll,0);near(secondStride.board.y,102);
+  const flip=techniquePose('ghostride-kickflip',.61),landing=techniquePose('ghostride-kickflip',.84);
+  assert.ok(flip.board.y<90&&flip.board.roll>0&&flip.board.roll<2*Math.PI);
+  near(landing.feet[0].y,landing.board.y-2);near(landing.hip.x,landing.board.x);
+  const reverse=techniquePose('ghostride-kickflip',.24,'clean',Math.PI,Math.PI);
+  assert.ok(reverse.hip.x<reverse.board.x-30);
   const noComply=techniquePose('no-comply',.26);near(noComply.feet[1].y,109);assert.ok(noComply.board.y<102);
   const wood=techniquePose('wood',.5);assert.ok(wood.feet[0].x<25&&wood.feet[0].y<90);near(wood.board.y,102);
 });

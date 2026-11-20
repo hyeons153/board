@@ -393,7 +393,7 @@ test('previous competition proofs replay under their original stamina rules',()=
   command(career,{type:'entry',disciplines:['dance']},()=>({id:randomUUID(),seed:517}),true);
   command(career,{type:'retire'},()=>({id:randomUUID(),seed:517}),true);
   const archive=career.hall[0],meet=archive.records[0],result=meet.results[0],proof=result.proof!;
-  assert.equal(proof.rules,5);assert.ok(verifiedResult(archive,meet,result));
+  assert.equal(proof.rules,6);assert.ok(verifiedResult(archive,meet,result));
   delete proof.rules;
   result.run=simulateRun({stats:proof.stats,energy:proof.energy,injury:proof.injury,skills:proof.skills},'dance',proof.routine,seeded(proof.seed,meet.year,meet.id,'dance','player'),1);
   result.standings.find(row=>row.id==='player')!.score=result.run.score;
@@ -402,4 +402,20 @@ test('previous competition proofs replay under their original stamina rules',()=
   result.points=RULES.places[Math.min(place-1,5)];
   assert.ok(verifiedResult(archive,meet,result),'Old records must remain verifiable');
   proof.rules=2;assert.equal(verifiedResult(archive,meet,result),false);
+});
+
+test('an official Ghostride Kickflip routine remains eligible for the public hall',()=>{
+  const rider=newRider(randomUUID(),517,'Ghostride',DEFAULT_LOOK),career:Career={rider,hall:[]};
+  const id='ghostride-kickflip',identity=()=>({id:rider.id,seed:rider.seed});
+  rider.skills[id]={study:100,mastery:80};
+  command(career,{type:'routine',discipline:'dance',skills:[id,'peter-pan','cross']},identity,true);
+  rider.week=7;rider.phase='meet';
+  command(career,{type:'entry',disciplines:['dance']},identity,true);
+  command(career,{type:'retire'},identity,true);
+  const archive=career.hall[0],meet=archive.records[0],result=meet.results[0];
+  assert.equal(result.run.log[0].id,id);
+  assert.ok(verifiedResult(archive,meet,result));
+  const {profile,entries}=publicationFor(archive);
+  assert.equal(profile.routines.dance?.[0],id);
+  assert.ok(entries.some(entry=>entry.metric==='dance'&&entry.score===result.points));
 });

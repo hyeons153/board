@@ -8,7 +8,16 @@ import { learned } from './skillTree.js';
 import { DISCIPLINES, STATS, type Discipline, type Rider, type RoutineStyle, type Run, type RunRules, type Skill, type Meet, type Result, type Stats, type Outcome, type Standing } from './types.js';
 
 export { learned } from './skillTree.js';
-export const CURRENT_RUN_RULES=5 satisfies RunRules;
+export const CURRENT_RUN_RULES=6 satisfies RunRules;
+// A missing prior definition means the skill did not exist under the earlier rules.
+const runSkillChanges:Record<string,{since:RunRules;prior?:Pick<Skill,'difficulty'|'risk'>}|undefined>={
+  sidewinder:{since:5,prior:{difficulty:2,risk:.12}},
+  ollie:{since:5},
+  p2p:{since:5},
+  bigspin:{since:6,prior:{difficulty:2,risk:.12}},
+  bigger:{since:6,prior:{difficulty:3,risk:.18}},
+  'ghostride-kickflip':{since:6},
+};
 export const allowed = (skill:Skill, discipline:Discipline) => discipline==='freestyle' || skill.family===discipline;
 export const routineTime = (ids:string[]) => ids.reduce((s,id,i)=>s+(SKILL[id]?.seconds??0)+(i?RULES.transition:0),0);
 export function validRoutine(rider:Pick<Rider,'skills'>,discipline:Discipline,ids:string[]) {
@@ -60,10 +69,12 @@ export function simulateRun(p:Profile, discipline:Discipline, ids:string[], rng:
   const bonus=rules<3?legacyBonuses(p):gearBonuses(p),stats=rules<3?p.stats:effectiveStats(p);
   const log:Run['log']=[];
   for (const id of ids) {
-    if(rules<5&&(id==='ollie'||id==='p2p'))throw new Error('이 경기 규칙에서 사용할 수 없는 기술이에요.');
-    const skill=SKILL[id]!;
-    // Archived runs used the intermediate landing difficulty for Sidewinder.
-    const move=rules<5&&id==='sidewinder'?{...skill,difficulty:2,risk:.12}:skill;
+    let move=SKILL[id]!;
+    const change=runSkillChanges[id];
+    if(change&&rules<change.since){
+      if(!change.prior)throw new Error('이 경기 규칙에서 사용할 수 없는 기술이에요.');
+      move={...move,...change.prior};
+    }
     const start=at+(log.length?RULES.transition:0);
     const end=start+move.seconds;
     if (end>RULES.runSeconds) break;
