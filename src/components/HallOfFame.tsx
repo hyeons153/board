@@ -58,7 +58,10 @@ function OnlineRecords({view,tab,selectedId,onSelect,target,registration}:{view:
     if(selectedId)params.set('id',selectedId);
     else{
       params.set('page',String(page));
-      if(ranking)params.set('metric',metric);
+      if(ranking){
+        params.set('metric',metric);
+        if(target?.publicId)params.set('focus',target.publicId);
+      }
       else {params.set('search',term);params.set('division',division);params.set('ending',ending);}
     }
     service<Directory|PublicCard>('public',undefined,undefined,params).then(value=>{
@@ -88,7 +91,7 @@ function OnlineRecords({view,tab,selectedId,onSelect,target,registration}:{view:
       {focused&&<div className="my-ranking hall-selected-rider">
         <div>
           <strong role="status">{target?.name}{target?.registered?' · 명예의 전당 등록을 완료했어요.':''}</strong>
-          {actualRank!==undefined?<p>{RANK_LABELS[metric]} {actualRank}위</p>:unranked?<p>{unranked}</p>:data&&<p>이 종목의 글로벌 순위에 표시되는 계정 대표 선수가 아니에요.</p>}
+          {actualRank!==undefined?<p>{RANK_LABELS[metric]} {actualRank}위</p>:unranked?<p>{unranked}</p>:data&&<p>이 랭킹에 집계된 RP가 없어요.</p>}
         </div>
         <button className="button secondary small" onClick={()=>onSelect(focused.id)}>공개 프로필 보기 <ChevronRight size={15}/></button>
       </div>}
@@ -105,8 +108,6 @@ function OnlineRecords({view,tab,selectedId,onSelect,target,registration}:{view:
       </select></label>
     </div>}
     {failed||(!data?<p role="status">공개 기록을 읽는 중…</p>:<>
-      {ranking&&data.mine.length>0&&<div className="my-ranking"><strong>내 대표 선수</strong>{data.mine.map(row=>
-        <button key={row.id} className="pill" onClick={()=>onSelect(row.id)}>{row.rank}위 · {row.profile.name}</button>)}</div>}
       {data.rows.length>0?<div className={ranking?'global-rank-list':'public-grid'}>{data.rows.map(row=>ranking?
         <RankCard key={row.id} row={row} onSelect={()=>onSelect(row.id)}/>:
         <button className="public-card" key={row.id} onClick={()=>onSelect(row.id)}>
@@ -140,7 +141,7 @@ function RankingRules(){
       <li>종합은 세 종목의 통산 RP 합계입니다. 종목별 순위는 해당 종목의 통산 RP를 사용합니다.</li>
       <li>시즌 RP는 그 해에 획득한 RP입니다. 활동 기간이 길면 통산 RP를 더 쌓을 기회가 많습니다.</li>
       <li>통산 RP를 서버에서 검증할 수 있는 공개 은퇴 선수가 참가합니다. 조기 은퇴에도 같은 기준을 적용합니다.</li>
-      <li>랭킹마다 계정당 RP가 가장 높은 선수 한 명이 대표로 올라갑니다. 동점은 공동 순위이며 공개 ID 순으로 표시합니다.</li>
+      <li>같은 계정에서 공개한 선수도 각자의 RP로 순위에 오릅니다. 동점은 공동 순위이며 공개 ID 순으로 표시합니다.</li>
     </ul>
   </details>;
 }

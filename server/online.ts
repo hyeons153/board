@@ -24,6 +24,7 @@ const list=z.object({
   division:z.enum(['all',...DIVISIONS]).default('all'),
   ending:z.enum(['','legend','champion','technician','veteran','early']).default(''),
   metric:z.enum(METRICS).optional(),
+  focus:z.uuid().optional(),
 });
 const matchUuid=z.uuid();
 const options={N:65536,r:8,p:2,maxmem:80*1024*1024};

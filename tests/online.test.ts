@@ -266,20 +266,41 @@ test('account migration, scoped mutations, public rankings, reports, withdrawal 
     assert.deepEqual(refreshed.profile.rp,savedRP);
     assert.equal('honorScores' in refreshed.profile,false);
 
-    // Equal verified scores share a rank, with one representative per account.
+    // Every eligible rider has a rank, including ties or lower scores from the same account.
     const viewerId=(await store.actor(sessionHash(viewer.token())))!.id;
-    const duplicate=randomUUID(),equalRider=randomUUID();
-    for(const [id,account] of [[duplicate,ownerId],[equalRider,viewerId]]){
-      await pg.db.query(`INSERT INTO public_riders(id,owner_id,archive_id,profile,search_name,complete,division,ending)
-        SELECT $1,$2,$3,profile,search_name,complete,division,ending FROM public_riders WHERE id=$4`,[id,account,randomUUID(),publish.id]);
+    const sameAccountTie=randomUUID(),otherTie=randomUUID(),lowerRider=randomUUID(),hiddenRider=randomUUID(),withdrawnRider=randomUUID();
+    const fixtures=[
+      {id:sameAccountTie,account:ownerId,delta:0,active:true,hidden:false},
+      {id:otherTie,account:viewerId,delta:0,active:true,hidden:false},
+      {id:lowerRider,account:ownerId,delta:-1,active:true,hidden:false},
+      {id:hiddenRider,account:ownerId,delta:10,active:true,hidden:true},
+      {id:withdrawnRider,account:ownerId,delta:10,active:false,hidden:false},
+    ];
+    for(const {id,account,delta,active,hidden} of fixtures){
+      await pg.db.query(`INSERT INTO public_riders(id,owner_id,archive_id,profile,search_name,complete,division,ending,active,hidden)
+        SELECT $1,$2,$3,profile,search_name,complete,division,ending,$5,$6 FROM public_riders WHERE id=$4`,
+        [id,account,randomUUID(),publish.id,active,hidden]);
       await pg.db.query(`INSERT INTO rider_rankings(public_id,metric,scope,version,score)
-        SELECT $1,metric,scope,version,score FROM rider_rankings WHERE public_id=$2 AND version=$3`,[id,publish.id,RANKING_VERSION]);
+        SELECT $1,metric,scope,version,score+$4::numeric FROM rider_rankings WHERE public_id=$2 AND version=$3`,[id,publish.id,RANKING_VERSION,delta]);
     }
+    const expectedOrder=[...[publish.id,sameAccountTie,otherTie].sort(),lowerRider];
     const tied=await overall();
-    assert.equal(tied.rows.length,2);
-    assert.deepEqual(tied.rows.map(item=>item.rank),[1,1]);
-    assert.equal(tied.mine[0].id,equalRider);
-    await pg.db.query('DELETE FROM public_riders WHERE id IN ($1,$2)',[duplicate,equalRider]);
+    assert.deepEqual(tied.rows.map(item=>item.id),expectedOrder);
+    assert.deepEqual(tied.rows.map(item=>item.rank),[1,1,1,4]);
+    assert.deepEqual(tied.mine.map(item=>item.id),[otherTie]);
+    const owned=await (await status(owner.call('?area=public&metric=dance&focus='+lowerRider),200)).json() as Directory;
+    assert.deepEqual(owned.rows.map(item=>item.id),expectedOrder);
+    assert.deepEqual(owned.mine.map(item=>item.id),expectedOrder.filter(id=>id!==otherTie));
+    assert.equal(owned.rows.at(-1)?.score,savedRP.disciplines.dance-1);
+    const focusedQuery='?area=public&metric=career&page=2&focus=';
+    const offPage=await (await status(owner.call(focusedQuery+lowerRider),200)).json() as Directory;
+    assert.deepEqual(offPage.rows,[]);
+    assert.deepEqual(offPage.mine.map(item=>[item.id,item.rank]),[[lowerRider,4]]);
+    const foreignFocus=await (await status(viewer.call(focusedQuery+lowerRider),200)).json() as Directory;
+    const hiddenFocus=await (await status(owner.call(focusedQuery+hiddenRider),200)).json() as Directory;
+    assert.deepEqual(foreignFocus.mine,[]);
+    assert.deepEqual(hiddenFocus.mine,[]);
+    await pg.db.query('DELETE FROM public_riders WHERE id=ANY($1::uuid[])',[fixtures.map(({id})=>id)]);
     await status(viewer.call('?area=public',{type:'report',id:publish.id,reason:'name'}),200);
     await status(viewer.call('?area=public',{type:'report',id:publish.id,reason:'other'}),200);
     assert.equal((await pg.db.query('SELECT public_id FROM rider_reports')).length,1);

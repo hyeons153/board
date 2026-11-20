@@ -13,7 +13,7 @@ const GUEST_SECONDS=365*24*60*60;
 const PAGE_SIZE=16;
 export type Actor={id:string;username:string|null};
 export type LoginRecord={id:string;passwordHash:string};
-export type DirectoryFilter={page:number;search:string;division:'all'|Division;ending:string;metric?:Metric};
+export type DirectoryFilter={page:number;search:string;division:'all'|Division;ending:string;metric?:Metric;focus?:string};
 type LegacyRow={id:string;expires:number;version:number;snapshot:Save};
 type LocalLegacy=(hash:string)=>Promise<LegacyRow|undefined>;
 export class AccessError extends Error {
@@ -237,26 +237,26 @@ export function databaseStore(db:Database,kind:Store['kind'],legacy?:LocalLegacy
           [...values,PAGE_SIZE+1,offset]);
         return {rows:rows.slice(0,PAGE_SIZE),page:filter.page,hasMore:rows.length>PAGE_SIZE,mine:[]};
       }
-      const ranked=await db.query<RankRow>(`WITH representatives AS (
-          SELECT DISTINCT ON (p.owner_id) p.id,p.owner_id,r.score
+      const ranked=await db.query<RankRow>(`WITH ranks AS (
+          SELECT p.id,p.owner_id,r.score,rank() OVER (ORDER BY r.score DESC)::int AS rank
           FROM rider_rankings r JOIN public_riders p ON p.id=r.public_id
           WHERE r.metric=$1 AND r.scope='all' AND r.version=$2 AND ${visibility}
-          ORDER BY p.owner_id,r.score DESC,p.id
-        ), ranks AS (
-          SELECT id,owner_id,score,rank() OVER (ORDER BY score DESC)::int AS rank FROM representatives
         ), selected AS (
           (SELECT id,score,rank,false AS owned_row FROM ranks ORDER BY rank,id LIMIT $3 OFFSET $4)
           UNION ALL
-          SELECT id,score,rank,true AS owned_row FROM ranks WHERE owner_id=$5
+          SELECT id,score,rank,true AS owned_row FROM ranks WHERE owner_id=$5 AND id=$6
         )
         SELECT p.id,${publicSummary} AS profile,COALESCE(p.owner_id=$5,false) AS mine,
           s.score,s.rank,p.profile->'representatives'->$1 AS representative,s.owned_row AS "ownedRow"
-        FROM selected s JOIN public_riders p ON p.id=s.id ORDER BY s.owned_row,s.rank,p.id`,[filter.metric,RANKING_VERSION,PAGE_SIZE+1,offset,owner??null]);
+        FROM selected s JOIN public_riders p ON p.id=s.id ORDER BY s.owned_row,s.rank,p.id`,
+        [filter.metric,RANKING_VERSION,PAGE_SIZE+1,offset,owner??null,filter.focus??null]);
       const {page,mine}=ranked.reduce<{page:PublicCard<PublicSummary>[];mine:PublicCard<PublicSummary>[]}>((groups,{ownedRow,...card})=>{
         groups[ownedRow?'mine':'page'].push(card);return groups;
       },{page:[],mine:[]});
+      const rows=page.slice(0,PAGE_SIZE);
       return {
-        rows:page.slice(0,PAGE_SIZE),page:filter.page,hasMore:page.length>PAGE_SIZE,mine,
+        rows,page:filter.page,hasMore:page.length>PAGE_SIZE,
+        mine:[...rows.filter(row=>row.mine),...mine.filter(row=>!rows.some(item=>item.id===row.id))],
       };
     },
   };

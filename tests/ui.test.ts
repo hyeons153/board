@@ -47,7 +47,8 @@ test('one game frame previews choices on the existing HUD before confirmation, t
           return Response.json(hallPublication);
         }
         if(url.searchParams.has('id'))return Response.json(publicCard);
-        const mine=hallPublication?.active&&hallPublication.rankStatus==='eligible'?[{...publicCard,rank:17,mine:true}]:[];
+        const mine=hallPublication?.active&&hallPublication.rankStatus==='eligible'&&url.searchParams.get('focus')===hallPublication.id?
+          [{...publicCard,rank:17,mine:true}]:[];
         return Response.json({rows:[],page:1,mine,hasMore:false});
       }
     }
@@ -242,6 +243,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
         await click('글로벌 랭킹');
         assert.equal(opened.querySelector('.hall-metrics [aria-pressed="true"]')?.textContent,'종합');
         assert.deepEqual([...opened.querySelectorAll('.hall-metrics button')].map(button=>button.textContent),['종합','댄싱','트릭','프리스타일']);
+        assert.match(opened.querySelector('.rp-rules')!.textContent!,/같은 계정에서 공개한 선수도 각자의 RP/);
         await click('선수 둘러보기');
         assert.ok(opened.querySelector('.search-form input'));
         assert.equal(opened.querySelector('input[type="checkbox"]'),null);
