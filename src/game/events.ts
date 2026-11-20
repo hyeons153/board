@@ -10,7 +10,7 @@ import { elapsed, storyProgress, type StoryChange, type StoryImpact } from './st
 import { pickHappening, type Happening } from './happenings.js';
 import type { Family, Rider, Settings, Stat, Strategy } from './types.js';
 
-type Effect = { energy?:number; money?:number; fame?:number; relation?:number; skill?:string; study?:number; stat?:Stat; gain?:number; item?:string };
+type Effect = { energy?:number; money?:number; fame?:number; relation?:number; skill?:string; study?:number; teach?:true; stat?:Stat; gain?:number; item?:string };
 type Choice = { label:string; effect:Effect; tags:Strategy[]; dialogue?:string; relationship?:RelationshipChoice; story?:(r:Rider)=>StoryImpact };
 export type EventDef = { id:string; kind:string; title:string; body:string|((r:Rider)=>string); npc?:string; cast?:(r:Rider)=>string[]; story?:boolean; chapter?:boolean; finale?:boolean; afterMeet?:boolean; important?:boolean; decision?:boolean; repeat?:boolean; special?:boolean; when:(r:Rider)=>boolean; choices:Choice[] };
 const option=(label:string,effect:Effect,...tags:Strategy[]):Choice=>({label,effect,tags});
@@ -33,7 +33,7 @@ export const EVENTS:EventDef[] = [
     option('첫 푸시에서 균형 잡는 법부터 묻는다',{stat:'balance',gain:3,relation:4},'balanced','trick'),
     option('가로등까지 탄 뒤 커피도 마시자고 한다',{relation:6})]},
   {id:'juns-clip',kind:'기술 습득',title:'강준의 3초 영상',body:'준이 착지 장면만 슬로모션으로 반복한다. 화면 밖에서 들리는 비명은 못 들은 척해 주자.',npc:'jun',story:true,when:r=>r.week>=3&&r.spot==='plaza',choices:[
-    option('프론트 팝의 자세를 따라 한다',{skill:'front-pop',study:100,energy:-7,relation:8},'trick','freestyle'),
+    option('프론팝의 자세를 따라 한다',{skill:'front-pop',teach:true,energy:-7,relation:8},'trick','freestyle'),
     option('링크만 받아 저장한다',{relation:3,stat:'link',gain:2},'balanced','dance')]},
   {id:'registration',kind:'대회',title:'처음 받아 본 번호표',body:'첫 대회 번호표를 쥐니 접수처에서 이름을 세 번 확인하던 일이 떠오른다. 손이 떨리는 건 커피 때문일 거다.',npc:'sol',story:true,when:r=>r.year===1&&r.week>=7,choices:[
     option('솔과 스트레칭을 한다',{energy:14,relation:4},'balanced','dance','freestyle'),
@@ -51,8 +51,8 @@ export const EVENTS:EventDef[] = [
     option('세 번 안에 착지해 본다',{stat:'balance',gain:3,money:8_000,energy:-9,relation:5},'trick','freestyle'),
     option('심판 옆에서 야식을 먹는다',{energy:16,relation:3},'balanced','dance')]},
   {id:'mango-lesson',kind:'기술 습득',title:'망고는 과일이 아니야',body:'유리는 네가 챙겨 온 음료를 보고 웃었다. “그 망고도 좋아. 이쪽 망고도 배워 볼래?”',npc:'yu',story:true,important:true,when:r=>(r.relations.yu??0)>=8&&r.week>=11,choices:[
-    option('망고 한 바퀴를 익힌다',{skill:'mango',study:100,relation:6},'dance','freestyle'),
-    option('찹더우드부터 배운다',{skill:'wood',study:100,relation:5},'balanced','trick')]},
+    option('망고 한 바퀴를 익힌다',{skill:'mango',teach:true,relation:6},'dance','freestyle'),
+    option('찹더우드부터 배운다',{skill:'wood',teach:true,relation:5},'balanced','trick')]},
   {id:'trophy-table',kind:'라이벌',title:'사진에는 트로피가 잘 나온다',body:'솔이 대회 사진을 넘기다 민망한 착지 장면에서 멈췄다. “우승할 때도 이런 표정인데.”',npc:'sol',story:true,when:r=>r.records.some(m=>m.results.some(x=>x.standings[0]?.id==='player')),choices:[
     option('다음에는 더 높은 점수를 노린다',{stat:'link',gain:4,fame:3,relation:5},'trick','freestyle'),
     option('같은 표정으로 기념사진을 찍는다',{fame:6,energy:10,relation:8},'balanced','dance')]},
@@ -70,7 +70,6 @@ export const EVENTS:EventDef[] = [
     choices:[option('조명이 켜질 때까지 몸을 푼다',{energy:5},'balanced'),option('조명이 닿는 경계에서 스텝을 밟는다',{relation:2},'dance','freestyle'),option('착지 위치를 먼저 확인한다',{relation:2},'trick')]},
 ];
 export const EVENT = Object.fromEntries(EVENTS.map(e=>[e.id,e])) as Record<string,EventDef|undefined>;
-export const canStudy=(r:Rider,id:string)=>SKILL[id]?.requires.every(pre=>(r.skills[pre]?.study??0)>=100)??false;
 export const eventNpc=(e:EventDef,r?:Rider)=>{
   const id=r?eventCast(r,e)[0]:e.npc;
   return id==='mentor'?r?.mentor:id?RIVAL.get(id):undefined;
@@ -91,7 +90,7 @@ function mentorEvents(r:Rider):EventDef[]{
         option('지난 시즌의 이야기를 듣는다',{relation:6,energy:11},'balanced','trick')]},
     {id:'mentor-practice',kind:'다회차 · 합동 훈련',npc:'mentor',title:'보드 위에 남은 습관',body:`${mentor.name}이 ${SKILL[mentor.skill??'']?.name??'첫 발 위치'}를 시범으로 보여 주었다. “이 동작을 처음 성공한 날은 아직도 기억나.”`,
       story:true,important:true,when:r=>r.week>=15&&!!r.events['mentor-intro'],choices:[
-        option('선배의 동작을 함께 연습한다',{relation:12,skill:mentor.skill,study:42,stat:'link',gain:2},'dance','trick','freestyle'),
+        option('선배에게 동작을 배운다',{relation:12,skill:mentor.skill,teach:true,stat:'link',gain:2},'dance','trick','freestyle'),
         option('두 사람의 라인을 찍어 둔다',{relation:9,energy:13},'balanced')]},
     {id:'mentor-cheer',kind:'다회차 · 대회 응원',npc:'mentor',title:'관객석의 첫 번째 박수',body:`${mentor.name}이 관객석 맨 앞에 서 있었다. “내 기록은 지난 시즌 얘기야. 오늘 네 기록은 네가 써.”`,
       story:true,when:r=>r.week>=25&&!!r.events['mentor-practice'],choices:[

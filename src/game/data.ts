@@ -8,8 +8,9 @@ export const RULES = {
   energy: { speed:17, carve:17, link:17, balance:15, dance:19, trick:23, rest:0, hospital:0, rehearsal:18 } satisfies Record<Action,number>,
   entryCost:{ dance:20, trick:25, freestyle:30 }, places:[100,75,60,45,35,10], majorMultiplier:1.5,
   prizes:[80_000,55_000,40_000,25_000,18_000,10_000],
+  podiumGrowth:[[1,.5],[.7,.3],[.4,.2]],
   scoreWeights: {
-    dance:{ execution:40, link:35, carve:15, speed:10 },
+    dance:{ execution:40, link:25, carve:20, speed:15 },
     trick:{ execution:75, link:10, combo:15 },
     freestyle:{ execution:55, combo:25, carve:12, speed:8 },
   },
@@ -134,7 +135,7 @@ export function formatCareerDate({year,week}:{year:number;week:number}){
 
 const skill = (id:string,name:string,family:Family,kind:Skill['kind'],difficulty:number,points:number,seconds:number,requires:string[]=[],tags:string[]=[]):Skill =>
   ({id,name,family,kind,difficulty,points,seconds,requires,risk:[0,.07,.12,.18,.23][difficulty],tags});
-export const SKILLS = [
+export const SKILLS:Skill[] = [
   skill('peter-pan','피터팬','dance','step',1,6,5,[],['switch','flow']),
   skill('step-180','180','dance','step',1,6,4,[],['switch','spin']),
   skill('step-360','360','dance','step',1,7,5,['step-180'],['spin','flow']),
@@ -146,26 +147,26 @@ export const SKILLS = [
   skill('piglet','피글렛','dance','technique',1,7,5,[],['pop','switch']),
   skill('mango','망고','dance','technique',1,7,5,[],['flow','switch']),
   skill('wood','찹더우드','dance','technique',1,8,5,[],['pop','flow']),
-  skill('pirouette','피루엣','dance','technique',2,10,5,['step-360'],['spin','flow']),
+  skill('pirouette','피루엣 360','dance','technique',2,10,5,['step-360'],['spin','flow']),
   skill('mango-pendulum','시계추 망고','dance','technique',2,11,6,['mango','wood'],['switch','flow']),
   skill('pirouette-540','피루엣 540','dance','technique',3,14,6,['pirouette'],['spin','flow']),
   skill('pendulum','시계추','dance','technique',3,13,6,['mango-pendulum'],['switch','flow']),
   skill('pirouette-720','피루엣 720','dance','technique',4,17,7,['pirouette-540'],['spin','flow']),
-  skill('pivot','피봇','trick','spin',1,6,4,[],['spin','switch']),
-  skill('shuvit','샤빗','trick','spin',1,7,4,[],['spin','pop']),
-  skill('no-comply','노컴플라이','trick','pop',1,7,5,[],['pop','flow']),
-  skill('kickflip','킥플립','trick','flip',2,11,5,['shuvit'],['flip','pop']),
-  skill('no-com-big','노컴 빅스핀','trick','spin',2,11,5,['no-comply','pivot'],['spin','flow']),
-  skill('bigspin','빅스핀','trick','spin',2,11,5,['shuvit','pivot'],['spin','switch']),
-  skill('front-pop','프론트 팝','trick','pop',2,10,5,['no-comply'],['pop','switch']),
-  skill('pop-shuvit','팝샤빗','trick','pop',2,10,5,['shuvit'],['spin','pop']),
-  skill('heelflip','힐플립','trick','flip',2,11,5,['pop-shuvit'],['flip','switch']),
-  skill('bigger','비거스핀','trick','spin',3,14,6,['bigspin'],['spin','switch']),
-  skill('hardflip','하드플립','trick','flip',3,15,6,['kickflip','front-pop'],['flip','pop']),
-  skill('treflip','트래플립','trick','flip',3,15,6,['kickflip','bigspin'],['spin','flip']),
-  skill('varial','베리얼 킥플립','trick','flip',3,14,6,['kickflip','shuvit'],['spin','flip']),
+  {...skill('pivot','180 피봇','trick','spin',1,6,4,[],['spin','switch']),trickSide:'nose'},
+  {...skill('shuvit','샤빗','trick','spin',1,7,4,['pivot'],['spin','pop']),trickSide:'nose'},
+  {...skill('no-comply','노컴플라이','trick','pop',1,7,5,[],['pop','flow']),trickSide:'tail'},
+  {...skill('kickflip','킥플립','trick','flip',2,11,5,['shuvit'],['flip','pop']),trickSide:'tail'},
+  {...skill('no-com-big','노컴 빅스핀','trick','spin',2,11,5,['shuvit','no-comply'],['spin','flow']),trickSide:'nose'},
+  {...skill('bigspin','빅스핀','trick','spin',2,11,5,['no-com-big'],['spin','switch']),trickSide:'nose'},
+  {...skill('front-pop','프론팝','trick','pop',2,10,5,['no-comply'],['pop','switch']),trickSide:'tail'},
+  {...skill('pop-shuvit','팝샤빗','trick','pop',2,10,5,['shuvit'],['spin','pop']),trickSide:'tail'},
+  {...skill('heelflip','힐플립','trick','flip',2,11,5,['pop-shuvit'],['flip','switch']),trickSide:'tail'},
+  {...skill('bigger','비거스핀','trick','spin',3,14,6,['bigspin'],['spin','switch']),trickSide:'nose'},
+  {...skill('hardflip','하드플립','trick','flip',3,15,6,['heelflip','front-pop'],['flip','pop']),trickSide:'tail'},
+  {...skill('treflip','트래플립','trick','flip',3,15,6,['kickflip','bigspin'],['spin','flip']),trickSide:'tail'},
+  {...skill('varial','베리얼 킥플립','trick','flip',3,14,6,['kickflip','pop-shuvit'],['spin','flip']),trickSide:'tail'},
 ];
 export const SKILL = Object.fromEntries(SKILLS.map(s=>[s.id,s])) as Record<string,Skill|undefined>;
 export const START_SKILLS:Record<string,Progress> = Object.fromEntries(
-  ([['peter-pan',66],['cross',56],['step-180',49],['pivot',62],['shuvit',46],['no-comply',43]] as const).map(([id,mastery])=>[id,{study:100,mastery}])
+  ([['peter-pan',66],['cross',56],['step-180',49],['pivot',62],['no-comply',43]] as const).map(([id,mastery])=>[id,{study:100,mastery}])
 );

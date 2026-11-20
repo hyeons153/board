@@ -2,7 +2,8 @@ import { Aperture, Check, Coffee, Cross, Footprints, Link2, MoveDiagonal2, Route
 import { useEffect, useMemo, useState } from 'react';
 import { ACTION_NAMES, ACTION_STORIES, DISCIPLINE_NAMES, SKILL, SKILLS, STAT_NAMES, STRATEGY_DETAILS, STRATEGY_NAMES } from '../game/data';
 import { validatePlan } from '../game/career';
-import { canStudy, skipsEventChoices } from '../game/events';
+import { skipsEventChoices } from '../game/events';
+import { canStudy } from '../game/skillTree';
 import { isTrainingAction, meetTrainingAvailable, previewTraining, randomSpecialTraining } from '../game/training';
 import { ACTIONS, DISCIPLINES, STRATEGIES, type Plan, type Rider } from '../game/types';
 import type { Submit } from './Overview';

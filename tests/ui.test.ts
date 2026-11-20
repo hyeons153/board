@@ -170,6 +170,13 @@ test('one game frame previews choices on the existing HUD before confirmation, t
         assert.deepEqual([...win.document.querySelectorAll('.skill-detail-actions button')].map(button=>button.textContent?.trim()),['동작 보기']);
         await click('피터팬 미리보기');
         assert.ok(win.document.querySelector('.technique-preview'));
+        await click('트릭');
+        await click('노즈트릭');
+        assert.equal(win.document.querySelectorAll('.skill-entry-summary').length,5);
+        await click('테일트릭');
+        assert.equal(win.document.querySelectorAll('.skill-entry-summary').length,8);
+        await click('트래플립 상세');
+        assert.match(win.document.querySelector('.skill-detail')!.textContent!,/킥플립.*남은 숙련도.*빅스핀/);
       }
       if(menu==='상점'){
         assert.equal(win.document.querySelectorAll('.equipment-choice').length,8);
@@ -366,9 +373,11 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.throws(()=>command(career,{type:'entry',disciplines:['dance','trick']},()=>({id:'automatic-ui',seed:71})),/1종목/);
     rider.records.push({year:1,id:'regular-1',division:'rookie',results:simulateMeet(rider,(await import('../src/game/data')).CALENDAR[0],['dance','trick']).results});
     const record=structuredClone(rider.records[0]);
+    record.results[0].statGains={carve:.7,speed:.3};
     rider.settings.skipMeets=true;
     await act(async()=>root.render(createElement(GameStage,{r:rider,send:async()=>true,saving:false,remaining:0,weekMs:2000,fastForward:false,spot:'river',motion:'ride',record,onDone:()=>{}})));
     assert.ok(win.document.querySelector('[aria-label="대회 시상식"]'));
+    assert.match(win.document.querySelector('[aria-label="대회 시상식"]')!.textContent!,/입상 성장 · 속도 \+0\.3 · 카빙 \+0\.7/);
     assert.equal(win.document.querySelector('[aria-label="대회 스킵"]'),null);
     delete rider.settings.skipMeets;
     rider.year=2;rider.week=52;rider.phase='meet';

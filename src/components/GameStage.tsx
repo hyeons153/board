@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, Flag, HeartPulse, ListChecks, MapPin, Play, Timer, Trophy } from 'lucide-react';
-import { ACTION_NAMES, ACTION_STORIES, calendarFor, formatCareerDate, meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, OUTCOME_NAMES, RULES, SKILL } from '../game/data';
+import { ACTION_NAMES, ACTION_STORIES, calendarFor, formatCareerDate, meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, OUTCOME_NAMES, RULES, SKILL, STAT_NAMES } from '../game/data';
 import { currentMeet, divisionFor, singleEntry } from '../game/career';
 import { eventBody, eventCast, eventChoiceAvailable, eventFor, eventNpc, eventPaused } from '../game/events';
 import { happeningDuration } from '../game/happenings';
@@ -8,7 +8,7 @@ import { RIVAL, lineTerms } from '../game/content';
 import { equippedLook, gearBonuses, playerPlace } from '../game/economy';
 import { formatRP, meetRP, validRP } from '../game/rp';
 import { specialTraining } from '../game/training';
-import { DISCIPLINES, type Discipline, type EventOutcome, type GameAction, type Look, type MeetRecord, type Rider, type Spot } from '../game/types';
+import { DISCIPLINES, STATS, type Discipline, type EventOutcome, type GameAction, type Look, type MeetRecord, type Rider, type Spot } from '../game/types';
 import type { Motion } from '../scene/motion';
 import { headingsBefore, trainingTechnique } from '../scene/techniques';
 import Scene from './Scene';
@@ -138,11 +138,13 @@ function Playback({record,index,r,saving,active,autoSkip,playbackRate,onSpeed,on
   const timer=mode==='result'?60:seconds;
   const speedButton=<button className="game-quiet competition-speed" aria-label="대회 2배속" aria-pressed={playbackRate===2} onClick={onSpeed}>2배속</button>;
   const podium=[2,1,3].map(place=>result.standings.find(row=>row.place===place)!);
+  const gains=result.statGains;
   let panel:ReactNode;
   if(mode==='result') panel=<>
     <div className="game-caption"><Trophy size={16}/> {DISCIPLINE_NAMES[result.discipline]} 시상식</div><h2>{r.name} · {playerPlace(result)}위</h2>
     <div className="game-podium">{podium.map(row=><div key={row.id} className={'place-'+row.place}><PixelRider look={row.id==='player'?result.look??equippedLook(r):RIVAL.get(row.id)?.look??r.look}/><strong>{row.name}</strong><small>{row.score.toFixed(1)}점</small><b>{row.place}</b></div>)}</div>
     <p className="game-reward">내 점수 {result.run.score.toFixed(1)} · {validRP(result.points)?'획득 +'+formatRP(result.points):'RP 기록 없음'} · 보상 {money(result.prize)}</p>
+    {gains&&<p className="game-reward">입상 성장 · {STATS.filter(stat=>gains[stat]).map(stat=>`${STAT_NAMES[stat]} +${gains[stat]}`).join(' · ')}</p>}
     <details className="game-scoreboard"><summary>전체 순위와 채점 보기</summary>
       <ol>{result.standings.map(row=><li key={row.id}><b>{row.place}</b><span>{row.name}</span><strong>{row.score.toFixed(1)}</strong></li>)}</ol>
       <p>{standing.name} · 성공률 {Math.round(run.log.filter(log=>log.outcome!=='miss').length/Math.max(1,run.log.length)*100)}% · 최고 {Math.max(0,...run.log.map(log=>log.combo))}콤보</p>

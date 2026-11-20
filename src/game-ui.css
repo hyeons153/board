@@ -337,6 +337,8 @@
 .skill-entry-progress progress::-webkit-progress-value { background:#306847; }
 .skill-entry-progress progress::-moz-progress-bar { background:#306847; }
 .skill-entry-progress b { text-align:right; font-variant-numeric:tabular-nums; }
+.skill-entry-prerequisites { grid-column:1/-1; color:#4e6259; font-size:.74rem; overflow-wrap:anywhere; }
+.skill-trick-filters { margin:0 0 10px; }
 .skill-detail { position:sticky; top:0; padding:13px; }
 .skill-detail > header { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
 .skill-detail > header h2 { font-size:1.15rem; }

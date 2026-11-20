@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CALENDAR, calendarFor, formatCareerDate, formatMonthWeek, INTERNATIONAL_MEETS, monthWeek, DEFAULT_LOOK, RULES, SKILL, SKILLS } from '../src/game/data';
-import { command, divisionFor, GameError, newRider, prepareWeek, processWeek } from '../src/game/career';
+import { CALENDAR, calendarFor, formatCareerDate, formatMonthWeek, INTERNATIONAL_MEETS, monthWeek, DEFAULT_LOOK, RULES, SKILL, SKILLS, START_SKILLS } from '../src/game/data';
+import { awardPodiumGrowth, command, divisionFor, GameError, newRider, prepareWeek, processWeek } from '../src/game/career';
 import { chance, generateRoutine, learned, routineTime, simulateMeet, simulateRun, validRoutine } from '../src/game/competition';
 import { ECONOMY, equippedLook, extras, gearBonuses, playerPlace, SPONSOR } from '../src/game/economy';
 import { previewTraining, randomSpecialTraining, statAfter, trainingFactor, trainingSuccess } from '../src/game/training';
 import { EVENTS, eventBody, eventCast, eventChoiceAvailable, eventFor, pickEvent } from '../src/game/events';
+import { canStudy, nextSkillTraining } from '../src/game/skillTree';
 import { RIVALS, spotRegulars, spotUnlocked, spotVisitor } from '../src/game/content';
 import { HAPPENINGS, pickHappening } from '../src/game/happenings';
 import { CREW_STORIES } from '../src/game/crewStories';
@@ -316,6 +317,120 @@ test('three disciplines have reproducible bounded runs, and repeats, failed land
   assert.throws(()=>simulateRun(r,'dance',['shuvit'],()=>0));
   assert.throws(()=>simulateRun(r,'dance',Array<string>(16).fill('peter-pan'),()=>0));
   assert.deepEqual(simulateRun(r,'freestyle',mixed,()=>.72),simulateRun({...r,energy:0},'freestyle',mixed,()=>.72));
+});
+
+test('the documented tech tree is reachable and requires every prerequisite to be mastered',()=>{
+  const r=career().rider!;
+  assert.deepEqual(Object.keys(START_SKILLS),['peter-pan','cross','step-180','pivot','no-comply']);
+  assert.equal(SKILL.pirouette?.name,'피루엣 360');
+  assert.deepEqual(SKILLS.filter(s=>s.trickSide==='nose').map(s=>s.id),['pivot','shuvit','no-com-big','bigspin','bigger']);
+  assert.equal(SKILLS.filter(s=>s.trickSide==='tail').length,8);
+  const reached=new Set<string>();
+  for(const skill of SKILLS){
+    assert.equal(new Set(skill.requires).size,skill.requires.length,skill.id);
+    assert.ok(skill.requires.every(id=>reached.has(id)),`Invalid, cyclic, or out-of-order prerequisite for ${skill.id}`);
+    reached.add(skill.id);
+  }
+  assert.equal(reached.size,29);
+  assert.equal(nextSkillTraining(r,'trick')?.id,'pivot');
+  assert.equal(canStudy(r,'shuvit'),false);
+  r.skills.pivot.mastery=100;
+  assert.equal(nextSkillTraining(r,'trick')?.id,'shuvit');
+  r.skills.kickflip={study:100,mastery:100};
+  r.skills['pop-shuvit']={study:100,mastery:99.9};
+  assert.equal(canStudy(r,'varial'),false);
+  r.skills['pop-shuvit'].mastery=100;
+  assert.equal(canStudy(r,'varial'),true);
+  r.skills.kickflip.mastery=99.9;
+  assert.equal(canStudy(r,'varial'),false);
+});
+
+test('NPC instruction grants a skill once, and it stays available in lessons, auto training and lines',()=>{
+  const c=career(),r=c.rider!;
+  r.week=3;r.phase='event';r.event='noa-pop';
+  assert.equal(r.skills.shuvit,undefined);
+  command(c,{type:'event',index:0},identity);
+  const progress=r.skills['pop-shuvit'];
+  assert.equal(progress.study,100);
+  assert.equal(r.skills.shuvit,undefined);
+  assert.equal(canStudy(r,'pop-shuvit'),true);
+  assert.equal(canStudy(r,'heelflip'),false);
+  assert.ok(validRoutine(r,'trick',['pop-shuvit']));
+  r.phase='event';r.event='noa-pop';
+  const before={...progress};
+  command(c,{type:'event',index:0},identity);
+  assert.deepEqual(r.skills['pop-shuvit'],before);
+  r.energy=100;
+  command(c,{type:'plan',plan:{action:'trick',spot:'studio',skill:'pop-shuvit',lesson:true}},identity);
+  assert.ok(processWeek(c));
+  assert.ok(progress.mastery>before.mastery);
+  const focus=career().rider!;
+  focus.skills['front-pop']={study:100,mastery:99};
+  focus.skills.kickflip={study:100,mastery:100};
+  assert.equal(nextSkillTraining(focus,'trick')?.id,'front-pop');
+});
+
+test('run scoring keeps speed and carve useful at 200 and awards a bounded landing assist on successful links',()=>{
+  const r=career().rider!;
+  const ids=['peter-pan','cross','step-180','peter-pan','cross','step-180','peter-pan','cross','step-180','peter-pan'];
+  const lower={...r,stats:{...r.stats,speed:110,carve:110}},upper={...r,stats:{...r.stats,speed:200,carve:200}};
+  const base=simulateRun(lower,'dance',ids,()=>0);
+  const improved=simulateRun(upper,'dance',ids,()=>0);
+  assert.ok(improved.parts.speed!>base.parts.speed!&&improved.parts.carve!>base.parts.carve!);
+  assert.equal(improved.score,Math.round((improved.parts.execution!*.4+improved.parts.link!*.25+improved.parts.carve!*.2+improved.parts.speed!*.15)*10)/10);
+  assert.equal(simulateRun(lower,'dance',ids,()=>0,3).score,simulateRun(upper,'dance',ids,()=>0,3).score);
+  r.stats={...r.stats,link:200,balance:20};
+  r.skills.hardflip={study:100,mastery:10};
+  const landing=chance(r,SKILL.hardflip!)-RULES.run.trickChainSuccess;
+  const run=(values:number[])=>simulateRun(r,'trick',['pivot','hardflip'],()=>values.shift()!);
+  assert.equal(run([0,landing+.05,0]).log[1].linked,true);
+  assert.equal(run([0,landing+.05,.99]).log[1].outcome,'miss');
+  assert.equal(run([0,landing+.08,0]).log[1].linked,false);
+  assert.equal(run([.99,landing+.05]).log[1].linked,null);
+});
+
+test('podium growth uses the actual clamped increase and awards the best international finish once',()=>{
+  const r=career().rider!;
+  const make=(places:number[])=>simulateMeet(r,CALENDAR[0],[...DISCIPLINES]).results.map((result,i)=>({
+    ...result,standings:[{id:'player',name:r.name,place:places[i],score:0}],
+  })).reverse();
+  for(const [places,winner,gains] of [
+    [[1,3,3],'dance',{carve:1,speed:.5}],
+    [[2,2,2],'dance',{carve:.7,speed:.3}],
+    [[5,3,3],'trick',{balance:.4,link:.2}],
+    [[2,3,1],'freestyle',{link:1,carve:.5}],
+    [[4,5,6],undefined,undefined],
+  ] as const){
+    const results=make([...places]);
+    const before={...r.stats};
+    awardPodiumGrowth(r,results,true);
+    assert.deepEqual(results.filter(result=>result.statGains).map(result=>[result.discipline,result.statGains]),winner?[[winner,gains]]:[]);
+    for(const stat of STATS)assert.equal(r.stats[stat],before[stat]+((gains as Partial<typeof r.stats>|undefined)?.[stat]??0));
+  }
+  r.stats.carve=199.9;r.stats.speed=200;
+  const [dance]=make([1,4,4]).filter(result=>result.discipline==='dance');
+  awardPodiumGrowth(r,[dance],false);
+  assert.equal(r.stats.carve,statAfter(199.9,1));
+  assert.equal(r.stats.speed,200);
+  assert.equal(dance.statGains,undefined);
+});
+
+test('an official international meet resolves every run before changing stats and cannot pay twice',()=>{
+  const c=career(),r=c.rider!;
+  r.year=2;r.week=52;r.phase='meet';
+  r.season={year:2,division:'rookie',scores:{dance:{},trick:{},freestyle:{}}};
+  r.stats={speed:145,carve:147,link:148,balance:146};
+  for(const skill of SKILLS)r.skills[skill.id]={study:100,mastery:100};
+  const before={...r.stats};
+  command(c,{type:'entry',disciplines:[...DISCIPLINES]},identity,true);
+  const [meet]=r.records;
+  assert.equal(meet.results.length,3);
+  assert.equal(meet.results.filter(result=>result.statGains).length,1);
+  assert.ok(meet.results.every(result=>result.proof&&result.points>0&&result.prize>0&&result.fame>0));
+  for(const result of meet.results)assert.deepEqual(result.proof?.stats,before);
+  const after={...r.stats};
+  assert.throws(()=>command(c,{type:'entry',disciplines:[...DISCIPLINES]},identity,true),GameError);
+  assert.deepEqual(r.stats,after);
 });
 
 test('eight consecutive seasons yield 48 distinct meets, promotion, resets, and one immutable archive',()=>{

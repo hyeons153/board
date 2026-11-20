@@ -22,7 +22,7 @@ export const EXTRA_EVENTS: EventDef[] = [
     choice('박자에 맞춰 따라간다',{relation:9,stat:'carve',gain:2,energy:-4},'dance','freestyle'),
     choice('함께 강변을 한 바퀴 돈다',{relation:5,stat:'speed',gain:2},'balanced','trick')]},
   {id:'harin-route',kind:'합동 훈련',npc:'ha',title:'돌아오는 발걸음',body:'하린이 같은 스텝을 뒤로 밟아 보자고 한다. 손목시계는 재촉하지 않기로 했다.',story:true,important:true,when:r=>r.week>=14&&r.spot==='river'&&chosen(r,'harin-lap',0)&&(r.relations.ha??0)>=9,choices:[
-    choice('백워드 크로스스텝을 배운다',{skill:'back-cross',study:100,energy:-6,relation:8},'dance','freestyle'),
+    choice('백워드 크로스스텝을 배운다',{skill:'back-cross',teach:true,energy:-6,relation:8},'dance','freestyle'),
     choice('코스의 곡선을 먼저 익힌다',{stat:'carve',gain:3,relation:6},'balanced','trick')]},
   {id:'harin-coach',kind:'관계',npc:'ha',title:'시계 없이 달리기',body:'오늘 하린은 시계를 두고 나왔다. 속도를 기록하는 대신, 언제 풍경이 달라지는지 말해 달라고 한다.',when:r=>r.spot==='park'&&chosen(r,'harin-lap',1),choices:[
     choice('오르막 전에 호흡을 맞춘다',{stat:'speed',gain:3,relation:8},'balanced','trick'),
@@ -40,7 +40,7 @@ export const EXTRA_EVENTS: EventDef[] = [
     choice('야간 잼에 같이 간다',{relation:10,stat:'balance',gain:2},'trick','freestyle'),
     choice('다음에 갈 위치를 기록한다',{relation:6,energy:8},'balanced','dance')]},
   {id:'noa-pop',kind:'기술 습득',npc:'noa',title:'조명 아래서 도는 데크',body:'실패 영상을 스무 번 본 노아가 발끝 위치 한 곳에 빨간 점을 찍었다.',story:true,important:true,when:r=>r.spot==='night'&&r.week>=15&&chosen(r,'neon-invite',0),choices:[
-    choice('팝샤빗을 프레임 단위로 배운다',{skill:'pop-shuvit',study:100,energy:-7,relation:9},'trick','freestyle'),
+    choice('팝샤빗을 프레임 단위로 배운다',{skill:'pop-shuvit',teach:true,energy:-7,relation:9},'trick','freestyle'),
     choice('착지만 느리게 반복한다',{stat:'balance',gain:3,relation:7},'balanced','dance')]},
   {id:'noa-crew',kind:'라이벌',npc:'noa',title:'카메라를 끄고 한 번만',body:'노아가 카메라 배터리를 뺐다. 오늘만큼은 기록할 사람 대신 함께 탈 사람이 필요하다.',when:r=>r.spot==='night'&&!!r.events['noa-pop'],choices:[
     choice('번갈아 시그니처를 시도한다',{relation:11,energy:-7,fame:3},'trick','freestyle'),

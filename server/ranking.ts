@@ -1,5 +1,5 @@
 import { calendarFor, meetById, RULES } from '../src/game/data.js';
-import { simulateRun } from '../src/game/competition.js';
+import { CURRENT_RUN_RULES, simulateRun } from '../src/game/competition.js';
 import { equippedLook, freshExtras } from '../src/game/economy.js';
 import { chooseEnding, endingName, honors, summarize } from '../src/game/legacy.js';
 import { representativeTitle } from '../src/game/relationships.js';
@@ -20,7 +20,8 @@ function canonical(value:unknown):string {
 }
 export function verifiedResult(archive:Archive,meet:MeetRecord,result:Result){
   const proof=result.proof;
-  if(!proof||proof.version!==RUN_PROOF_VERSION||(proof.rules!==undefined&&proof.rules!==1&&proof.rules!==2&&proof.rules!==3)||!meetById(meet.id)) return false;
+  if(!proof||proof.version!==RUN_PROOF_VERSION||
+    (proof.rules!==undefined&&(!Number.isInteger(proof.rules)||proof.rules<1||proof.rules>CURRENT_RUN_RULES))||!meetById(meet.id)) return false;
   const player=result.standings.find(row=>row.id==='player');
   if(!player||player.name!==archive.name||player.score!==result.run.score) return false;
   const sorted=[...result.standings].sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));

@@ -1,6 +1,7 @@
 import { ACTION_NAMES, ACTION_STORIES, calendarFor, DISCIPLINE_NAMES, LOCATIONS, RULES, SKILL, SKILLS, START_SKILLS, STAT_NAMES } from './data.js';
 import { generateRoutine, learned, simulateMeet, validRoutine } from './competition.js';
-import { autoChoice, canStudy, eventCast, eventChoiceAvailable, eventFor, eventPaused, pickEvent } from './events.js';
+import { autoChoice, eventCast, eventChoiceAvailable, eventFor, eventPaused, pickEvent } from './events.js';
+import { canStudy, nextSkillTraining } from './skillTree.js';
 import { chooseEnding, honors, mentorFrom } from './legacy.js';
 import { RUN_PROOF_VERSION } from './public.js';
 import { meetRP } from './rp.js';
@@ -11,7 +12,7 @@ import { RELATIONSHIP_NAMES, RELATIONSHIP_TITLES, rooftopUnlocked } from './rela
 import { applyStoryImpact, name as storyNpcName, storyAffinity } from './storyState.js';
 import type { Happening } from './happenings.js';
 import { greatTraining, meetTrainingAvailable, randomSpecialTraining, specialTraining, specialTrainingForm, statAfter, trainingCost, trainingFactor, trainingStatGains, trainingSuccess } from './training.js';
-import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family, type Settings } from './types.js';
+import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family, type Settings, type Stat, type Result } from './types.js';
 
 export class GameError extends Error {}
 export const singleEntry=(entries:readonly Discipline[]):Discipline[]=>entries.slice(0,1);
@@ -200,11 +201,12 @@ function autoPlan(r:Rider):Plan {
   const technique=rng()<(strategy==='balanced'?.39:.59);
   if(special==='dance'||special==='trick'||!special&&technique){
     const family=special??preferredFamily;
-    const available=SKILLS.filter(s=>s.family===family&&canStudy(r,s.id));
-    const priorities=available.filter(s=>!learned(r.skills,s.id)).sort((a,b)=>(r.skills[b.id]?.study??0)-(r.skills[a.id]?.study??0)||a.difficulty-b.difficulty);
-    const target=priorities[0] ?? [...available].filter(s=>(r.skills[s.id]?.mastery??0)<94).sort((a,b)=>(r.skills[a.id]?.mastery??0)-(r.skills[b.id]?.mastery??0))[0];
-    const spot=target&&target.difficulty>=3&&spotUnlocked(r,'night')?'night':target&&rng()<.37?'studio':family==='dance'?'river':'plaza';
-    return {...base,action:family,spot,skill:target?.id};
+    const target=nextSkillTraining(r,family)??(!special?nextSkillTraining(r,family==='dance'?'trick':'dance'):undefined);
+    if(target||special){
+      const action=target?.family??family;
+      const spot=target&&target.difficulty>=3&&spotUnlocked(r,'night')?'night':target&&rng()<.37?'studio':action==='dance'?'river':'plaza';
+      return {...base,action,spot,skill:target?.id};
+    }
   }
   const prioritiesByStrategy = {
     balanced:{speed:0,carve:0,link:0,balance:0},
@@ -248,9 +250,9 @@ function applyEvent(r:Rider,index:number){
     const change=round(r.relations[npc]-before);
     if(change)details.push(`관계 ${change>0?'+':''}${change}`);
   }
-  if(fx.skill&&canStudy(r,fx.skill)){
+  if(fx.skill&&SKILL[fx.skill]&&(fx.teach?!learned(r.skills,fx.skill):canStudy(r,fx.skill))){
     const before={study:r.skills[fx.skill]?.study??0,mastery:r.skills[fx.skill]?.mastery??0};
-    trainSkill(r,fx.skill,fx.study??0,4);
+    trainSkill(r,fx.skill,fx.teach?100:fx.study??0,4);
     const after=r.skills[fx.skill]!;
     const changes=[after.study>before.study?`학습 +${round(after.study-before.study)}%`:undefined,after.mastery>before.mastery?`숙련 +${round(after.mastery-before.mastery)}%`:undefined].filter(Boolean);
     if(changes.length)details.push(`${SKILL[fx.skill]!.name} ${changes.join(' · ')}`);
@@ -351,6 +353,26 @@ function finishWeek(c:Career,r:Rider) {
   } else r.week++;
   r.phase='plan'; r.plan=null; r.entries=null;
 }
+const podiumStats:Record<Discipline,[Stat,Stat]>={dance:['carve','speed'],trick:['balance','link'],freestyle:['link','carve']};
+
+export function awardPodiumGrowth(r:Pick<Rider,'stats'>,results:Result[],international:boolean){
+  const podium=results.filter(result=>playerPlace(result)<=RULES.podiumGrowth.length);
+  const eligible=international
+    ?podium.sort((a,b)=>playerPlace(a)-playerPlace(b)||DISCIPLINES.indexOf(a.discipline)-DISCIPLINES.indexOf(b.discipline)).slice(0,1)
+    :podium;
+  for(const result of eligible){
+    const increases=RULES.podiumGrowth[playerPlace(result)-1];
+    const gains:Partial<Record<Stat,number>>={};
+    podiumStats[result.discipline].forEach((stat,index)=>{
+      const before=r.stats[stat];
+      r.stats[stat]=statAfter(before,increases[index]);
+      const increase=round(r.stats[stat]-before);
+      if(increase>0)gains[stat]=increase;
+    });
+    if(Object.keys(gains).length)result.statGains=gains;
+  }
+}
+
 function runMeet(c:Career,r:Rider,disciplines:Discipline[],official:boolean) {
   const meet=currentMeet(r);
   if(!meet) throw new GameError('이번 주에 예정된 대회가 없어요.');
@@ -373,6 +395,7 @@ function runMeet(c:Career,r:Rider,disciplines:Discipline[],official:boolean) {
     const landed=new Set(result.run.log.filter(l=>l.outcome!=='miss').map(l=>l.id));
     for(const id of landed) trainSkill(r,id,0,1.4);
   }
+  awardPodiumGrowth(r,results,!!meet.international);
   r.records.push({year:r.year,id:meet.id,division:divisionFor(r.year),results});
   if(results.length){
     award(r,'meet','첫 대회 완주');
@@ -406,7 +429,9 @@ export function processWeek(c:Career,official=false,setup?:import('./types.js').
   const r=c.rider;
   if(!r||r.phase!=='plan'||(!r.plan&&r.settings.mode==='manual')) return false;
   r.extras=upgradeEquipment(r.extras??freshExtras());
-  const plan=r.plan??autoPlan(r);
+  let plan=r.plan??autoPlan(r);
+  // An unfinished plan saved before the mastery rules can finish as free practice.
+  if(plan.skill&&SKILL[plan.skill]&&!canStudy(r,plan.skill))plan={...plan,skill:undefined,lesson:undefined};
   validatePlan(r,plan);
   train(r,plan,setup);
   r.plan=null;

@@ -2,22 +2,32 @@ import { ArrowDown, ArrowUp, Check, ChevronRight, CirclePlay, Clock3, LockKeyhol
 import { useRef, useState } from 'react';
 import { DISCIPLINE_NAMES, DIFFICULTY_NAMES, KIND_NAMES, RULES, SKILLS, SKILL, STYLE_NAMES } from '../game/data';
 import { allowed, chance, generateRoutine, learned, routineTime } from '../game/competition';
-import { canStudy } from '../game/events';
+import { canStudy, mastered, missingMastery } from '../game/skillTree';
 import { skillDescription } from '../game/content';
 import { TechniquePreview } from './TechniquePreview';
 import { DISCIPLINES, STYLES, type Discipline, type Rider, type Skill } from '../game/types';
 import { Tag } from './Brand';
 import type { Submit } from './Overview';
 
+const trickSides=[['all','전체 트릭'],['nose','노즈트릭'],['tail','테일트릭']] as const;
+const trickName=(skill:Skill)=>trickSides.find(([id])=>id===skill.trickSide)?.[1]??DISCIPLINE_NAMES[skill.family];
+const missingSkills=(r:Rider,ids:string[])=>ids.map(id=>{
+  const current=learned(r.skills,id)?r.skills[id].mastery:0;
+  return `${SKILL[id]?.name} ${current}% / 100% (남은 숙련도 ${Math.round((100-current)*10)/10}%p)`;
+}).join(' · ');
+
 export function Skills({r}:{r:Rider}){
   const [family,setFamily]=useState<'all'|'dance'|'trick'>('all');
+  const [trickSide,setTrickSide]=useState<typeof trickSides[number][0]>('all');
   const [status,setStatus]=useState<'all'|'learned'|'unlearned'>('all');
   const [selected,setSelected]=useState<string>();
   const [preview,setPreview]=useState<string|null>(null);
   const detail=useRef<HTMLElement>(null);
   const trigger=useRef<HTMLButtonElement>(null);
   const ready=SKILLS.filter(s=>learned(r.skills,s.id)).length;
-  const list=SKILLS.filter(s=>(family==='all'||family===s.family)&&(status==='all'||learned(r.skills,s.id)===(status==='learned')));
+  const list=SKILLS.filter(s=>(family==='all'||family===s.family)&&
+    (family!=='trick'||trickSide==='all'||trickSide===s.trickSide)&&
+    (status==='all'||learned(r.skills,s.id)===(status==='learned')));
   const skill=list.find(s=>s.id===selected);
   const select=(id:string|undefined,button?:HTMLButtonElement)=>{
     setSelected(id);
@@ -37,6 +47,9 @@ export function Skills({r}:{r:Rider}){
       <label>습득 상태<select value={status} onChange={e=>{setStatus(e.target.value as typeof status);setPreview(null);}}><option value="all">모두 보기</option><option value="learned">습득</option><option value="unlearned">미습득</option></select></label>
       <Tag kind="lime">습득 {ready} / {SKILLS.length}</Tag>
     </div>
+    {family==='trick'&&<div className="pill-row skill-trick-filters" role="group" aria-label="트릭 하위 분류">
+      {trickSides.map(([id,label])=><button key={id} className="pill" aria-pressed={trickSide===id} onClick={()=>{setTrickSide(id);setPreview(null);}}>{label}</button>)}
+    </div>}
     {!list.length&&<p className="game-empty">조건에 맞는 기술이 없어요.</p>}
     <div className={'skill-browser'+(skill?' has-detail':'')}>
       <div className="skill-list">{list.map(s=>{
@@ -48,10 +61,11 @@ export function Skills({r}:{r:Rider}){
       return <button key={s.id} className={'skill-entry-summary'+(known?' is-known':'')+(!available?' is-locked':'')}
           aria-expanded={open} aria-controls={open?'skill-detail':undefined} aria-label={s.name+' 상세'}
           onClick={event=>select(open?undefined:s.id,event.currentTarget)}>
-          <span className="skill-entry-title"><strong>{s.name}</strong><small>{DISCIPLINE_NAMES[s.family]} · {DIFFICULTY_NAMES[s.difficulty]}</small></span>
-          <span className="skill-entry-state">{known?<><Check size={14}/> 습득</>:available?'미습득':<><LockKeyhole size={14}/> 잠김</>}</span>
+          <span className="skill-entry-title"><strong>{s.name}</strong><small>{trickName(s)} · {DIFFICULTY_NAMES[s.difficulty]}</small></span>
+          <span className="skill-entry-state">{known?<><Check size={14}/> {mastered(r.skills,s.id)?'마스터':'습득'}</>:available?'미습득':<><LockKeyhole size={14}/> 잠김</>}</span>
           <ChevronRight size={16} className="skill-chevron"/>
           {available&&<span className="skill-entry-progress"><span>{known?'숙련도':'학습'}</span><progress max={100} value={value} aria-label={s.name+(known?' 숙련도':' 학습 진척도')}/><b>{value}%</b></span>}
+          {!available&&<span className="skill-entry-prerequisites">{missingSkills(r,missingMastery(r.skills,s))}</span>}
         </button>;
       })}</div>
       {skill&&<section className="skill-detail" id="skill-detail" key={skill.id} ref={detail} tabIndex={-1} aria-label={skill.name+' 기술 정보'}>
@@ -64,14 +78,15 @@ export function Skills({r}:{r:Rider}){
 function SkillDetail({r,skill:s,preview,onPreview,onClose}:{r:Rider;skill:Skill;preview:boolean;onPreview:()=>void;onClose:()=>void}){
   const {id}=s;
   const known=learned(r.skills,id);
+  const missing=known?[]:missingMastery(r.skills,s);
   const estimate=chance(known?r:{...r,skills:{...r.skills,[id]:{study:100,mastery:17}}},s);
   return <>
     <header><h2>{s.name}</h2><button className="icon-button" aria-label="기술 상세 닫기" onClick={onClose}><X size={17}/></button></header>
     <p>{skillDescription(id)}</p>
     <dl className="game-facts">
       <div><dt>동작</dt><dd>{KIND_NAMES[s.kind]} · {s.points}점 · {s.seconds}초</dd></div>
-      <div><dt>선행 기술</dt><dd>{s.requires.length?s.requires.map(id=>SKILL[id]?.name).join(' · '):'없음'}</dd></div>
-      <div><dt>{known?'대회 성공률':'습득 직후 성공률'}</dt><dd>약 {Math.round(estimate*100)}%</dd></div>
+      <div><dt>선행 기술</dt><dd>{missing.length?missingSkills(r,missing):s.requires.length?s.requires.map(id=>SKILL[id]?.name).join(' · '):'없음'}</dd></div>
+      <div><dt>{known?'대회 성공률':'습득 직후 예상 성공률'}</dt><dd>약 {Math.round(estimate*100)}%</dd></div>
     </dl>
     <div className="skill-detail-actions">
       <button className="button secondary small" aria-expanded={preview} aria-label={s.name+' 미리보기'} onClick={onPreview}><CirclePlay size={16}/> {preview?'동작 닫기':'동작 보기'}</button>
