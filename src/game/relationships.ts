@@ -177,7 +177,7 @@ function storyFor(npc:ArcId,arc:Arc):EventDef[]{
   const id=(episode:string)=>atArc(npc,episode);
   const scene=(episode:string,content:Pick<EventDef,'title'|'body'|'choices'>,when:EventDef['when'],decision=false):EventDef=>
     ({...content,id:id(episode),npc,kind:decision?'관계 선택':'개인 에피소드',story:true,anyGender:true,decision,when,
-      ...(episode==='confession'?{requiresChoice:true}:{})});
+      ...(episode==='fork'||episode==='confession'?{requiresChoice:true}:{})});
   const established=(r:Rider)=>arc.introductions.some(event=>r.events[event]);
   const trust={...arc.trust,body:(r:Rider)=>established(r)?arc.trust.body:arc.reunion};
   const fork={...arc.fork,body:(r:Rider)=>{

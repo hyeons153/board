@@ -654,3 +654,36 @@
   .weekly-confirm { min-height:47px; }
   .weekly-confirm .weekly-execute { min-height:38px; }
 }
+
+.competition-stage.is-feature-match .game-dialogue { border-color:#e7c984; }
+.competition-stage.is-feature-match .game-caption { color:#f9dea2; }
+.match-scores { display:flex; gap:8px; margin:8px 0; }
+.match-scores > div {
+  flex:1;
+  min-width:0;
+  display:grid;
+  gap:3px;
+  padding:7px 10px;
+  border:1px solid #bacad160;
+  border-radius:5px;
+  background:#253b52;
+  overflow-wrap:anywhere;
+}
+.match-scores span { font-size:.78rem; }
+.match-scores strong { color:#fff8de; font:800 clamp(1.3rem,3.5vw,2rem)/1 var(--mono); }
+.match-scores small { margin-left:3px; }
+.match-scores .match-player-score { background:#344a4b; border-color:#d8ef9b; }
+.match-player-score strong { color:#e1f4ab; }
+.game-console .game-dialogue .match-context,
+.game-console .game-dialogue .match-closing-skill { margin:4px 0; font-size:.81rem; }
+.game-dialogue .match-closing-skill { color:#e4f39f; }
+.game-dialogue .match-closing-skill.outcome-miss { color:#ffbea7; }
+.match-moment { padding:2px 6px; border:1px solid #e7c984; border-radius:4px; color:#ffe3a0; }
+@media (prefers-reduced-motion:no-preference) {
+  .match-scores.is-revealing .match-player-score { animation:match-score-reveal .28s .18s ease-out both; }
+  .is-feature-match .match-scores.is-revealing .match-player-score { animation-delay:.5s; }
+}
+@keyframes match-score-reveal {
+  from { opacity:0; transform:translateY(5px); }
+  to { opacity:1; transform:translateY(0); }
+}

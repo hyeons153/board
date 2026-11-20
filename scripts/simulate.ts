@@ -13,6 +13,7 @@ import { DISCIPLINES, STATS, STRATEGIES, type Career } from '../src/game/types';
 const count=Number(process.argv[2]??12);
 if(!Number.isInteger(count)||count<1||count>100) throw new Error('Choose between 1 and 100 seeds.');
 const nonRomance:Record<string,number>={
+  'relationship-yu-partner':0,'relationship-jun-partner':0,'story-noa-3':0,'story-sol-3':0,
   'story-jun-2':1,'story-min-4':1,'story-sol-4':1,'story-jun-4':1,'story-ha-4':1,'story-noa-4':1,'story-yu-4':0,
 };
 

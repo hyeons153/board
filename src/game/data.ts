@@ -28,7 +28,7 @@ export const RULES = {
   ],
 } as const;
 
-export const AUTO_FLOW={choiceMs:2000,resultMs:2000,ceremonyMs:2000,entryMs:5000,exitMs:3000} as const;
+export const AUTO_FLOW={choiceMs:1000,resultMs:2000,ceremonyMs:2000,entryMs:5000,exitMs:3000} as const;
 
 export const STAT_NAMES = { speed:'속도', carve:'카빙', link:'연계', balance:'밸런스' };
 export const DISCIPLINE_NAMES: Record<Discipline,string> = { dance:'댄싱', trick:'트릭', freestyle:'프리스타일' };

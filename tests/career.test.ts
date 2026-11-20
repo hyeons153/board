@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CALENDAR, calendarFor, formatCareerDate, formatMonthWeek, INTERNATIONAL_MEETS, monthWeek, DEFAULT_LOOK, RULES, SKILL, SKILLS, START_SKILLS } from '../src/game/data';
+import { AUTO_FLOW, CALENDAR, calendarFor, formatCareerDate, formatMonthWeek, INTERNATIONAL_MEETS, monthWeek, DEFAULT_LOOK, RULES, SKILL, SKILLS, START_SKILLS } from '../src/game/data';
 import { awardPodiumGrowth, command, divisionFor, GameError, newRider, prepareWeek, processWeek } from '../src/game/career';
 import { chance, competitionStandings, generateRoutine, learned, routineTime, simulateMeet, simulateRun, validRoutine } from '../src/game/competition';
 import { ECONOMY, equippedLook, extras, gearBonuses, playerPlace, SPONSOR } from '../src/game/economy';
@@ -11,6 +11,8 @@ import { canStudy, nextSkillTraining } from '../src/game/skillTree';
 import { RIVALS, spotRegulars, spotUnlocked, spotVisitor } from '../src/game/content';
 import { HAPPENINGS, pickHappening } from '../src/game/happenings';
 import { NPC_WORKSHOPS, trainingPromiseActive, workshopId, workshopTitle } from '../src/game/npcWorkshops';
+import { ceremonyDuration, eventResultDuration, trainingResultDuration } from '../src/game/autoFlow';
+import { closingSkill, featureMatch, matchPresentation } from '../src/game/matchPresentation';
 import { currentObjectives, ensureObjectives, objectiveTrainingPlan, settleObjectives } from '../src/game/objectives';
 import { CREW_STORIES } from '../src/game/crewStories';
 import { STORY_ARCS } from '../src/game/storyArcs';
@@ -19,7 +21,7 @@ import { RELATIONSHIP_REWARDS, relationshipEpilogues, relationshipWith, represen
 import { seeded } from '../src/game/random';
 import { meetRP, rankingPoints, seasonPlace } from '../src/game/rp';
 import { advance, blankSave, remaining } from '../server/clock';
-import { DISCIPLINES, SPOTS, STATS, TRAINING_ACTIONS, type Career, type Plan, type Spot } from '../src/game/types';
+import { DISCIPLINES, SPOTS, STATS, TRAINING_ACTIONS, type Career, type Plan, type Spot, type MeetRecord, type Result } from '../src/game/types';
 
 const identity=()=>({id:'rider-1',seed:5411});
 const career=():Career=>({rider:newRider(identity().id,identity().seed,'리버',{...DEFAULT_LOOK}),hall:[]});
@@ -191,21 +193,84 @@ test('manual event preference pauses a regular auto choice and skip shortens onl
   assert.deepEqual(resumed.career.rider?.records[0].results,result);
 });
 
-test('pending relationship choices resume in foreground and background using the saved event-skip setting',()=>{
+test('relationship turning points and advanced workshops wait for the player despite event skip',()=>{
   for(const action of [{type:'pulse'},{type:'pulse',background:'hidden'}] as const){
-    const save=blankSave(),r=career().rider!;
-    save.career.rider=r;
-    r.year=6;r.week=11;r.phase='event';r.event='relationship-yu-partner';
-    r.energy=20;
-    r.settings={mode:'auto',strategy:'dance',entries:['dance'],manualEvents:false,pauseStory:true};
-    r.extras!.relationships={npcs:{yu:{state:'partner',flags:['confession-accepted']}},titles:[]};
-    const next=advance(save,action,'tab',2000,RULES.weekMs,identity);
-    assert.equal(next.clock.pendingEvent?.eventId,'relationship-yu-partner');
-    assert.equal(next.career.rider?.events['relationship-yu-partner'],1);
-    assert.equal(relationshipWith(next.career.rider!,'yu')?.state,'partner');
-    assert.equal(next.career.rider?.extras?.choices['relationship-yu-partner'].index,0);
-    assert.equal(next.career.rider?.week,12);
+    for(const eventId of ['relationship-yu-fork','relationship-yu-confession','relationship-yu-partner','career-first-season',workshopId('ha')]){
+      const save=blankSave(),r=career().rider!;
+      Object.assign(r,{year:6,week:11,phase:'event',event:eventId,energy:20});
+      r.settings={mode:'auto',strategy:'dance',entries:['dance'],skipEvents:true};
+      if(eventId.endsWith('-partner'))r.extras!.relationships={npcs:{yu:{state:'partner',flags:['confession-accepted']}},titles:[]};
+      save.career.rider=r;
+      assert.equal(advance(save,action,'tab',2000,RULES.weekMs,identity),save);
+      assert.equal(r.events[eventId],undefined);
+      if(eventId.endsWith('-partner')){
+        const answered=advance(save,{type:'event',eventId,index:1},'tab',2100,RULES.weekMs,identity);
+        assert.equal(relationshipWith(answered.career.rider!,'yu')?.state,'ended');
+        assert.equal(answered.clock.pendingEvent?.eventId,eventId);
+        assert.equal(answered.career.rider?.settings.mode,'auto');
+        assert.throws(()=>advance(answered,{type:'event',eventId,index:1},'tab',2200,RULES.weekMs,identity),GameError);
+      }
+    }
   }
+});
+
+test('match presentation uses saved scores, ranks, prior meetings and the last difficult move',()=>{
+  const r=career().rider!;
+  r.relations.jun=57;
+  const result=(score:number,opponent:number,place:number,opponentPlace:number):Result=>({
+    discipline:'trick',run:{score,parts:{},log:[]},standings:[
+      {id:'jun',name:'강준',score:opponent,place:opponentPlace},
+      {id:'player',name:r.name,score,place},
+      {id:'yu',name:'한유리',score:81,place:3},
+    ],points:100,energy:50,prize:0,fame:0,
+  });
+  const earlier:MeetRecord={id:'regular-1',year:3,division:'regular',results:[result(87,88,2,1)]};
+  const now=result(92.1,91.4,1,2);
+  now.run.log=[
+    {id:'hardflip',at:12,end:14,outcome:'great',combo:2,linked:true,points:19},
+    {id:'hardflip',at:38,end:41,outcome:'miss',combo:0,linked:null,points:0},
+    {id:'mango',at:42,end:44,outcome:'clean',combo:1,linked:null,points:10},
+  ];
+  const match:MeetRecord={...earlier,id:'major-1',results:[now]};
+  const after:MeetRecord={...earlier,year:4,results:[result(99,90,1,2)]};
+  r.records=[after,earlier,match];
+  const snapshot=structuredClone(r);
+  const story=matchPresentation(r,match,now,true)!;
+  assert.equal(story.title,'역전 우승!');
+  assert.equal(story.gap,.7);
+  assert.equal(story.leader?.id,'jun');
+  assert.equal(story.rematch?.id,'jun');
+  assert.equal(story.personalBest,87);
+  assert.equal(story.reaction?.name,'강준');
+  assert.equal(closingSkill(now.run)?.outcome,'miss');
+  assert.equal(matchPresentation(r,match,now,false)?.reaction,undefined);
+  assert.equal(matchPresentation(r,match,result(91.4,92.1,2,1),true)?.title,'아쉬운 접전');
+  assert.equal(matchPresentation(r,match,result(92.1,92.1,1,1),true)?.title,'공동 1위');
+  assert.equal(matchPresentation(r,match,result(92.1,92.1,2,1),true)?.title,'2위로 마쳤다');
+  assert.equal(matchPresentation(r,match,result(87,85,1,2),true)?.personalBest,undefined);
+  assert.deepEqual(r,snapshot);
+});
+
+test('background auto mode shortens routine results and can watch just featured competitions',()=>{
+  const save=blankSave(),r=career().rider!;
+  const step=(prev:typeof save,elapsed:number)=>advance(prev,{type:'pulse',background:'hidden'},'feature',1_000_000+elapsed,RULES.weekMs,identity);
+  r.settings={mode:'auto',strategy:'balanced',entries:['dance'],skipMeets:true,watchMajor:true};
+  const international=INTERNATIONAL_MEETS[0];
+  const record:MeetRecord={id:international.id,year:2,division:'rookie',results:simulateMeet(r,international,['dance']).results};
+  save.career.rider=r;
+  r.records.push(record);
+  save.clock.pendingMeet=r.id+':2:'+record.id;
+  const duration=AUTO_FLOW.entryMs+RULES.runSeconds*1000+AUTO_FLOW.exitMs+ceremonyDuration(record,true);
+  const watched=step(save,0);
+  assert.equal(featureMatch(record),'국제대회');
+  assert.equal(featureMatch({id:'festival',division:'master'}),'마스터부 시즌 결승');
+  assert.equal(watched.clock.background?.at,1_000_000+duration);
+  assert.equal(step(watched,AUTO_FLOW.ceremonyMs),watched);
+  assert.equal(step(watched,duration).clock.pendingMeet,undefined);
+  const routine={grade:'success',text:'',year:1,week:1} as const;
+  assert.ok(trainingResultDuration(routine)<AUTO_FLOW.resultMs);
+  assert.equal(trainingResultDuration({...routine,special:'random'}),AUTO_FLOW.resultMs);
+  assert.equal(eventResultDuration({key:'casual',eventId:'park-tea',title:'',kind:'',choice:'',details:[],year:1,week:1}),1000);
 });
 
 test('RP comes from competition, accumulates after a new season, and restores exact saved season totals without duplication',()=>{

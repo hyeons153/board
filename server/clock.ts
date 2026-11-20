@@ -2,7 +2,8 @@ import { command, currentMeet, divisionFor, GameError, prepareWeek, processWeek,
 import { extras } from '../src/game/economy.js';
 import { AUTO_FLOW, RULES } from '../src/game/data.js';
 import { eventPaused } from '../src/game/events.js';
-import { happeningDuration } from '../src/game/happenings.js';
+import { ceremonyDuration, eventResultDuration, trainingResultDuration } from '../src/game/autoFlow.js';
+import { skipsMatch } from '../src/game/matchPresentation.js';
 import { meetTrainingAvailable } from '../src/game/training.js';
 import type { Career, EventOutcome, GameAction, TrainingSetup } from '../src/game/types.js';
 
@@ -49,13 +50,15 @@ function backgroundAction({clock}:Save):GameAction{
 
 function backgroundDeadline(save:Save,now:number){
   const {clock,career:{rider}}=save;
-  if(clock.pendingTraining)return now+AUTO_FLOW.resultMs;
+  if(clock.pendingTraining)return now+trainingResultDuration(rider?.extras?.lastTraining);
   const event=visibleEvent(clock);
-  if(event)return now+(event.happening?happeningDuration(event.dialogue??''):AUTO_FLOW.resultMs);
+  if(event)return now+eventResultDuration(event);
   if(clock.pendingMeet){
-    const runs=rider?.records.findLast(record=>rider.id+':'+record.year+':'+record.id===clock.pendingMeet)?.results.length??0;
-    const runMs=rider?.settings.skipMeets?AUTO_FLOW.ceremonyMs:AUTO_FLOW.entryMs+RULES.runSeconds*1000+AUTO_FLOW.exitMs+AUTO_FLOW.ceremonyMs;
-    return now+(runs?runs*runMs:AUTO_FLOW.resultMs);
+    const record=rider?.records.findLast(match=>rider.id+':'+match.year+':'+match.id===clock.pendingMeet);
+    if(!rider||!record?.results.length)return now+AUTO_FLOW.resultMs;
+    const full=!skipsMatch(rider.settings,record);
+    const runMs=full?AUTO_FLOW.entryMs+RULES.runSeconds*1000+AUTO_FLOW.exitMs:0;
+    return now+record.results.length*(runMs+ceremonyDuration(record,full));
   }
   if(!rider||rider.phase==='retired'||awaitingDecision(rider))return undefined;
   if(clock.pendingChoice)return now+AUTO_FLOW.choiceMs;

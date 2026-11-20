@@ -152,6 +152,9 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.deepEqual(optionsChecks.map(node=>node.checked),[true,false]);
     const beforeApply=requestActions.filter(action=>action==='settings').length;
     await act(async()=>{optionsChecks[0].click();optionsChecks[1].click();});
+    const majorOption=win.document.querySelectorAll<HTMLInputElement>('.auto-settings input[type="checkbox"]')[2];
+    assert.match(majorOption.parentElement!.textContent!,/국제대회와 마스터부 시즌 결승/);
+    await act(async()=>majorOption.click());
     const entryRadios=[...win.document.querySelectorAll<HTMLInputElement>('.auto-settings input[type="radio"]')];assert.equal(entryRadios.filter(input=>input.checked).length,1);
     await act(async()=>entryRadios[1].click());await settle();await act(async()=>{await Promise.all([...pendingRequests]);});
     assert.equal(win.document.querySelectorAll('.auto-settings input[type="radio"]:checked').length,1);
@@ -389,7 +392,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       assert.equal(win.document.querySelector('.game-reward')?.textContent,'체력 -23');
     }
     const story=newRider('story-ui',991,'Story rider',DEFAULT_LOOK);
-    story.year=3;story.week=9;story.phase='event';story.event='relationship-yu-fork';story.settings.mode='auto';story.settings.skipEvents=false;
+    story.year=3;story.week=9;story.phase='event';story.event='relationship-yu-fork';story.settings.mode='auto';story.settings.skipEvents=true;
     let submitted:unknown;
     const sendStory=async(action:unknown)=>{submitted=action;return true;};
     const storyProps={r:story,send:sendStory,saving:false,remaining:0,weekMs:2000,fastForward:false,spot:'river' as const,motion:'rest' as const,onDone:()=>{}};
@@ -434,6 +437,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     rider.settings.skipMeets=true;
     await act(async()=>root.render(createElement(GameStage,{r:rider,send:async()=>true,saving:false,remaining:0,weekMs:2000,fastForward:false,spot:'river',motion:'ride',record,onDone:()=>{}})));
     assert.ok(win.document.querySelector('[aria-label="대회 시상식"]'));
+    assert.equal(win.document.querySelectorAll('[aria-label="최종 점수"] strong').length,2);
     assert.match(win.document.querySelector('[aria-label="대회 시상식"]')!.textContent!,/입상 성장 · 속도 \+0\.3 · 카빙 \+0\.7/);
     assert.equal(win.document.querySelectorAll('.game-podium .place-1').length,2);
     assert.match(win.document.querySelector('.game-scoreboard')!.textContent!,/2회차 \(71% 반영\)/);
@@ -476,6 +480,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       const began=playbackNow;
       await act(async()=>root.render(stage()));
       assert.equal(win.document.querySelector('[aria-label="대회 스킵"]')?.textContent?.includes('스킵'),true);
+      assert.match(win.document.querySelector('[aria-label="경기 진행"]')!.textContent!,/먼저 발표된 선두/);
       assert.doesNotMatch(win.document.querySelector('[aria-label="인게임 대회"]')!.textContent!,/하이라이트/);
       assert.ok(record.results[0].run.log.length>3);
       assert.equal(win.document.querySelector('.scene-counter button'),null);
@@ -508,18 +513,15 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       assert.equal(win.document.querySelector('[aria-label="자동 행동 선택"] h2')?.textContent,'이번 주엔 무엇을 할까?');
       assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,8);
       assert.equal(win.document.querySelectorAll('.weekly-action-grid > button[aria-pressed="true"]').length,1);
-      await settle(2150);
+      const waitFor=async(selector:string)=>{
+        for(let attempt=0;attempt<120&&!win.document.querySelector(selector);attempt++)await settle(35);
+        assert.ok(win.document.querySelector(selector),'Missing stage: '+selector);
+      };
+      await waitFor('[aria-label="행동 진행"]');
       assert.equal(win.document.querySelector('[aria-label="자동 행동 선택"]'),null);
-      assert.ok(win.document.querySelector('[aria-label="행동 진행"]'));
-      await settle(2250);
-      assert.ok(win.document.querySelector('[aria-labelledby="training-outcome-title"]'));
-      await settle(1000);
-      assert.ok(win.document.querySelector('[aria-labelledby="training-outcome-title"]'),'Result should remain visible for two seconds');
-      await settle(1150);
-      if(win.document.querySelector('[aria-label="이벤트 결과"]')){
-        await settle(1000);assert.ok(win.document.querySelector('[aria-label="이벤트 결과"]'),'Automatic event result must remain visible');
-        await settle(1150);
-      }
+      await waitFor('[aria-labelledby="training-outcome-title"]');
+      await waitFor('[aria-label="자동 행동 선택"]');
+      assert.equal(win.document.querySelector('[aria-labelledby="training-outcome-title"]'),null);
     }
     assert.equal(win.document.querySelector('.console-rider b')!.textContent,'1년차 · 1월 셋째 주');
     await act(async()=>root.unmount());await Promise.allSettled([...pendingRequests]);

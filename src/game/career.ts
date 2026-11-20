@@ -13,7 +13,7 @@ import { clamp, round, seeded } from './random.js';
 import { RELATIONSHIP_NAMES, RELATIONSHIP_TITLES, rooftopUnlocked } from './relationships.js';
 import { applyStoryImpact, name as storyNpcName, storyAffinity } from './storyState.js';
 import type { Happening } from './happenings.js';
-import { greatTraining, isTrainingAction, meetTrainingAvailable, practiceMasteryRate, practiceStudyRate, randomSpecialTraining, specialTraining, specialTrainingForm, statAfter, trainingCost, trainingFactor, trainingStatGains, trainingSuccess } from './training.js';
+import { greatTraining, isTrainingAction, meetTrainingAvailable, practiceMasteryRate, practiceStudyRate, randomSpecialTraining, SECONDARY_STAT, specialTraining, specialTrainingForm, statAfter, trainingCost, trainingFactor, trainingStatGains, trainingSuccess } from './training.js';
 import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family, type Settings, type Stat, type Result } from './types.js';
 
 export class GameError extends Error {}
@@ -207,16 +207,23 @@ function standardAutoPlan(r:Rider):Plan {
   if(r.injury?.severity==='major'&&!r.injury.treated) return {...base,action:'hospital'};
   if(r.injury?.severity==='major') return base;
   const meetTraining=meetTrainingAvailable(r)&&!(r.entries??r.settings.entries).length;
-  const special=meetTraining?undefined:randomSpecialTraining(r);
+  const offer=meetTraining?undefined:randomSpecialTraining(r);
+  const strategy=r.settings.strategy;
+  const specialFamily=offer==='dance'||offer==='trick'?offer:undefined;
+  const skill=specialFamily?nextSkillTraining(r,specialFamily):undefined;
+  const saturated=offer&&offer!=='dance'&&offer!=='trick'&&
+    r.stats[offer]>=RULES.statCap-.5&&r.stats[SECONDARY_STAT[offer]]>=RULES.statCap-.5;
+  const offStrategy=specialFamily&&(strategy==='dance'||strategy==='trick')&&strategy!==specialFamily&&
+    r.energy>=80&&!r.injury&&nextSkillTraining(r,strategy);
+  const special=saturated||offStrategy||specialFamily&&!skill&&r.energy>=65&&!r.injury?undefined:offer;
   if(!meetTraining&&!special&&(r.injury||r.energy<65)) return base;
   if(meetTraining)base.meetTraining=true;
   const rng=seeded(r.seed,r.year,r.week,'auto');
-  const strategy=r.settings.strategy;
   const preferredFamily:Family=rng()<(strategy==='dance'?.86:strategy==='trick'?.16:.51)?'dance':'trick';
   const technique=rng()<(strategy==='balanced'?.39:.59);
   if(special==='dance'||special==='trick'||!special&&technique){
     const family=special??preferredFamily;
-    const target=nextSkillTraining(r,family)??(!special?nextSkillTraining(r,family==='dance'?'trick':'dance'):undefined);
+    const target=special?skill:nextSkillTraining(r,family)??nextSkillTraining(r,family==='dance'?'trick':'dance');
     if(target||special){
       const action=target?.family??family;
       const spot=target&&target.difficulty>=3&&spotUnlocked(r,'night')?'night':target&&rng()<.37?'studio':action==='dance'?'river':'plaza';
@@ -246,8 +253,9 @@ function jointAutoPlan(r:Rider):Plan {
   const statGap=action!=='dance'&&action!=='trick'&&baseStat?Math.max(0,r.stats[action]-r.stats[baseStat]):0;
   const strategy=r.settings.strategy;
   const opposed=family&&(strategy==='dance'||strategy==='trick')&&strategy!==family;
-  const switchingCost=(baseStat&&!family ? .08 : .16)+statGap*.013+(opposed ? .12 : 0);
-  if(offer.growth-1+jointEnergySaving(offer)*.02<=switchingCost)return base;
+  const switchingCost=(baseStat&&!family ? .08 : .16)+statGap*.013+(opposed ? .22 : 0);
+  const benefit=offer.growth-1+jointEnergySaving(offer)*.02+(1-jointInjuryFactor(offer))*.12;
+  if(benefit<=switchingCost)return base;
   return {action,spot:base.spot,skill:target?.id};
 }
 function autoPlan(r:Rider):Plan {

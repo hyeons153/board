@@ -84,9 +84,16 @@ export function eventPaused(r:Rider){
   if(event.requiresChoice)return true;
   if(!event.decision)return false;
   const choices=event.choices.flatMap((choice,index)=>eventChoiceAvailable(r,event,index)?[{choice,impact:choice.story?.(r)}]:[]);
-  const mutualChoice=choices.some(({impact})=>impact?.romanceAttempt&&impact.changes?.some(change=>
-    change.flag==='overlap-requested'||change.state==='partner'&&storyProgress(r,change.npc)?.state!=='partner'));
-  return mutualChoice||!choices.some(({choice,impact})=>keepsRelationship(r,event,choice,impact));
+  const turningPoint=choices.some(({choice,impact})=>{
+    if(impact?.romanceAttempt)return true;
+    const changes=[...(impact?.changes??[])];
+    if(event.npc&&choice.relationship?.state)changes.push({npc:event.npc,state:choice.relationship.state});
+    return changes.some(({npc,state})=>{
+      const previous=storyProgress(r,npc)?.state;
+      return previous!=='ended'&&(state==='ended'||state==='partner'&&previous!=='partner'||previous==='partner'&&!!state&&state!=='partner');
+    });
+  });
+  return turningPoint||!choices.some(({choice,impact})=>keepsRelationship(r,event,choice,impact));
 }
 export const eventBody=(r:Rider,e:EventDef)=>typeof e.body==='string'?e.body:e.body(r);
 export const eventCast=(r:Rider,e:EventDef)=>[...new Set(e.cast?.(r)??(e.npc?[e.npc]:[]))];

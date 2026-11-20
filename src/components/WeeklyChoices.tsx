@@ -101,7 +101,7 @@ const jointBonus=(joint:JointTraining)=>`성장 +${Math.round((joint.growth-1)*1
 export function AutoSettings({r,send,saving,onApplied}:{r:Rider;send:Submit;saving:boolean;onApplied:()=>void}){
   const [draft,setDraft]=useState(()=>({
     strategy:r.settings.strategy,entries:r.settings.entries.slice(0,1),
-    skipEvents:skipsEventChoices(r.settings),skipMeets:!!r.settings.skipMeets,
+    skipEvents:skipsEventChoices(r.settings),skipMeets:!!r.settings.skipMeets,watchMajor:!!r.settings.watchMajor,
   }));
   return <form className="panel auto-settings" onSubmit={async event=>{
     event.preventDefault();
@@ -114,6 +114,8 @@ export function AutoSettings({r,send,saving,onApplied}:{r:Rider;send:Submit;savi
     <fieldset className="auto-presentation-options"><legend>이벤트와 경기</legend>
       <label><input type="checkbox" checked={draft.skipEvents} disabled={saving} onChange={e=>setDraft({...draft,skipEvents:e.target.checked})}/>이벤트 선택지 스킵하기</label>
       <label><input type="checkbox" checked={draft.skipMeets} disabled={saving} onChange={e=>setDraft({...draft,skipMeets:e.target.checked})}/>대회 진행 스킵하기</label>
+      {draft.skipMeets&&<label><input type="checkbox" checked={draft.watchMajor} disabled={saving} onChange={e=>setDraft({...draft,watchMajor:e.target.checked})}/>국제대회와 마스터부 시즌 결승 관람하기</label>}
+      <p>관계를 바꾸거나 특별한 기술을 배우는 순간에는 직접 고를 수 있어요.</p>
     </fieldset>
     <button type="submit" className="button primary" disabled={saving}>설정 적용 <Check size={16}/></button>
   </form>;
