@@ -92,7 +92,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     await act(async()=>{root.render(createElement(App));});
     for(let attempt=0;!win.document.querySelector('.game-console')&&attempt<80;attempt++)await settle(25);
     const frame=win.document.querySelector('.game-console');assert.ok(frame);
-    await click('새 라이더 등록');
+    await click('나만의 라이더 만들기');
     await click('여성');await click('데크 색상 검정');
     assert.equal(win.document.querySelectorAll('.look-presets button').length,5);
     await click('추천 코디 3');
@@ -111,7 +111,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.equal(win.document.querySelector('.gender-options button[aria-pressed="true"]')!.textContent,'여성');
     const name=win.document.querySelector<HTMLInputElement>('input[aria-label="라이더 이름"]')!;
     await act(async()=>{Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype,'value')!.set!.call(name,'UI test rider');name.dispatchEvent(new win.Event('input',{bubbles:true}));});
-    await click('등록하고 시작');
+    await click('육성 시작');
     const created=await handler(new Request('http://127.0.0.1/api/game',{headers:{cookie}}));
     const createdView=await created.json();assert.equal(createdView.career.rider.look.hair,10);assert.equal(createdView.career.rider.look.outfit,1);assert.equal(createdView.career.rider.look.bottom,3);
     const options=win.document.querySelector('[aria-label="이번 주 행동 선택"]')!;
@@ -432,10 +432,10 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     }
     await act(async()=>{await Promise.all([...pendingRequests]);});cookie='';
     await act(async()=>root.render(createElement(App,{key:'automatic-cycle'})));await settle(100);
-    await click('새 라이더 등록');
+    await click('나만의 라이더 만들기');
     const autoName=win.document.querySelector<HTMLInputElement>('input[aria-label="라이더 이름"]')!;
     await act(async()=>{Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype,'value')!.set!.call(autoName,'Auto cycle');autoName.dispatchEvent(new win.Event('input',{bubbles:true}));});
-    await click('등록하고 시작');await click('자동 진행');
+    await click('육성 시작');await click('자동 진행');
     for(let cycle=0;cycle<2;cycle++){
       assert.equal(win.document.querySelector('[aria-label="자동 행동 선택"] h2')?.textContent,'이번 주엔 무엇을 할까?');
       assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,8);

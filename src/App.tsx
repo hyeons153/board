@@ -244,7 +244,7 @@ export default function App(){
   return <div className="console-page"><main className="game-console" aria-label="롱보더 키우기">
     <header className="console-top"><button className="console-brand" onClick={playHome} aria-label="게임 홈"><Brand/></button>
       {r?<div className="console-rider"><span>{r.name}</span><b>{formatCareerDate(r)}</b><small>{DIVISION_NAMES[divisionFor(r.year)]}</small></div>:<span className="console-motto">나만의 롱보드 커리어</span>}
-      <div className="console-top-actions">{active&&<button aria-label="자동 육성 설정" title="자동 육성 설정" onClick={()=>go('training')}><Settings size={18}/></button>}{active&&<button className={'console-auto '+(r!.settings.mode==='auto'?'is-on':'')} aria-label="자동 진행" aria-pressed={r!.settings.mode==='auto'} disabled={game.saving} onClick={async()=>{if(await game.send({type:'settings',settings:{...r!.settings,mode:r!.settings.mode==='auto'?'manual':'auto',pauseStory:false,pauseMeet:false,pauseInjury:false}}))playHome();}}>{r!.settings.mode==='auto'?'AUTO ON':'AUTO OFF'}</button>}<span className="console-save" role="status">{game.saving?'저장 중':view.storage==='neon'?'저장됨':'로컬 저장'}</span><button aria-label="라이더 일지" onClick={()=>go(r?'journal':'menu')}><NotebookText size={18}/></button><button aria-label="계정" onClick={()=>go('account')}><UserRound size={18}/></button></div>
+      <div className="console-top-actions">{active&&<button aria-label="자동 육성 설정" title="자동 육성 설정" onClick={()=>go('training')}><Settings size={18}/></button>}{active&&<button className={'console-auto '+(r!.settings.mode==='auto'?'is-on':'')} aria-label="자동 진행" aria-pressed={r!.settings.mode==='auto'} disabled={game.saving} onClick={async()=>{if(await game.send({type:'settings',settings:{...r!.settings,mode:r!.settings.mode==='auto'?'manual':'auto',pauseStory:false,pauseMeet:false,pauseInjury:false}}))playHome();}}>{r!.settings.mode==='auto'?'AUTO ON':'AUTO OFF'}</button>}{(game.saving||view.storage==='neon')&&<span className="console-save" role="status">{game.saving?'저장 중':'저장됨'}</span>}<button aria-label="라이더 일지" onClick={()=>go(r?'journal':'menu')}><NotebookText size={18}/></button><button aria-label="계정" onClick={()=>go('account')}><UserRound size={18}/></button></div>
     </header>
     <div className={'console-world'+(showTraining&&trainingVisible?' has-weekly-choices':'')}>
       <div className="console-field">
@@ -264,7 +264,7 @@ export default function App(){
       </div>
       {screen==='home'&&!busyFlow&&!replay&&!replayLoading&&(r?<>
         {r.phase==='retired'&&<div className="console-home-actions"><button className="console-primary" onClick={()=>{setEndingId(r.id);setEndingStep(0);go('ending');}}>은퇴식 보기 <Trophy size={18}/></button><button onClick={()=>go('new')}>새 선수 육성</button></div>}
-      </>:<div className="console-welcome"><span>{ENGLISH_GAME_NAME}</span><h1>롱보더 <br/><em>키우기</em></h1><p>강변의 첫 푸시부터 마지막 국제대회까지.<br/>나만의 8년 커리어를 시작하세요.</p><button className="console-primary" onClick={()=>go('new')}>새 라이더 등록 <ArrowRight size={20}/></button></div>)}
+      </>:<div className="console-welcome"><span>{ENGLISH_GAME_NAME}</span><h1>롱보더 <br/><em>키우기</em></h1><p>강변의 첫 푸시부터 마지막 국제대회까지.<br/>나만의 8년 커리어를 시작하세요.</p><button className="console-primary" onClick={()=>go('new')}>나만의 라이더 만들기 <ArrowRight size={20}/></button></div>)}
       {spotMap&&r&&screen==='home'&&!busyFlow&&!r.plan&&<SpotMap r={r} send={game.send} saving={game.saving} onClose={()=>setSpotMap(false)}/>}
       {content&&screen!=='home'&&<section className={'console-panel console-panel-'+(panelStyle[screen]??'standard')} aria-label={names[screen]}>
         <header><h1>{names[screen]}</h1><button onClick={back} aria-label={trail.length?'뒤로 가기':'메뉴 닫기'} title={trail.length?'뒤로 가기':'닫기'}>{trail.length?<ArrowLeft size={18}/>:<X size={18}/>}</button></header>
@@ -289,6 +289,6 @@ function NewRider({saving,onCreate}:{saving:boolean;onCreate:(name:string,look:L
         </label>
       </LookFields>
     </div>
-    <button type="submit" className="button primary" disabled={saving||!name.trim()}>등록하고 시작 <ArrowRight size={17}/></button>
+    <button type="submit" className="button primary" disabled={saving||!name.trim()}>육성 시작 <ArrowRight size={17}/></button>
   </form>;
 }
