@@ -35,6 +35,7 @@ export type CareerExtras = {
   relationships?:RelationshipHistory;
   storyReadyAt?:Partial<Record<string,number>>;
   jointSessions?:Partial<Record<import('./jointTraining.js').TrainingNpc,number>>;
+  objectives?:import('./objectives.js').ObjectiveState;
   timeline: { year:number; week:number; title:string; text:string }[];
   lastEvent?:import('./types.js').EventOutcome;
   lastTraining?: { reaction?:string; special?:import('./training.js').SpecialTraining; joint?:import('./jointTraining.js').JointTrainingResult; grade:'success'|'great'|'learned'|'mastery'|'miss'|'injury'|'recovery'; text:string; narration?:string; changes?:string[]; skill?:string; year:number; week:number };

@@ -117,6 +117,9 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     const created=await handler(new Request('http://127.0.0.1/api/game',{headers:{cookie}}));
     const createdView=await created.json();assert.equal(createdView.career.rider.look.hair,10);assert.equal(createdView.career.rider.look.outfit,1);assert.equal(createdView.career.rider.look.bottom,3);
     const options=win.document.querySelector('[aria-label="이번 주 행동 선택"]')!;
+    const objectives=options.querySelector('[aria-label="육성 목표"]')!;
+    assert.equal(objectives.querySelectorAll('.weekly-objective').length,2);
+    assert.match(objectives.textContent!,/단기.*주 남음.*시즌/);
     assert.equal(options.querySelector('h2')?.textContent,'이번 주엔 무엇을 할까?');
     assert.deepEqual([...options.querySelectorAll('.weekly-action-grid strong')].map(label=>label.textContent),
       ['속도','카빙','연계','밸런스','댄싱','트릭','휴식','병원 치료']);

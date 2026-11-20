@@ -4,6 +4,7 @@ import { ACTION_NAMES, ACTION_STORIES, DISCIPLINE_NAMES, SKILL, SKILLS, STAT_NAM
 import { validatePlan } from '../game/career';
 import { skipsEventChoices } from '../game/events';
 import { jointEffectLabel, jointTrainingLabel, jointTrainingOffer, type JointTraining } from '../game/jointTraining';
+import { currentObjectives, objectiveAwardDialogue, objectiveAwardText, objectiveText, recentObjectiveAwards } from '../game/objectives';
 import { canStudy } from '../game/skillTree';
 import { isTrainingAction, meetTrainingAvailable, previewTraining, randomSpecialTraining } from '../game/training';
 import { ACTIONS, DISCIPLINES, STRATEGIES, type Plan, type Rider } from '../game/types';
@@ -39,6 +40,7 @@ export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true
   useEffect(()=>()=>onPreview?.(undefined),[onPreview]);
   return <section className={'weekly-choices '+(auto?'is-auto ':'')+(action||pendingChoice?'has-preview':'')} aria-label={auto?'자동 행동 선택':'이번 주 행동 선택'} hidden={hidden}>
     <h2>이번 주엔 무엇을 할까?</h2>
+    <WeeklyObjectives r={r}/>
     {meetChoice&&<div className="weekly-meet-choice" role="group" aria-label="대회 주간 행동">
       <button type="button" disabled={saving} aria-pressed={!skipMeet} onClick={()=>setSkipMeet(false)}>대회 준비</button>
       <button type="button" disabled={saving} aria-pressed={skipMeet} onClick={()=>setSkipMeet(true)}>불참하고 특별훈련</button>
@@ -75,6 +77,21 @@ export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true
     </>}
     </div>
   </section>;
+}
+
+function WeeklyObjectives({r}:{r:Rider}){
+  const {short,season}=currentObjectives(r);
+  const awards=recentObjectiveAwards(r);
+  return <div className="weekly-objectives" aria-label="육성 목표">
+    {([{label:'단기',goal:short},{label:'시즌',goal:season}]).map(({label,goal})=>goal&&<div className="weekly-objective" key={label}>
+      <b>{label}</b>
+      <span>{goal.steps.map(({target,value},i)=><span key={i}>{objectiveText(target)} <small>{Math.min(value,target.target)}/{target.target}</small></span>)}</span>
+      <strong>{goal.status==='complete'?'달성':goal.status==='expired'?'종료':label==='단기'?`${goal.end-r.week+1}주 남음`:`${goal.steps.filter(step=>step.value>=step.target.target).length}/${goal.steps.length} 달성`}</strong>
+    </div>)}
+    {!!awards.length&&<div className="weekly-objective-awards" role="status">{awards.map(award=><div key={award.scope}>
+      <b>{objectiveAwardText(award)}</b>{objectiveAwardDialogue(r,award)&&<small>{objectiveAwardDialogue(r,award)}</small>}
+    </div>)}</div>}
+  </div>;
 }
 
 export function SpecialTrainingBadge(){return <span className="weekly-special-badge">SPECIAL ×2</span>;}

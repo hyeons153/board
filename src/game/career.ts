@@ -2,6 +2,7 @@ import { ACTION_NAMES, ACTION_STORIES, calendarFor, DISCIPLINE_NAMES, LOCATIONS,
 import { generateRoutine, learned, simulateMeet, validRoutine } from './competition.js';
 import { autoChoice, eventCast, eventChoiceAvailable, eventFor, eventPaused, pickEvent } from './events.js';
 import { jointDiscovery, jointEnergySaving, jointInjuryFactor, jointTrainingFor, jointTrainingLabel, jointTrainingOffer } from './jointTraining.js';
+import { ensureObjectives, objectiveTrainingPlan, settleObjectives } from './objectives.js';
 import { canStudy, nextSkillTraining } from './skillTree.js';
 import { chooseEnding, honors, mentorFrom } from './legacy.js';
 import { RUN_PROOF_VERSION } from './public.js';
@@ -232,7 +233,7 @@ function standardAutoPlan(r:Rider):Plan {
   const s=special??order[0].s;
   return {...base,action:s,spot:s==='speed'?'river':s==='link'?'plaza':'park'};
 }
-function autoPlan(r:Rider):Plan {
+function jointAutoPlan(r:Rider):Plan {
   const base=standardAutoPlan(r);
   if(!isTrainingAction(base.action)||specialTraining(r,base))return base;
   const offer=jointTrainingOffer(r,base.spot);
@@ -249,8 +250,12 @@ function autoPlan(r:Rider):Plan {
   if(offer.growth-1+jointEnergySaving(offer)*.02<=switchingCost)return base;
   return {action,spot:base.spot,skill:target?.id};
 }
+function autoPlan(r:Rider):Plan {
+  const base=jointAutoPlan(r);
+  return isTrainingAction(base.action)&&!specialTraining(r,base)?objectiveTrainingPlan(r,base):base;
+}
 export function prepareWeek(r:Rider|undefined|null){
-  if(r?.phase==='plan'&&r.settings.mode==='auto'&&!r.plan){r.plan=autoPlan(r);r.spot=r.plan.spot;}
+  if(r?.phase==='plan'&&r.settings.mode==='auto'&&!r.plan){ensureObjectives(r);r.plan=autoPlan(r);r.spot=r.plan.spot;}
 }
 function applyEvent(r:Rider,index:number){
   const e=eventFor(r,r.event??'');
@@ -360,6 +365,7 @@ function applyHappening(r:Rider,event:Happening){
   note(r,'event',event.title+' · '+dialogue.split(/(?<=[.?!])\s/u)[0]);
 }
 function finishWeek(c:Career,r:Rider) {
+  settleObjectives(r);
   if(r.week===RULES.weeks){
     for(const d of DISCIPLINES){
       const place=seasonPlace(r.season.scores[d],'player');
@@ -382,6 +388,7 @@ function finishWeek(c:Career,r:Rider) {
     note(r,'system',`${r.year}년차가 시작됐다. 새 시즌 RP를 쌓아 보자!`);
   } else r.week++;
   r.phase='plan'; r.plan=null; r.entries=null;
+  ensureObjectives(r);
 }
 const podiumStats:Record<Discipline,[Stat,Stat]>={dance:['carve','speed'],trick:['balance','link'],freestyle:['link','carve']};
 
@@ -459,6 +466,7 @@ export function processWeek(c:Career,official=false,setup?:import('./types.js').
   const r=c.rider;
   if(!r||r.phase!=='plan'||(!r.plan&&r.settings.mode==='manual')) return false;
   r.extras=upgradeEquipment(r.extras??freshExtras());
+  ensureObjectives(r);
   let plan=r.plan??autoPlan(r);
   // An unfinished plan saved before the mastery rules can finish as free practice.
   if(plan.skill&&SKILL[plan.skill]&&!canStudy(r,plan.skill))plan={...plan,skill:undefined,lesson:undefined};

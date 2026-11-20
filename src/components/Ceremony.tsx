@@ -4,6 +4,7 @@ import { meetById, DISCIPLINE_NAMES, SKILL } from '../game/data';
 import { RIVAL } from '../game/content';
 import { equippedLook } from '../game/economy';
 import { chooseEnding, endingName, ENDINGS, summarize } from '../game/legacy';
+import { objectiveAwardText } from '../game/objectives';
 import { formatRP, rankingPoints } from '../game/rp';
 import { relationshipEpilogues, representativeTitle } from '../game/relationships';
 import { DISCIPLINES, type Archive } from '../game/types';
@@ -91,6 +92,8 @@ export default function Ceremony({archive,step,onStep,onHall,onNew,registration}
           <div><dt>출전 대회</dt><dd>{summary.meets}개</dd></div>
           <div><dt>습득 기술</dt><dd>{summary.learned.length}개</dd></div>
         </dl>
+        {archive.extras?.objectives?.awards.filter(award=>award.year===archive.year&&award.week===archive.week).map(award=>
+          <p className="weekly-objective-awards" key={award.scope}>{objectiveAwardText(award)}</p>)}
         {(titleInUse||disciplines.length>0)&&<div className="pill-row ceremony-best">
           {titleInUse&&titleInUse!==finalTitle&&<Tag kind="lime">{titleInUse}</Tag>}
           {disciplines.length>0&&<span>종목별 최고</span>}
