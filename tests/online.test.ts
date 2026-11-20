@@ -414,7 +414,12 @@ test('previous competition proofs replay under their original stamina rules',()=
   command(career,{type:'entry',disciplines:['dance']},()=>({id:randomUUID(),seed:517}),true);
   command(career,{type:'retire'},()=>({id:randomUUID(),seed:517}),true);
   const archive=career.hall[0],meet=archive.records[0],result=meet.results[0],proof=result.proof!;
-  assert.equal(proof.rules,6);assert.ok(verifiedResult(archive,meet,result));
+  assert.equal(proof.rules,7);assert.ok(verifiedResult(archive,meet,result));
+  const npc=result.standings.find(row=>row.id==='jun')!;
+  npc.score+=1;
+  assert.equal(verifiedResult(archive,meet,result),false,'NPC standings must match the verified run');
+  npc.score=result.opponents!.jun.score;
+  assert.ok(verifiedResult(archive,meet,result));
   delete proof.rules;
   result.run=simulateRun({stats:proof.stats,energy:proof.energy,injury:proof.injury,skills:proof.skills},'dance',proof.routine,seeded(proof.seed,meet.year,meet.id,'dance','player'),1);
   result.standings.find(row=>row.id==='player')!.score=result.run.score;

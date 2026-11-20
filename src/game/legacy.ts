@@ -1,5 +1,6 @@
 import { meetById, DISCIPLINE_NAMES, SKILLS } from './data.js';
 import { equippedLook } from './economy.js';
+import { seasonPlace } from './rp.js';
 import { DISCIPLINES, type Archive, type Career, type Discipline, type Ending, type Look, type Mentor, type Rider } from './types.js';
 
 type CareerRecord = Pick<Archive,'name'|'year'|'week'|'stats'|'skills'|'records'|'relations'|'seasons'|'extras'> & { reason?: Rider['reason']; season?: Rider['season']; events?: Rider['events'] };
@@ -18,9 +19,7 @@ export function summarize(record:CareerRecord){
   const place=(result:typeof results[number])=>result.standings.find(row=>row.id==='player')?.place??Infinity;
   const best=Object.fromEntries(DISCIPLINES.map(d=>[d,Math.max(0,...results.filter(result=>result.discipline===d).map(result=>result.run.score))])) as Record<Discipline,number>;
   const champions=record.seasons.flatMap(season=>DISCIPLINES.flatMap(d=>{
-    const points=season.scores[d];
-    const top=Object.entries(points).sort(([a,x],[b,y])=>y-x||a.localeCompare(b))[0];
-    return top?.[0]==='player'?[{year:season.year,discipline:d,division:season.division}]:[];
+    return seasonPlace(season.scores[d],'player')===1?[{year:season.year,discipline:d,division:season.division}]:[];
   }));
   const learned=SKILLS.filter(skill=>(record.skills[skill.id]?.study??0)>=100);
   const advanced=learned.filter(skill=>skill.difficulty>=3&&(record.skills[skill.id]?.mastery??0)>=ENDING_RULES.mastery);

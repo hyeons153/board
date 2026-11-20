@@ -1,5 +1,6 @@
 import { calendarFor, meetById, RULES } from '../src/game/data.js';
-import { CURRENT_RUN_RULES, simulateRun } from '../src/game/competition.js';
+import { RIVALS } from '../src/game/content.js';
+import { competitionStandings, CURRENT_RUN_RULES, opponentPerformance, simulateRun } from '../src/game/competition.js';
 import { equippedLook, freshExtras } from '../src/game/economy.js';
 import { chooseEnding, endingName, honors, summarize } from '../src/game/legacy.js';
 import { representativeTitle } from '../src/game/relationships.js';
@@ -20,19 +21,25 @@ function canonical(value:unknown):string {
 }
 export function verifiedResult(archive:Archive,meet:MeetRecord,result:Result){
   const proof=result.proof;
+  const scheduled=meetById(meet.id);
   if(!proof||proof.version!==RUN_PROOF_VERSION||
-    (proof.rules!==undefined&&(!Number.isInteger(proof.rules)||proof.rules<1||proof.rules>CURRENT_RUN_RULES))||!meetById(meet.id)) return false;
+    (proof.rules!==undefined&&(!Number.isInteger(proof.rules)||proof.rules<1||proof.rules>CURRENT_RUN_RULES))||!scheduled) return false;
   const player=result.standings.find(row=>row.id==='player');
   if(!player||player.name!==archive.name||player.score!==result.run.score) return false;
-  const sorted=[...result.standings].sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
-  if(sorted.length!==7||new Set(sorted.map(x=>x.id)).size!==7||sorted.some((row,index)=>row.place!==index+1||!Number.isFinite(row.score))) return false;
+  if(result.standings.length!==7||new Set(result.standings.map(x=>x.id)).size!==7||result.standings.some(row=>!Number.isFinite(row.score)))return false;
   try{
     const gear=proof.gear?{...freshExtras(),...proof.gear}:undefined;
     const {stats,energy,injury,skills}=proof;
     const replay=simulateRun({stats,energy,injury,skills,extras:gear},result.discipline,proof.routine,meetRng(proof.seed,meet.year,meet.id,result.discipline),proof.rules??1);
-    const major=meetById(meet.id)!.major;
-    const points=meetRP(player.place,major);
-    return points===result.points&&canonical(replay)===canonical(result.run);
+    if(meetRP(player.place,scheduled.major)!==result.points||canonical(replay)!==canonical(result.run))return false;
+    if((proof.rules??1)<7){
+      const sorted=[...result.standings].sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
+      return sorted.every((row,index)=>row.place===index+1);
+    }
+    const expected=competitionStandings([{id:'player',name:archive.name,run:replay},
+      ...RIVALS.map(n=>opponentPerformance(n,meet.year,scheduled,result.discipline,proof.seed))]);
+    return expected.every(row=>result.standings.some(saved=>
+      saved.id===row.id&&saved.name===row.name&&saved.score===row.score&&saved.place===row.place));
   }catch{
     return false;
   }

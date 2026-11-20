@@ -8,6 +8,8 @@ const empty=():DisciplineRP=>({dance:0,trick:0,freestyle:0});
 const total=(points:DisciplineRP)=>DISCIPLINES.reduce((sum,discipline)=>sum+points[discipline],0);
 export const validRP=(points:unknown):points is number=>typeof points==='number'&&Number.isSafeInteger(points)&&points>=0;
 export const formatRP=(points:number)=>points.toLocaleString('ko-KR')+' RP';
+export const seasonPlace=(scores:Record<string,number>,id:string)=>
+  scores[id]===undefined?Infinity:1+Object.values(scores).filter(points=>points>scores[id]).length;
 
 export function meetRP(place:number,major:boolean){
   const base=RULES.places[Math.min(place-1,RULES.places.length-1)]??0;

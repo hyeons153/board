@@ -7,6 +7,7 @@ import { happeningDuration } from '../game/happenings';
 import { RIVAL, lineTerms } from '../game/content';
 import { equippedLook, gearBonuses, playerPlace } from '../game/economy';
 import { formatRP, meetRP, validRP } from '../game/rp';
+import { repeatFactor } from '../game/runScoring';
 import { specialTraining } from '../game/training';
 import { DISCIPLINES, STATS, type Discipline, type EventOutcome, type GameAction, type Look, type MeetRecord, type Rider, type Spot } from '../game/types';
 import type { Motion } from '../scene/motion';
@@ -140,7 +141,8 @@ function Playback({record,index,r,saving,active,autoSkip,playbackRate,onSpeed,on
   const play=(next:typeof mode)=>{clock.current={elapsed:0};setElapsed(0);setMode(next);};
   const timer=mode==='result'?60:seconds;
   const speedButton=<button className="game-quiet competition-speed" aria-label="대회 2배속" aria-pressed={playbackRate===2} onClick={onSpeed}>2배속</button>;
-  const podium=[2,1,3].map(place=>result.standings.find(row=>row.place===place)!);
+  const podium=[2,1,3].flatMap(place=>result.standings.filter(row=>row.place===place));
+  const attempts:Record<string,number>={};
   const gains=result.statGains;
   let panel:ReactNode;
   if(mode==='result') panel=<>
@@ -153,7 +155,12 @@ function Playback({record,index,r,saving,active,autoSkip,playbackRate,onSpeed,on
       <p>{standing.name} · 성공률 {Math.round(run.log.filter(log=>log.outcome!=='miss').length/Math.max(1,run.log.length)*100)}% · 최고 {Math.max(0,...run.log.map(log=>log.combo))}콤보</p>
       <dl className="game-parts">{Object.entries(run.parts).map(([key,value])=><div key={key}><dt>{partNames[key as keyof typeof partNames]}</dt><dd>{value.toFixed(1)}</dd></div>)}</dl>
       <p>내 경기 후 체력 {Math.round(result.energy)} · 명성 +{result.fame}{result.participation?' · 참가 보상 '+money(result.participation):''}{result.sponsorBonus?' · 스폰서 보너스 '+money(result.sponsorBonus):''}</p>
-      <details><summary>{standing.name} 기술별 경기 로그</summary><ol>{run.log.map(log=><li key={log.at}><span>{log.at.toFixed(1)}초 · {SKILL[log.id]?.name} · {OUTCOME_NAMES[log.outcome]}{log.linked?' · 연계 성공':''}{log.combo>1?' · '+log.combo+'콤보':''}</span><strong>{log.points}점</strong></li>)}</ol></details>
+      <details><summary>{standing.name} 기술별 경기 로그</summary><ol>{run.log.map(log=>{
+        const attempt=log.attempt??(attempts[log.id]??0)+1;
+        attempts[log.id]=attempt;
+        return <li key={log.at}><span>{log.at.toFixed(1)}초 · {SKILL[log.id]?.name} · {OUTCOME_NAMES[log.outcome]}{log.linked?' · 연계 성공':''}{log.combo>1?' · '+log.combo+'콤보':''}{attempt>1?' · '+attempt+'회차 ('+Math.round(100*repeatFactor(attempt-1))+'% 반영)':''}</span><strong>{log.points}점</strong></li>;
+      })}</ol></details>
+      {run.judging&&<p>표시 점수가 같으면 정밀 점수, 기술 수행, 난도, 다양성, 연계·콤보 순으로 비교합니다. 모두 같으면 공동 순위입니다.</p>}
     </details>
     <div className="game-actions">{speedButton}<button className="game-quiet" onClick={()=>play('full')}>다시 관람</button><button disabled={saving} onClick={onNext}>{index+1<record.results.length?'다음 종목':doneLabel} <ArrowRight size={15}/></button></div>
   </>;

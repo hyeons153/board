@@ -1,5 +1,6 @@
 import { command, newRider, prepareWeek, processWeek } from '../src/game/career';
-import { CALENDAR, DEFAULT_LOOK, RULES, SKILLS } from '../src/game/data';
+import { CALENDAR, DEFAULT_LOOK, RULES, SKILL, SKILLS } from '../src/game/data';
+import { chance, generateRoutine, routineTime, simulateRun } from '../src/game/competition';
 import { chooseEnding, summarize } from '../src/game/legacy';
 import { eventFor } from '../src/game/events';
 import { seeded } from '../src/game/random';
@@ -47,12 +48,56 @@ const energyCheck=energyRanges.map(([min,max])=>{
 });
 console.log('training-success',JSON.stringify(energyCheck));
 
+const manualLines={
+  dance:['sidewinder','step-360','back-cross','pirouette','pirouette-540','pirouette-720','v-spin','pendulum','step-180'],
+  trick:['ollie','heelflip','varial','bigspin','treflip','hardflip','bigger','pivot','kickflip'],
+  freestyle:['step-180','ollie','sidewinder','heelflip','pirouette-540','hardflip','pendulum','treflip','p2p'],
+};
+const trial=newRider('competition-trial',1,'Competition trial',DEFAULT_LOOK);
+trial.stats={speed:155,carve:155,link:155,balance:155};
+trial.skills=Object.fromEntries(SKILLS.map(skill=>[skill.id,{study:100,mastery:85}]));
+const masteryTrials=[25,50,75,100].map(mastery=>({
+  mastery,percent:Object.fromEntries(['ollie','kickflip','hardflip','bigger'].map(id=>[
+    id,average(100*chance({...trial,skills:{...trial.skills,[id]:{study:100,mastery}}},SKILL[id]!),1),
+  ])),
+}));
+console.log('competition-landing',JSON.stringify(masteryTrials));
+for(const discipline of DISCIPLINES){
+  const manual=manualLines[discipline];
+  const staple=discipline==='trick'?'hardflip':'pirouette-720';
+  const repeat=Array<string>(7).fill(staple);
+  const lines={stable:generateRoutine(trial,discipline,'stable'),flow:generateRoutine(trial,discipline,'flow'),
+    score:generateRoutine(trial,discipline,'score'),manual,repeat};
+  for(const [style,line] of Object.entries(lines)){
+    const trials=1200;
+    const runs=Array.from({length:trials},(_,seed)=>simulateRun(trial,discipline,line,seeded(seed,'line-trial',discipline)));
+    console.log('competition-line',JSON.stringify({discipline,style,time:routineTime(line),distinct:new Set(line).size,
+      mean:average(runs.reduce((sum,run)=>sum+run.score,0),trials),
+      max:Math.max(...runs.map(run=>run.score)),perfect:runs.filter(run=>run.score===100).length}));
+  }
+}
+
 for(const enterOrdinary of [true,false])for(const strategy of STRATEGIES){
   const endings:Record<string,number>={};
   const totals={rankedMeets:0,wins:0,maxed:0,statTotal:0,scoreSum:0,runs:0,rp:0,money:0,decisions:0,personal:0,crew:0,happenings:0,chapters:0,casual:0};
   const training={weeks:0,regularWeeks:0,rest:0,hospital:0,attempts:0,injuries:0,recovered:0,recoveryWeeks:0,opportunities:0,randomUsed:0,meetUsed:0};
   const years=Array.from({length:RULES.years},()=>({stats:0,learned:0,mastery:0,mastered:0,intermediate:0,advanced:0,expert:0}));
   const byDiscipline=Object.fromEntries(DISCIPLINES.map(d=>[d,{score:0,runs:0}])) as Record<typeof DISCIPLINES[number],{score:number;runs:number}>;
+  const samples=new Map<string,{scores:number[];wins:number;podiums:number;parts:Record<string,[number,number]>;meets:Record<string,number[]>}>();
+  function recordScore(key:string,meetId:string,run:Career['hall'][number]['records'][number]['results'][number]['run'],place:number){
+    const row=samples.get(key)??{scores:[],wins:0,podiums:0,parts:{},meets:{}};
+    row.scores.push(run.score);
+    (row.meets[meetId]??=[]).push(run.score);
+    row.wins+=Number(place===1);
+    row.podiums+=Number(place<=3);
+    for(const [part,value] of Object.entries(run.parts)){
+      const bucket=row.parts[part]??[0,0];
+      bucket[0]+=Number(value>=99.9);
+      bucket[1]++;
+      row.parts[part]=bucket;
+    }
+    samples.set(key,row);
+  }
   let podiumGrowth=0,podiumAwards=0;
   for(let seed=1;seed<=count;seed++){
     const rider=newRider('internal-'+seed,seed,'Simulation Rider',DEFAULT_LOOK);
@@ -114,6 +159,10 @@ for(const enterOrdinary of [true,false])for(const strategy of STRATEGIES){
     totals.statTotal+=STATS.reduce((sum,stat)=>sum+archive.stats[stat],0);
     for(const meet of archive.records) for(const result of meet.results){
       if(!Number.isFinite(result.run.score)||result.run.score<0||result.run.score>100) throw new Error('Out-of-bounds score');
+      for(const row of result.standings){
+        const run=row.id==='player'?result.run:result.opponents?.[row.id];
+        if(run)recordScore([meet.year,result.discipline,row.id].join('/'),meet.id,run,row.place);
+      }
       totals.scoreSum+=result.run.score;
       totals.runs++;
       byDiscipline[result.discipline].score+=result.run.score;
@@ -139,5 +188,16 @@ for(const enterOrdinary of [true,false])for(const strategy of STRATEGIES){
     years:years.map(season=>({stat:average(season.stats,count),learned:average(season.learned,count),mastery:average(season.mastery,count),
       mastered:average(season.mastered,count),intermediate:average(100*season.intermediate,count),advanced:average(100*season.advanced,count),expert:average(100*season.expert,count)})),
     eventsPerCareer:Object.fromEntries((['decisions','personal','crew','happenings','chapters','casual'] as const).map(key=>[key,Math.round(totals[key]/count*10)/10])),
+    competition:Object.fromEntries([...samples].map(([key,{scores,wins,podiums,parts,meets}])=>{
+      scores.sort((a,b)=>a-b);
+      const percentile=(p:number)=>scores[Math.floor((scores.length-1)*p)];
+      const mean=scores.reduce((a,b)=>a+b,0)/scores.length;
+      const squaredErrors=(runs:number[],center:number)=>runs.reduce((sum,score)=>sum+(score-center)**2,0);
+      const withinMeet=Object.values(meets).reduce((sum,scores)=>sum+squaredErrors(scores,scores.reduce((a,b)=>a+b,0)/scores.length),0);
+      return [key,{n:scores.length,mean:average(mean,1),p10:percentile(.1),p50:percentile(.5),p90:percentile(.9),
+        deviation:average(Math.sqrt(squaredErrors(scores,mean)/scores.length),1),withinMeetDeviation:average(Math.sqrt(withinMeet/scores.length),1),max:scores.at(-1),
+        over:[90,95,100].map(limit=>scores.filter(score=>score>=limit).length),wins,podiums,
+        saturated:Object.fromEntries(Object.entries(parts).map(([part,[hits,total]])=>[part,average(100*hits,total)]))}];
+    })),
   }));
 }

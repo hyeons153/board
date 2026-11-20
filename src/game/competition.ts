@@ -4,11 +4,12 @@ import { ECONOMY, effectiveStats, equippedLook, gearBonuses, legacyBonuses } fro
 import { RUN_PROOF_VERSION } from './public.js';
 import { meetRP } from './rp.js';
 import { clamp, round, seeded } from './random.js';
+import { competitionConditions, expectedMove, judgeRun, landedPoints, landingChance, landingOutcome, connectionChance, type CompetitionProfile } from './runScoring.js';
 import { learned } from './skillTree.js';
 import { DISCIPLINES, STATS, type Discipline, type Rider, type RoutineStyle, type Run, type RunRules, type Skill, type Meet, type Result, type Stats, type Outcome, type Standing } from './types.js';
 
 export { learned } from './skillTree.js';
-export const CURRENT_RUN_RULES=6 satisfies RunRules;
+export const CURRENT_RUN_RULES=7 satisfies RunRules;
 // A missing prior definition means the skill did not exist under the earlier rules.
 const runSkillChanges:Record<string,{since:RunRules;prior?:Pick<Skill,'difficulty'|'risk'>}|undefined>={
   sidewinder:{since:5,prior:{difficulty:2,risk:.12}},
@@ -23,7 +24,7 @@ export const routineTime = (ids:string[]) => ids.reduce((s,id,i)=>s+(SKILL[id]?.
 export function validRoutine(rider:Pick<Rider,'skills'>,discipline:Discipline,ids:string[]) {
   return routineTime(ids)<=RULES.runSeconds && ids.every(id=>{const s=SKILL[id];return !!s&&allowed(s,discipline)&&learned(rider.skills,id);});
 }
-type Profile = Pick<Rider,'stats'|'energy'|'skills'|'injury'|'extras'>;
+type Profile = CompetitionProfile;
 function legacyChance(profile:Profile,s:Skill,energy:number) {
   const c=RULES.success;
   const equipment = s.family==='trick' ? legacyBonuses(profile).trickLand : 0;
@@ -36,34 +37,71 @@ function currentChance(profile:Profile,s:Skill,stats=effectiveStats(profile),equ
   const injury=profile.injury?.severity==='major'?.18:profile.injury?.08:0;
   return clamp(c.base+(profile.skills[s.id]?.mastery??0)*c.mastery+stats.balance*c.balance+100*c.energy-(s.difficulty-1)*c.difficulty-s.risk-injury+(s.family==='trick'?equipment.trickLand:0),c.min,c.max);
 }
-export const chance=currentChance;
+export const chance=(p:Profile,skill:Skill)=>landingChance(competitionConditions(p),skill);
 const affinity = (a:Skill,b:Skill) => a.id===b.id ? -.17 : (a.tags.some(t=>b.tags.includes(t)) ? RULES.run.danceAffinity : 0)+(a.family!==b.family ? RULES.run.mixedAffinity : 0);
 export function generateRoutine(p:Profile,d:Discipline,style:RoutineStyle,signature?:string):string[] {
-  const stats=effectiveStats(p),equipment=gearBonuses(p);
+  const conditions=competitionConditions(p);
   const pool=SKILLS.filter(s=>allowed(s,d)&&learned(p.skills,s.id));
+  const uses:Record<string,number>={};
+  const familyLandings={dance:0,trick:0};
   const ids:string[]=[];
-  let used=0;
-  const budget=RULES.runSeconds-(style==='stable'?7:style==='flow'?4:0);
-  while (used<budget) {
-    const prev=SKILL[ids.at(-1)??''];
-    const score=(s:Skill)=>{
-      const seen=ids.filter(id=>id===s.id).length;
-      const mixed=d==='freestyle'&&prev&&prev.family!==s.family?1.4:0;
-      const pSuccess=currentChance(p,s,stats,equipment);
-      const base=style==='stable'?pSuccess*12+s.points*.18:style==='flow'?pSuccess*7+s.points*.45+(prev?affinity(prev,s)*17:0):s.points*.78+pSuccess*4;
-      const signatureWeight=s.id===signature&&!seen ? 3 : 0;
-      return base+mixed+signatureWeight-(seen*(style==='score'?3.5:4.5))-(prev?.id===s.id?3:0);
-    };
-    const next=pool.filter(s=>used+s.seconds+(ids.length?RULES.transition:0)<=budget).sort((a,b)=>score(b)-score(a))[0];
+  const recoveryWeight=style==='stable'?1:style==='flow'?.65:.40;
+  let used=0,recovery=0,previous:Skill|undefined,previousSuccess=1;
+  while (used<RULES.runSeconds) {
+    let next:{move:Skill;value:number;success:number;time:number}|undefined;
+    for(const move of pool){
+      const time=move.seconds+(previous?RULES.transition:0);
+      if(used+time+recovery*recoveryWeight>RULES.runSeconds)continue;
+      const seen=uses[move.id]??0;
+      const expected=expectedMove(conditions,move,seen,previous,previousSuccess);
+      const mix=d==='freestyle'?Math.max(0,2-familyLandings[move.family]):0;
+      const variety=seen===0?expected.success*(1.7+(move.id===signature?2.5:0)):0;
+      const alternation=d==='freestyle'&&previous&&previous.family!==move.family?1.2:0;
+      const flow=expected.linked*((style==='flow'?3.6:2)*(d==='trick'?.8:1)+alternation);
+      const safety=style==='stable'?3.8:style==='flow'?2.4:1.2;
+      const cost=time+(1-expected.success)*RULES.recovery*recoveryWeight;
+      const value=(expected.points+flow+variety+mix*expected.success+safety*expected.success)/cost;
+      if(!next||value>next.value)next={move,value,success:expected.success,time};
+    }
     if(!next) break;
-    used+=next.seconds+(ids.length?RULES.transition:0);
-    ids.push(next.id);
+    previous=next.move;
+    previousSuccess=next.success;
+    used+=next.time;
+    recovery+=(1-next.success)*RULES.recovery;
+    uses[previous.id]=(uses[previous.id]??0)+1;
+    familyLandings[previous.family]+=next.success;
+    ids.push(previous.id);
   }
   return ids;
 }
 
 export function simulateRun(p:Profile, discipline:Discipline, ids:string[], rng:()=>number,rules:RunRules=CURRENT_RUN_RULES):Run {
   if(!validRoutine(p,discipline,ids)) throw new Error('유효하지 않은 라인입니다.');
+  if(rules>=7){
+    const conditions=competitionConditions(p);
+    const seen:Record<string,number>={};
+    const log:Run['log']=[];
+    let at=0,execution=0,combo=0,previous:Skill|undefined;
+    for(const id of ids){
+      const move=SKILL[id]!;
+      const start=at+(log.length?RULES.transition:0),end=start+move.seconds;
+      if(end>RULES.runSeconds)break;
+      const roll=rng();
+      const connected=previous?rng()<connectionChance(conditions,previous,move):null;
+      const outcome=landingOutcome(conditions,move,landingChance(conditions,move,previous,!!connected),roll);
+      const missed=outcome==='miss';
+      const linked=connected===null?null:connected&&!missed;
+      const used=seen[id]??0;
+      const points=landedPoints(conditions,move,used,outcome);
+      combo=missed?0:linked?combo+1:1;
+      execution+=points;
+      seen[id]=used+1;
+      log.push({id,at:start,end,outcome,linked,combo,points:round(points),attempt:used+1});
+      at=end+(missed?RULES.recovery:0);
+      previous=missed?undefined:move;
+    }
+    return log.length?judgeRun(conditions,discipline,log,execution):{score:0,parts:{},log};
+  }
   let at=0, execution=0, combo=0, comboRaw=0, totalLinks=0, linkedCount=0, previous:Skill|undefined, successes=0;
   const seen=new Map<string,number>(), variety=new Set<string>(), usedFamilies=new Set<string>();
   const bonus=rules<3?legacyBonuses(p):gearBonuses(p),stats=rules<3?p.stats:effectiveStats(p);
@@ -131,23 +169,52 @@ export function simulateRun(p:Profile, discipline:Discipline, ids:string[], rng:
 
 export const NAMES:Record<string,string> = Object.fromEntries(RIVALS.map(n=>[n.id,n.name]));
 export function competitor(n:Rival,year:number,week:number):Profile {
-  const development=year-1+(week-1)/52;
-  const stats=Object.fromEntries(STATS.map(s=>[s,clamp(n.stats[s]+development*n.growth[s],0,RULES.statCap)])) as Stats;
+  const development=year-1+(week-1)/RULES.weeks;
+  const {initialPractice,growthPace,unlockPace,specialist,allRounder,offDiscipline}=RULES.npc;
+  const stats=Object.fromEntries(STATS.map(s=>[s,clamp(n.stats[s]+n.growth[s]*(initialPractice+growthPace*development),0,RULES.statCap)])) as Stats;
   const skills:Profile['skills']={};
   for (const s of SKILLS) {
     if(s.requires.some(id=>!learned(skills,id))) continue;
     const base=s.id==='shuvit'?{mastery:46}:START_SKILLS[s.id];
-    const bonus=n.favorite===s.family ? RULES.npc.specialist : n.favorite==='freestyle' ? RULES.npc.allRounder : RULES.npc.offDiscipline;
-    const signature=n.signature===s.id ? 6 : 0;
-    if (base || development>=s.difficulty*RULES.npc.unlockPace-(bonus+signature)/25)
-      skills[s.id]={study:100,mastery:clamp((base?.mastery??(37-s.difficulty*4))+development*n.mastery+bonus+signature)};
+    const bonus=n.favorite===s.family?specialist:n.favorite==='freestyle'?allRounder:offDiscipline;
+    const signature=n.signature===s.id?8:0;
+    const unlock=Math.max(0,(s.difficulty-1)*unlockPace+s.requires.length*.46-(bonus+signature)/22);
+    if (base||development>=unlock)
+      skills[s.id]={study:100,mastery:clamp((base?.mastery??(62-s.difficulty*8))+development*n.mastery+bonus+signature)};
   }
   return {stats,skills,injury:null,energy:n.id==='sol'?RULES.npc.veteranEnergy:RULES.npc.energy};
+}
+const npcLines=new Map<string,{profile:Profile;routine:string[]}>();
+export function opponentPerformance(n:Rival,year:number,meet:Meet,discipline:Discipline,seed:number){
+  const key=[n.id,year,meet.week,discipline].join('/');
+  let line=npcLines.get(key);
+  if(!line){
+    const profile=competitor(n,year,meet.week);
+    const style=n.favorite===discipline||discipline==='freestyle'?n.tactic:'stable';
+    line={profile,routine:generateRoutine(profile,discipline,style,n.signature)};
+    npcLines.set(key,line);
+  }
+  const run=simulateRun(line.profile,discipline,line.routine,seeded(seed,year,meet.id,discipline,n.id));
+  return {id:n.id,name:n.name,run};
+}
+
+export function competitionStandings(rows:{id:string;name:string;run:Run}[]):Standing[]{
+  const compare=(a:Run,b:Run)=>{
+    const x=a.judging,y=b.judging;
+    return (y?.score??b.score)-(x?.score??a.score)||
+      (y?.execution??0)-(x?.execution??0)||(y?.difficulty??0)-(x?.difficulty??0)||
+      (y?.variety??0)-(x?.variety??0)||(y?.flow??0)-(x?.flow??0);
+  };
+  const sorted=[...rows].sort((a,b)=>compare(a.run,b.run)||a.name.localeCompare(b.name,'ko'));
+  let place=1;
+  return sorted.map(({id,name,run},index)=>{
+    if(index&&compare(sorted[index-1].run,run))place=index+1;
+    return {id,name,score:run.score,place};
+  });
 }
 export function simulateMeet(rider:Rider,meet:Meet,entries:Discipline[],official=false):{results:Result[];rankings:Record<Discipline,Standing[]>} {
   const effects=gearBonuses(rider);
   let energy=Math.min(100,rider.energy+effects.entryEnergy);
-  const npcEnergy:Record<string,number>={};
   const order=[...entries,...DISCIPLINES.filter(d=>!entries.includes(d))];
   const rankings={} as Record<Discipline,Standing[]>;
   const results:Result[]=[];
@@ -157,21 +224,11 @@ export function simulateMeet(rider:Rider,meet:Meet,entries:Discipline[],official
     const p={...rider,energy};
     const routine=entries.includes(d)?(rider.routines[d].length?rider.routines[d]:generateRoutine(p,d,'flow')):null;
     const run=routine?simulateRun(p,d,routine,seeded(rider.seed,rider.year,meet.id,d,'player')):null;
-    const opponents:Record<string,Run> = {};
-    const standings=[
-      ...(run?[{id:'player',name:rider.name,score:run.score}]:[]),
-      ...RIVALS.map(n=>{
-        const npc=competitor(n,rider.year,rider.week);
-        npc.energy=npcEnergy[n.id]??npc.energy;
-        const style=n.favorite===d || d==='freestyle' ? n.tactic : 'stable';
-        const r=simulateRun(npc,d,generateRoutine(npc,d,style,n.signature),seeded(rider.seed,rider.year,meet.id,d,n.id));
-        if(run) opponents[n.id]=r;
-        npcEnergy[n.id]=Math.max(0,npc.energy-RULES.entryCost[d]);
-        return {id:n.id,name:n.name,score:r.score};
-      }),
-    ].sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id)).map((e,i)=>({...e,place:i+1}));
+    const rivals=RIVALS.map(n=>opponentPerformance(n,rider.year,meet,d,rider.seed));
+    const standings=competitionStandings(run?[{id:'player',name:rider.name,run},...rivals]:rivals);
     rankings[d]=standings;
     if(!run) continue;
+    const opponents=Object.fromEntries(rivals.map(({id,run})=>[id,run]));
     const place=standings.find(x=>x.id==='player')!.place;
     energy=Math.max(0,energy-RULES.entryCost[d]+fatigue);
     const prize=Math.round(RULES.prizes[Math.min(place-1,5)]*(meet.international?2:meet.major?RULES.majorMultiplier:1));

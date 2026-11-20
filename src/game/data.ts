@@ -19,7 +19,7 @@ export const RULES = {
   injury:{ base:.024, energy:.0008, difficulty:.017, stability:.00055, minorWeeks:2, majorWeeks:4 },
   practice:{ discovery:.72, difficultyCost:.34, masteryByDifficulty:[1.25,1,.8,.65], targeted:1.17, lesson:1.25, rehearsalMastery:5, rehearsalLink:1.6, lowEnergy:30, missChance:.24, greatChance:.17 },
   run:{ repeatFloor:.19, repeatPenalty:.29, danceAffinity:.14, mixedAffinity:.09, trickChainSuccess:.055, trickChainLink:.12, masteryLink:.00065 },
-  npc:{ unlockPace:.82, specialist:8, allRounder:2, offDiscipline:-3, energy:91, veteranEnergy:99 },
+  npc:{ initialPractice:1, growthPace:1.85, unlockPace:1.36, specialist:12, allRounder:6, offDiscipline:-5, energy:91, veteranEnergy:99 },
   growth:[
     {stat:1.08,study:1.04,mastery:1},{stat:1,study:1,mastery:1},
     {stat:.91,study:.97,mastery:.98},{stat:.83,study:.93,mastery:.95},

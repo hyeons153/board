@@ -4,7 +4,7 @@ import { autoChoice, eventCast, eventChoiceAvailable, eventFor, eventPaused, pic
 import { canStudy, nextSkillTraining } from './skillTree.js';
 import { chooseEnding, honors, mentorFrom } from './legacy.js';
 import { RUN_PROOF_VERSION } from './public.js';
-import { meetRP } from './rp.js';
+import { meetRP, seasonPlace } from './rp.js';
 import { RIVALS, SPOT_GATE, spotUnlocked } from './content.js';
 import { ECONOMY, effectiveStats, eligibleSponsor, equipmentReaction, equipmentUnlocked, extras, freshExtras, gearBonuses, ITEM, maintainedSponsor, milestone, playerPlace, resaleValue, SPONSOR, STARTER_IDS, supply, unlockEquipment, upgradeEquipment } from './economy.js';
 import { clamp, round, seeded } from './random.js';
@@ -332,12 +332,11 @@ function applyHappening(r:Rider,event:Happening){
 function finishWeek(c:Career,r:Rider) {
   if(r.week===RULES.weeks){
     for(const d of DISCIPLINES){
-      const rows=Object.entries(r.season.scores[d]).sort(([a,x],[b,y])=>y-x||a.localeCompare(b));
-      const place=rows.findIndex(([id])=>id==='player');
-      if(place<0||place>=ECONOMY.podiumSeason.length) continue;
-      const prize=ECONOMY.podiumSeason[place];
+      const place=seasonPlace(r.season.scores[d],'player');
+      if(place>ECONOMY.podiumSeason.length) continue;
+      const prize=ECONOMY.podiumSeason[place-1];
       r.money+=prize;
-      milestone(r,'시즌 순위 보상',`${DISCIPLINE_NAMES[d]} ${place+1}위 · ₩${prize.toLocaleString('ko-KR')}`);
+      milestone(r,'시즌 순위 보상',`${DISCIPLINE_NAMES[d]} ${place}위 · ₩${prize.toLocaleString('ko-KR')}`);
     }
     r.seasons.push(r.season);
     if(r.year===RULES.years){ retire(c,r,'complete'); return; }

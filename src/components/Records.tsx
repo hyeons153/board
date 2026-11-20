@@ -11,7 +11,7 @@ import { PixelRider } from './Appearance';
 import { divisionFor } from '../game/career';
 import { DISCIPLINES, STATS, type Archive, type Rider } from '../game/types';
 import { chooseEnding, endingName, honors, summarize } from '../game/legacy';
-import { formatRP, peakSeasonRP, rankingPoints, validRP } from '../game/rp';
+import { formatRP, peakSeasonRP, rankingPoints, seasonPlace, validRP } from '../game/rp';
 import { RELATIONSHIP_NAMES, RELATIONSHIP_REWARDS, RELATIONSHIP_TITLES, relationshipHint, relationshipWith, representativeTitle } from '../game/relationships';
 import { RPDisciplines } from './RankingPoints';
 import { SectionTitle, Tag } from './Brand';
@@ -35,7 +35,7 @@ export function Rankings({r}:{r:Rider}){
     <div className="filter-line"><div className="pill-row">{DISCIPLINES.map(d=><button key={d} aria-pressed={d===discipline} className={`pill ${d===discipline?'active':''}`} onClick={()=>setDiscipline(d)}>{DISCIPLINE_NAMES[d]}</button>)}</div><label className="inline-select">시즌<select value={season.year} onChange={e=>setYear(Number(e.target.value))}>{history.map(s=><option value={s.year} key={s.year}>{s.year}년차 · {DIVISION_NAMES[s.division]}</option>)}</select></label></div>
     <div className="inner-card rankings">
       <div className="card-heading"><span><Trophy size={19}/> {DISCIPLINE_NAMES[discipline]} 순위표</span><Tag kind="lime">{DIVISION_NAMES[season.division]}</Tag></div>
-      {board.length?<ol className="rank-list">{board.map(([id,points],i)=><li className={id==='player'?'you':''} key={id}><b>{i+1}</b><span>{id==='player'?r.name:NAMES[id]} {id==='player'&&<small>나</small>}</span><strong>{formatRP(points)}</strong></li>)}</ol>:<p className="empty">아직 집계된 RP가 없어요. 대회가 열리면 순위표가 채워집니다.</p>}
+      {board.length?<ol className="rank-list">{board.map(([id,points])=><li className={id==='player'?'you':''} key={id}><b>{seasonPlace(scores,id)}</b><span>{id==='player'?r.name:NAMES[id]} {id==='player'&&<small>나</small>}</span><strong>{formatRP(points)}</strong></li>)}</ol>:<p className="empty">아직 집계된 RP가 없어요. 대회가 열리면 순위표가 채워집니다.</p>}
     </div>
   </section>;
 }

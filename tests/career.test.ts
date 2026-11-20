@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CALENDAR, calendarFor, formatCareerDate, formatMonthWeek, INTERNATIONAL_MEETS, monthWeek, DEFAULT_LOOK, RULES, SKILL, SKILLS, START_SKILLS } from '../src/game/data';
 import { awardPodiumGrowth, command, divisionFor, GameError, newRider, prepareWeek, processWeek } from '../src/game/career';
-import { chance, generateRoutine, learned, routineTime, simulateMeet, simulateRun, validRoutine } from '../src/game/competition';
+import { chance, competitionStandings, generateRoutine, learned, routineTime, simulateMeet, simulateRun, validRoutine } from '../src/game/competition';
 import { ECONOMY, equippedLook, extras, gearBonuses, playerPlace, SPONSOR } from '../src/game/economy';
 import { previewTraining, randomSpecialTraining, statAfter, trainingFactor, trainingSuccess } from '../src/game/training';
 import { EVENTS, eventBody, eventCast, eventChoiceAvailable, eventFor, pickEvent } from '../src/game/events';
@@ -14,7 +14,7 @@ import { STORY_ARCS } from '../src/game/storyArcs';
 import { activePartners, formerPartners, storyLog } from '../src/game/storyState';
 import { RELATIONSHIP_REWARDS, relationshipEpilogues, relationshipWith, representativeTitle } from '../src/game/relationships';
 import { seeded } from '../src/game/random';
-import { meetRP, rankingPoints } from '../src/game/rp';
+import { meetRP, rankingPoints, seasonPlace } from '../src/game/rp';
 import { advance, blankSave, remaining } from '../server/clock';
 import { DISCIPLINES, SPOTS, STATS, TRAINING_ACTIONS, type Career, type Plan } from '../src/game/types';
 
@@ -416,9 +416,9 @@ test('technique practice previews match actual gains and harder moves build mast
 test('run replays retain recorded skill difficulty and only admit skills available in those rules',()=>{
   const r=career().rider!;
   r.skills.sidewinder={study:100,mastery:35};
-  const landing=chance(r,SKILL.sidewinder!)-.03;
+  const landing=.74;
   assert.equal(simulateRun(r,'dance',['sidewinder'],()=>landing,4).log[0].outcome,'miss');
-  assert.equal(simulateRun(r,'dance',['sidewinder'],()=>landing).log[0].outcome,'rough');
+  assert.equal(simulateRun(r,'dance',['sidewinder'],()=>landing,6).log[0].outcome,'rough');
   for(const id of ['p2p','ollie']){
     r.skills[id]={study:100,mastery:35};
     assert.throws(()=>simulateRun(r,'freestyle',[id],()=>0,4));
@@ -426,9 +426,9 @@ test('run replays retain recorded skill difficulty and only admit skills availab
   }
   for(const id of ['bigspin','bigger']){
     r.skills[id]={study:100,mastery:70};
-    const roll=chance(r,SKILL[id]!)+.04;
+    const roll=id==='bigspin'?.72:.62;
     assert.equal(simulateRun(r,'trick',[id],()=>roll,5).log[0].outcome,'rough');
-    assert.equal(simulateRun(r,'trick',[id],()=>roll).log[0].outcome,'miss');
+    assert.equal(simulateRun(r,'trick',[id],()=>roll,6).log[0].outcome,'miss');
   }
   r.skills['ghostride-kickflip']={study:100,mastery:40};
   assert.throws(()=>simulateRun(r,'dance',['ghostride-kickflip'],()=>0,5));
@@ -467,7 +467,7 @@ test('run scoring keeps speed and carve useful at 200 and awards a bounded landi
   const base=simulateRun(lower,'dance',ids,()=>0);
   const improved=simulateRun(upper,'dance',ids,()=>0);
   assert.ok(improved.parts.speed!>base.parts.speed!&&improved.parts.carve!>base.parts.carve!);
-  assert.equal(improved.score,Math.round((improved.parts.execution!*.4+improved.parts.link!*.25+improved.parts.carve!*.2+improved.parts.speed!*.15)*10)/10);
+  assert.ok(Math.abs(improved.score-(improved.parts.execution!*.4+improved.parts.link!*.25+improved.parts.carve!*.2+improved.parts.speed!*.15))<.1);
   assert.equal(simulateRun(lower,'dance',ids,()=>0,3).score,simulateRun(upper,'dance',ids,()=>0,3).score);
   r.stats={...r.stats,link:200,balance:20};
   r.skills.hardflip={study:100,mastery:10};
@@ -477,6 +477,42 @@ test('run scoring keeps speed and carve useful at 200 and awards a bounded landi
   assert.equal(run([0,landing+.05,.99]).log[1].outcome,'miss');
   assert.equal(run([0,landing+.08,0]).log[1].linked,false);
   assert.equal(run([.99,landing+.05]).log[1].linked,null);
+});
+
+test('difficulty and mastery affect landing and execution throughout the scale; diverse lines outscore repeats',()=>{
+  const r=career().rider!;
+  for(const skill of SKILLS)r.skills[skill.id]={study:100,mastery:100};
+  r.stats={speed:200,carve:200,link:200,balance:200};
+  const hardest=SKILL.bigger!;
+  assert.ok(chance(r,hardest)>.8&&chance(r,hardest)<chance(r,SKILL.ollie!));
+  const practiced={...r,skills:{...r.skills,bigger:{study:100,mastery:55}}};
+  assert.ok(chance(r,hardest)>chance(practiced,hardest)+.15);
+  assert.ok(simulateRun(r,'trick',['bigger'],()=>0).parts.execution!>simulateRun(practiced,'trick',['bigger'],()=>0).parts.execution!);
+  const repeats=simulateRun(r,'trick',Array<string>(8).fill('bigger'),()=>0);
+  assert.deepEqual(repeats.log.slice(0,5).map(frame=>frame.attempt),[1,2,3,4,5]);
+  assert.deepEqual(repeats.log.slice(0,5).map(frame=>Math.round(100*frame.points/repeats.log[0].points)),[100,71,42,19,19]);
+  const routine=generateRoutine(r,'trick','flow');
+  assert.ok(routineTime(routine)<=60&&new Set(routine).size>=7);
+  assert.ok(simulateRun(r,'trick',routine,()=>0).score>repeats.score);
+  const perfect=['pop-shuvit','no-com-big','bigger','no-comply','heelflip','varial','kickflip','front-pop','shuvit','ollie'];
+  assert.equal(simulateRun(r,'trick',perfect,()=>0).score,100);
+  assert.ok(simulateRun(r,'trick',perfect,()=>.92).score<100);
+});
+
+test('placements use precise scores and performance, then share ranks and RP for identical runs',()=>{
+  const base={score:89.7,parts:{},log:[],judging:{score:89.7,execution:91,difficulty:14,variety:8,flow:87}};
+  const rows=[
+    {id:'a',name:'제',run:{...base,judging:{...base.judging,execution:90}}},
+    {id:'z',name:'가',run:base},
+    {id:'x',name:'나',run:base},
+    {id:'b',name:'라',run:{...base,judging:{...base.judging,score:89.71,execution:89}}},
+  ];
+  const standings=competitionStandings(rows);
+  assert.deepEqual(standings.map(row=>[row.id,row.place]),[['b',1],['z',2],['x',2],['a',4]]);
+  assert.deepEqual(standings,competitionStandings([...rows].reverse()));
+  assert.equal(meetRP(standings[1].place,true),meetRP(standings[2].place,true));
+  assert.equal(seasonPlace({jun:400,player:400,noa:320},'player'),1);
+  assert.equal(seasonPlace({jun:400,player:400,noa:320},'noa'),3);
 });
 
 test('podium growth uses the actual clamped increase and awards the best international finish once',()=>{

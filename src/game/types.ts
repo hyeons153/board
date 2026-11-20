@@ -37,10 +37,11 @@ export type RelationshipHistory = {
 export type Injury = { severity:'minor'|'major'; weeks:number; treated:boolean; taped?:boolean };
 export type Meet = { id:string; month:number; week:number; name:string; major:boolean; spot:Spot; international?:boolean; host?:string };
 export type Outcome = 'miss'|'rough'|'clean'|'great';
-export type MoveLog = { id:string; at:number; end:number; outcome:Outcome; linked:boolean|null; combo:number; points:number };
-export type Run = { score:number; parts:Partial<Record<'execution'|'link'|'combo'|'carve'|'speed',number>>; log:MoveLog[]; highlight?:MoveLog };
+export type MoveLog = { id:string; at:number; end:number; outcome:Outcome; linked:boolean|null; combo:number; points:number; attempt?:number };
+export type Run = { score:number; parts:Partial<Record<'execution'|'link'|'combo'|'carve'|'speed',number>>; log:MoveLog[]; highlight?:MoveLog;
+  judging?:{ score:number; execution:number; difficulty:number; variety:number; flow:number } };
 export type Standing = { id:string; name:string; score:number; place:number };
-export type RunRules = 1|2|3|4|5|6;
+export type RunRules = 1|2|3|4|5|6|7;
 export type RunProof = { version:number; rules?:RunRules; seed:number; routine:string[]; stats:Stats; energy:number; injury:Injury|null; skills:Record<string,Progress>; gear?:Pick<CareerExtras,'inventory'|'equipped'|'accessories'|'equipmentVersion'> };
 export type Result = { discipline:Discipline; run:Run; standings:Standing[]; points:number; prize:number; fame:number; energy:number; opponents?:Record<string,Run>; sponsorBonus?:number; participation?:number; statGains?:Partial<Stats>; look?:Look; proof?:RunProof };
 export type MeetRecord = { year:number; id:string; division:Division; results:Result[]; detail?:'summary'|'full' };
