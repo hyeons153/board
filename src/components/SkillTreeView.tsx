@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, type ReactNode, type Ref } from 'react';
 import { DISCIPLINE_NAMES, SKILL, SKILLS } from '../game/data';
 import type { Skill } from '../game/types';
 
@@ -11,8 +11,8 @@ const padding=14;
 // Vertical lanes keep the main chains straight while leaving room for their branches.
 const lanes={
   dance:[
-    ['peter-pan','v-spin'],
-    ['sidewinder'],
+    ['peter-pan'],
+    ['sidewinder','v-spin'],
     ['step-180','step-360'],
     ['piglet','pirouette','pirouette-540','pirouette-720'],
     ['cross','back-cross','p2p'],
@@ -22,10 +22,10 @@ const lanes={
   ],
   trick:[
     ['pivot','shuvit','bigspin','bigger'],
+    ['no-comply','no-com-big'],
     ['ollie','kickflip','varial','treflip'],
     ['heelflip','hardflip'],
     ['pop-shuvit','front-pop'],
-    ['no-comply','no-com-big'],
   ],
 };
 
@@ -49,16 +49,18 @@ function includePrerequisites(ids:Set<string>,skill:Skill){
   for(const id of skill.requires)includePrerequisites(ids,SKILL[id]!);
 }
 
-export function SkillTreeView({skills,node}:{
+export function SkillTreeView({skills,node,viewportRef}:{
   skills:Skill[];
   node:(skill:Skill,prerequisite:boolean)=>ReactNode;
+  viewportRef:Ref<HTMLDivElement>;
 }){
   const arrowId=useId();
   const matching=new Set(skills.map(skill=>skill.id));
   const visible=new Set<string>();
   for(const skill of skills)includePrerequisites(visible,skill);
 
-  return <div className="skill-tree-scroll" role="region" aria-label="스킬트리" tabIndex={0}>
+  return <div className="skill-tree-scroll" ref={viewportRef} role="region" aria-label="스킬트리" tabIndex={0}>
+    {!skills.length&&<p className="game-empty">조건에 맞는 기술이 없어요.</p>}
     {(['dance','trick'] as const).map(family=>{
       const group=SKILLS.filter(skill=>skill.family===family&&visible.has(skill.id));
       if(!group.length)return null;
@@ -81,9 +83,10 @@ export function SkillTreeView({skills,node}:{
         const endY=to.y+cardHeight/2+(index-(skill.requires.length-1)/2)*12;
         const lane=(routedByColumn.get(to.x)??0)+1;
         routedByColumn.set(to.x,lane);
-        const approach=endX-8-(columnGap-24)*lane/((incomingByColumn.get(to.x)??1)+1);
+        const approach=endX-8-(columnGap-18)*lane/((incomingByColumn.get(to.x)??1)+1);
+        const blocked=coordinates.some(point=>point.y===from.y&&point.x>from.x&&point.x<to.x);
         const detourY=from.y+cardHeight+rowGap/2;
-        const path=to.x-from.x>cardWidth+columnGap
+        const path=blocked
           ?`M${startX} ${startY} H${startX+10} V${detourY} H${approach} V${endY} H${endX}`
           :`M${startX} ${startY} H${approach} V${endY} H${endX}`;
         return <path key={id+'-'+skill.id} d={path} markerEnd={`url(#${arrowId}-${family})`}/>;
