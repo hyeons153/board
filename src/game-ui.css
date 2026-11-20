@@ -339,11 +339,72 @@
 .skill-entry-progress b { text-align:right; font-variant-numeric:tabular-nums; }
 .skill-entry-prerequisites { grid-column:1/-1; color:#4e6259; font-size:.74rem; overflow-wrap:anywhere; }
 .skill-trick-filters { margin:0 0 10px; }
+.skill-browser.is-tree {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(240px,27%);
+  align-items:start;
+  gap:12px;
+}
+.skill-tree-scroll {
+  min-width:0;
+  max-height:min(560px,56dvh);
+  overflow:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+  background:#f0eddf;
+  border:1px solid var(--game-border);
+  border-radius:8px;
+}
+.skill-tree-group { width:max-content; min-width:100%; }
+.skill-tree-group + .skill-tree-group { border-top:1px solid var(--game-border); }
+.skill-tree-group h2 {
+  position:sticky;
+  left:0;
+  width:max-content;
+  margin:12px 14px 0;
+  color:var(--game-ink);
+  font-size:.9rem;
+}
+.skill-tree-canvas { position:relative; }
+.skill-tree-node { position:absolute; }
+.skill-tree-canvas > svg { position:absolute; inset:0 auto auto 0; pointer-events:none; }
+.skill-tree-canvas > svg g { stroke:#657a69; stroke-width:1.5; fill:none; }
+.skill-tree-canvas > svg marker { fill:#657a69; }
+.skill-tree-card {
+  display:grid;
+  width:100%;
+  height:100%;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-content:center;
+  align-items:center;
+  gap:5px 3px;
+  padding:7px 8px;
+  border:1px solid var(--game-border);
+  border-radius:7px;
+  color:var(--game-ink);
+  background:#fffcf1;
+  text-align:left;
+}
+.skill-tree-card .skill-entry-title { display:contents; }
+.skill-tree-card .skill-entry-title strong { grid-column:1/-1; font-size:.86rem; line-height:1.2; }
+.skill-tree-card :is(.skill-entry-title small,.skill-entry-state,.skill-entry-progress) { font-size:.66rem; line-height:1.15; }
+.skill-tree-card .skill-entry-state { gap:2px; }
+.skill-tree-card .skill-entry-progress { gap:5px; }
+.skill-tree-card .skill-entry-progress progress { height:6px; }
+.skill-tree-card[data-skill-state="locked"] { background:#ece9e2; border-color:#bdbaac; }
+.skill-tree-card[data-skill-state="available"] { border-color:#8b9e72; }
+.skill-tree-card[data-skill-state="learned"] { background:#f0f4e4; border-color:#8b9e72; }
+.skill-tree-card[data-skill-state="mastered"] { background:#e1edc9; border-color:#6e8d60; }
+.skill-tree-card[data-prerequisite] { border-style:dashed; }
+.skill-tree-card[aria-expanded=true] { box-shadow:inset 0 0 0 2px #4a7657; }
+.skill-tree-card:focus-visible,.skill-tree-scroll:focus-visible { outline:2px solid #4a7657; outline-offset:2px; }
+.skill-detail-placeholder { padding:13px; color:#52655a; font-size:.86rem; }
 .skill-detail { position:sticky; top:0; padding:13px; }
 .skill-detail > header { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
 .skill-detail > header h2 { font-size:1.15rem; }
 .skill-detail > header .icon-button { width:40px; height:40px; flex:none; }
 .skill-detail p { font-size:.88rem; line-height:1.65; }
+.skill-detail .game-facts dt { flex:none; }
 .skill-detail-actions { display:flex; flex-wrap:wrap; align-items:center; gap:7px; }
 .skill-detail-actions .button { min-height:40px; }
 .skill-detail .technique-preview { height:clamp(128px,18vw,190px); }
@@ -506,8 +567,11 @@
   .weekly-selection-slot :is(.weekly-blocked,.weekly-selection-note) { grid-row:3; margin:2px 0 0; }
   .game-console .game-dialogue { bottom:8px; max-height:calc(100% - 160px); padding:11px; }
   .game-console .game-dialogue p { font-size:.84rem; }
-  .skill-list,.skill-browser.has-detail,.meet-browser-grid { grid-template-columns:1fr; }
+  .skill-list,.skill-browser.has-detail,.skill-browser.is-tree,.meet-browser-grid { grid-template-columns:1fr; }
   .skill-detail { grid-row:1; position:static; }
+  .skill-browser.is-tree .skill-detail { grid-row:2; }
+  .skill-tree-scroll { max-height:clamp(190px,42dvh,380px); }
+  .skill-detail-placeholder { display:none; }
   .meet-detail { position:static; }
   .meet-browser .calendar-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .meet-list-row { grid-template-columns:minmax(0,1fr) auto; gap:4px; height:100%; }

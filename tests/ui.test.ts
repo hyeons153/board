@@ -177,6 +177,18 @@ test('one game frame previews choices on the existing HUD before confirmation, t
         assert.equal(win.document.querySelectorAll('.skill-entry-summary').length,8);
         await click('트래플립 상세');
         assert.match(win.document.querySelector('.skill-detail')!.textContent!,/킥플립.*남은 숙련도.*빅스핀/);
+        assert.equal(win.document.querySelector('[role="region"][aria-label="스킬트리"]'),null);
+        await click('스킬트리 보기');
+        const tree=win.document.querySelector('[role="region"][aria-label="스킬트리"]')!;
+        assert.equal(tree.querySelectorAll('.skill-tree-card:not([data-prerequisite])').length,8);
+        assert.equal(tree.querySelectorAll('.skill-tree-card[data-prerequisite]').length,4);
+        assert.ok(tree.querySelector('svg g path[marker-end]'));
+        assert.equal(tree.querySelector('[aria-label="트래플립 상세"]')?.getAttribute('aria-expanded'),'true');
+        await click('트래플립 미리보기');
+        assert.ok(win.document.querySelector('.skill-detail .technique-preview'));
+        await click('목록 보기');
+        assert.equal(win.document.querySelector('.skill-entry-summary[aria-label="트래플립 상세"]')?.getAttribute('aria-expanded'),'true');
+        assert.ok(win.document.querySelector('.skill-detail .technique-preview'));
       }
       if(menu==='상점'){
         assert.equal(win.document.querySelectorAll('.equipment-choice').length,8);

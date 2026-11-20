@@ -4,6 +4,7 @@ import { DISCIPLINE_NAMES, DIFFICULTY_NAMES, KIND_NAMES, RULES, SKILLS, SKILL, S
 import { allowed, chance, generateRoutine, learned, routineTime } from '../game/competition';
 import { canStudy, mastered, missingMastery } from '../game/skillTree';
 import { skillDescription } from '../game/content';
+import { SkillTreeView } from './SkillTreeView';
 import { TechniquePreview } from './TechniquePreview';
 import { DISCIPLINES, STYLES, type Discipline, type Rider, type Skill } from '../game/types';
 import { Tag } from './Brand';
@@ -11,12 +12,22 @@ import type { Submit } from './Overview';
 
 const trickSides=[['all','전체 트릭'],['nose','노즈트릭'],['tail','테일트릭']] as const;
 const trickName=(skill:Skill)=>trickSides.find(([id])=>id===skill.trickSide)?.[1]??DISCIPLINE_NAMES[skill.family];
-const missingSkills=(r:Rider,ids:string[])=>ids.map(id=>{
+const prerequisiteStatus=(r:Rider,ids:string[])=>ids.map(id=>{
   const current=learned(r.skills,id)?r.skills[id].mastery:0;
-  return `${SKILL[id]?.name} ${current}% / 100% (남은 숙련도 ${Math.round((100-current)*10)/10}%p)`;
+  const remaining=Math.max(0,Math.round((100-current)*10)/10);
+  return `${SKILL[id]?.name} ${current}%${remaining?` (남은 숙련도 ${remaining}%p)`:''}`;
 }).join(' · ');
 
+function skillProgress(r:Rider,skill:Skill){
+  const known=learned(r.skills,skill.id);
+  const state=known?(mastered(r.skills,skill.id)?'mastered':'learned'):canStudy(r,skill.id)?'available':'locked';
+  const labels={mastered:'마스터',learned:'습득',available:'학습 가능',locked:'잠김'} as const;
+  const value=(known?r.skills[skill.id]?.mastery:r.skills[skill.id]?.study)??0;
+  return {state,label:labels[state],value,kind:known?'숙련도':'학습도',known};
+}
+
 export function Skills({r}:{r:Rider}){
+  const [view,setView]=useState<'list'|'tree'>('list');
   const [family,setFamily]=useState<'all'|'dance'|'trick'>('all');
   const [trickSide,setTrickSide]=useState<typeof trickSides[number][0]>('all');
   const [status,setStatus]=useState<'all'|'learned'|'unlearned'>('all');
@@ -28,19 +39,45 @@ export function Skills({r}:{r:Rider}){
   const list=SKILLS.filter(s=>(family==='all'||family===s.family)&&
     (family!=='trick'||trickSide==='all'||trickSide===s.trickSide)&&
     (status==='all'||learned(r.skills,s.id)===(status==='learned')));
-  const skill=list.find(s=>s.id===selected);
-  const select=(id:string|undefined,button?:HTMLButtonElement)=>{
+  const skill=SKILL[selected??''];
+  const select=(id:string|undefined)=>{
     setSelected(id);
     setPreview(null);
-    if(button)trigger.current=button;
     window.requestAnimationFrame(()=>{
-      if(!id){trigger.current?.focus();return;}
+      if(!id){trigger.current?.focus({preventScroll:true});return;}
       detail.current?.focus({preventScroll:true});
-      if(matchMedia('(max-width:760px)').matches)detail.current?.scrollIntoView({block:'start'});
+      if(matchMedia('(max-width:760px)').matches)detail.current?.scrollIntoView({block:view==='tree'?'nearest':'start'});
     });
+  };
+  const renderSkill=(s:Skill,prerequisite=false)=>{
+    const progress=skillProgress(r,s);
+    const open=selected===s.id;
+    const tree=view==='tree';
+    return <button key={s.id} type="button"
+      className={tree?'skill-tree-card':'skill-entry-summary'+(progress.known?' is-known':'')+(progress.state==='locked'?' is-locked':'')}
+      data-skill-state={progress.state} data-prerequisite={prerequisite||undefined}
+      aria-expanded={open} aria-controls={open?'skill-detail':undefined} aria-label={s.name+' 상세'}
+      aria-description={`${trickName(s)} · ${progress.label} · ${progress.kind} ${progress.value}%${prerequisite?' · 선행 기술':''}`}
+      ref={element=>{if(open&&element)trigger.current=element;}}
+      onClick={event=>{trigger.current=event.currentTarget;select(open?undefined:s.id);}}>
+      <span className="skill-entry-title"><strong>{s.name}</strong>
+        <small>{trickName(s)} · {DIFFICULTY_NAMES[s.difficulty]}{prerequisite?' · 선행':''}</small>
+      </span>
+      <span className="skill-entry-state">{progress.state==='locked'?<LockKeyhole size={13} aria-hidden="true"/>:
+        progress.known?<Check size={13} aria-hidden="true"/>:null} {progress.label}</span>
+      {!tree&&<ChevronRight size={16} className="skill-chevron" aria-hidden="true"/>}
+      {(tree||progress.state!=='locked')&&<span className="skill-entry-progress"><span>{progress.kind}</span>
+        <progress max={100} value={progress.value} aria-label={s.name+' '+progress.kind}/><b>{progress.value}%</b>
+      </span>}
+      {!tree&&progress.state==='locked'&&<span className="skill-entry-prerequisites">{prerequisiteStatus(r,missingMastery(r.skills,s))}</span>}
+    </button>;
   };
   return <section className="skill-library">
     <div className="game-toolbar">
+      <div className="pill-row" role="group" aria-label="기술 도감 보기 방식">
+        {([['list','목록 보기'],['tree','스킬트리 보기']] as const).map(([key,label])=>
+          <button key={key} className="pill" aria-pressed={view===key} onClick={()=>setView(key)}>{label}</button>)}
+      </div>
       <div className="pill-row" role="group" aria-label="기술 종류">
         {([['all','전체'],['dance','댄싱'],['trick','트릭']] as const).map(([key,label])=><button key={key} className="pill" aria-pressed={family===key} onClick={()=>{setFamily(key);setPreview(null);}}>{label}</button>)}
       </div>
@@ -51,41 +88,29 @@ export function Skills({r}:{r:Rider}){
       {trickSides.map(([id,label])=><button key={id} className="pill" aria-pressed={trickSide===id} onClick={()=>{setTrickSide(id);setPreview(null);}}>{label}</button>)}
     </div>}
     {!list.length&&<p className="game-empty">조건에 맞는 기술이 없어요.</p>}
-    <div className={'skill-browser'+(skill?' has-detail':'')}>
-      <div className="skill-list">{list.map(s=>{
-      const progress=r.skills[s.id];
-      const known=learned(r.skills,s.id);
-      const available=canStudy(r,s.id);
-      const value=Math.floor(known?progress?.mastery??0:progress?.study??0);
-      const open=selected===s.id;
-      return <button key={s.id} className={'skill-entry-summary'+(known?' is-known':'')+(!available?' is-locked':'')}
-          aria-expanded={open} aria-controls={open?'skill-detail':undefined} aria-label={s.name+' 상세'}
-          onClick={event=>select(open?undefined:s.id,event.currentTarget)}>
-          <span className="skill-entry-title"><strong>{s.name}</strong><small>{trickName(s)} · {DIFFICULTY_NAMES[s.difficulty]}</small></span>
-          <span className="skill-entry-state">{known?<><Check size={14}/> {mastered(r.skills,s.id)?'마스터':'습득'}</>:available?'미습득':<><LockKeyhole size={14}/> 잠김</>}</span>
-          <ChevronRight size={16} className="skill-chevron"/>
-          {available&&<span className="skill-entry-progress"><span>{known?'숙련도':'학습'}</span><progress max={100} value={value} aria-label={s.name+(known?' 숙련도':' 학습 진척도')}/><b>{value}%</b></span>}
-          {!available&&<span className="skill-entry-prerequisites">{missingSkills(r,missingMastery(r.skills,s))}</span>}
-        </button>;
-      })}</div>
+    <div className={'skill-browser'+(skill?' has-detail':'')+(view==='tree'?' is-tree':'')}>
+      {view==='tree'?<SkillTreeView skills={list} node={renderSkill}/>:<div className="skill-list">{list.map(s=>renderSkill(s))}</div>}
       {skill&&<section className="skill-detail" id="skill-detail" key={skill.id} ref={detail} tabIndex={-1} aria-label={skill.name+' 기술 정보'}>
         <SkillDetail r={r} skill={skill} preview={preview===skill.id} onPreview={()=>setPreview(preview===skill.id?null:skill.id)} onClose={()=>select(undefined)}/>
       </section>}
+      {view==='tree'&&!skill&&<aside className="skill-detail-placeholder">동작과 해금 조건을 보려면 기술을 선택하세요.</aside>}
     </div>
   </section>;
 }
 
 function SkillDetail({r,skill:s,preview,onPreview,onClose}:{r:Rider;skill:Skill;preview:boolean;onPreview:()=>void;onClose:()=>void}){
   const {id}=s;
-  const known=learned(r.skills,id);
-  const missing=known?[]:missingMastery(r.skills,s);
+  const progress=skillProgress(r,s);
+  const {known}=progress;
   const estimate=chance(known?r:{...r,skills:{...r.skills,[id]:{study:100,mastery:17}}},s);
   return <>
     <header><h2>{s.name}</h2><button className="icon-button" aria-label="기술 상세 닫기" onClick={onClose}><X size={17}/></button></header>
     <p>{skillDescription(id)}</p>
     <dl className="game-facts">
+      <div><dt>분류</dt><dd>{DISCIPLINE_NAMES[s.family]}{s.trickSide?' · '+trickName(s):''} · {DIFFICULTY_NAMES[s.difficulty]}</dd></div>
+      <div><dt>{progress.kind}</dt><dd>{progress.value}% · {progress.label}</dd></div>
       <div><dt>동작</dt><dd>{KIND_NAMES[s.kind]} · {s.points}점 · {s.seconds}초</dd></div>
-      <div><dt>선행 기술</dt><dd>{missing.length?missingSkills(r,missing):s.requires.length?s.requires.map(id=>SKILL[id]?.name).join(' · '):'없음'}</dd></div>
+      <div><dt>선행 기술</dt><dd>{s.requires.length?prerequisiteStatus(r,s.requires):'없음'}</dd></div>
       <div><dt>{known?'대회 성공률':'습득 직후 예상 성공률'}</dt><dd>약 {Math.round(estimate*100)}%</dd></div>
     </dl>
     <div className="skill-detail-actions">
