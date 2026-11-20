@@ -1,8 +1,10 @@
 import { command, newRider, prepareWeek, processWeek } from '../src/game/career';
 import { CALENDAR, DEFAULT_LOOK, RULES, SKILL, SKILLS } from '../src/game/data';
 import { chance, generateRoutine, routineTime, simulateRun } from '../src/game/competition';
+import { RIVALS } from '../src/game/content';
 import { chooseEnding, summarize } from '../src/game/legacy';
 import { eventFor } from '../src/game/events';
+import { jointTrainingOffer } from '../src/game/jointTraining';
 import { seeded } from '../src/game/random';
 import { randomSpecialTraining, trainingSuccess } from '../src/game/training';
 import { rankingPoints } from '../src/game/rp';
@@ -81,7 +83,8 @@ for(const enterOrdinary of [true,false])for(const strategy of STRATEGIES){
   const endings:Record<string,number>={};
   const totals={rankedMeets:0,wins:0,maxed:0,statTotal:0,scoreSum:0,runs:0,rp:0,money:0,decisions:0,personal:0,crew:0,happenings:0,chapters:0,casual:0};
   const training={weeks:0,regularWeeks:0,rest:0,hospital:0,attempts:0,injuries:0,recovered:0,recoveryWeeks:0,opportunities:0,randomUsed:0,meetUsed:0};
-  const years=Array.from({length:RULES.years},()=>({stats:0,learned:0,mastery:0,mastered:0,intermediate:0,advanced:0,expert:0}));
+  const years=Array.from({length:RULES.years},()=>({stats:0,learned:0,mastery:0,mastered:0,intermediate:0,advanced:0,expert:0,affinity:0,topAffinity:0}));
+  const joint={offers:0,focusOffers:0,sessions:0,focus:0,specialOverlap:0,affinity:0,firstFocusByYear:Array<number>(RULES.years).fill(0),firstMaxAffinityByYear:Array<number>(RULES.years).fill(0)};
   const byDiscipline=Object.fromEntries(DISCIPLINES.map(d=>[d,{score:0,runs:0}])) as Record<typeof DISCIPLINES[number],{score:number;runs:number}>;
   const samples=new Map<string,{scores:number[];wins:number;podiums:number;parts:Record<string,[number,number]>;meets:Record<string,number[]>}>();
   function recordScore(key:string,meetId:string,run:Career['hall'][number]['records'][number]['results'][number]['run'],place:number){
@@ -100,14 +103,18 @@ for(const enterOrdinary of [true,false])for(const strategy of STRATEGIES){
   }
   let podiumGrowth=0,podiumAwards=0;
   for(let seed=1;seed<=count;seed++){
-    const rider=newRider('internal-'+seed,seed,'Simulation Rider',DEFAULT_LOOK);
+    const rider=newRider('internal-'+seed,seed,'Simulation Rider',{...DEFAULT_LOOK,gender:seed%2?'male':'female'});
     const career:Career={rider,hall:[]};
     rider.settings={mode:'auto',strategy,entries:enterOrdinary?[strategy==='balanced'?'dance':strategy]:[]};
     let injuredSince:number|undefined;
+    let firstFocus=false,firstMaxAffinity=false;
     for(let week=0;week<RULES.weeks*RULES.years;week++){
       prepareWeek(rider);
       const action=rider.plan?.action;
       const year=rider.year;
+      const offer=jointTrainingOffer(rider,rider.spot);
+      joint.offers+=Number(!!offer);
+      joint.focusOffers+=Number(!!offer?.focus);
       training.opportunities+=Number(!!randomSpecialTraining(rider));
       if(!processWeek(career)) throw new Error('Automatic progression stalled on seed '+seed);
       if(rider.phase==='event'&&rider.event){
@@ -115,6 +122,14 @@ for(const enterOrdinary of [true,false])for(const strategy of STRATEGIES){
         command(career,{type:'event',eventId:rider.event,index:nonRomance[rider.event]??0},()=>({id:rider.id,seed}));
       }
       const result=rider.extras?.lastTraining;
+      if(result?.joint){
+        joint.sessions++;
+        joint.affinity+=result.joint.affinity;
+        joint.specialOverlap+=Number(!!result.special);
+        joint.focus+=Number(result.joint.focus);
+        if(result.joint.focus&&!firstFocus){joint.firstFocusByYear[year-1]++;firstFocus=true;}
+      }
+      if(!firstMaxAffinity&&Object.values(rider.relations).includes(100)){joint.firstMaxAffinityByYear[year-1]++;firstMaxAffinity=true;}
       training.weeks++;
       training.rest+=Number(action==='rest');
       training.hospital+=Number(action==='hospital');
@@ -129,6 +144,9 @@ for(const enterOrdinary of [true,false])for(const strategy of STRATEGIES){
       training.meetUsed+=Number(result?.special==='meet');
       if((week+1)%RULES.weeks===0){
         const season=years[year-1],skills=Object.values(rider.skills).filter(skill=>skill.study>=100);
+        const affinities=RIVALS.map(npc=>rider.relations[npc.id]??0);
+        season.affinity+=affinities.reduce((sum,value)=>sum+value,0)/affinities.length;
+        season.topAffinity+=Math.max(...affinities);
         season.stats+=STATS.reduce((sum,stat)=>sum+rider.stats[stat],0)/STATS.length;
         season.learned+=skills.length;
         season.mastery+=skills.reduce((sum,skill)=>sum+skill.mastery,0)/Math.max(1,skills.length);
@@ -185,8 +203,12 @@ for(const enterOrdinary of [true,false])for(const strategy of STRATEGIES){
       specialOfferPercent:average(training.opportunities*100,training.regularWeeks),
       specialUsePercent:average(training.randomUsed*100,training.opportunities),
       randomUses:average(training.randomUsed,count),meetUses:average(training.meetUsed,count)},
+    jointTraining:{offerPercent:average(joint.offers*100,training.weeks),focusOfferPercent:average(joint.focusOffers*100,training.weeks),
+      sessions:average(joint.sessions,count),focus:average(joint.focus,count),specialOverlap:average(joint.specialOverlap,count),affinity:average(joint.affinity,count),
+      firstFocusByYear:joint.firstFocusByYear,firstMaxAffinityByYear:joint.firstMaxAffinityByYear},
     years:years.map(season=>({stat:average(season.stats,count),learned:average(season.learned,count),mastery:average(season.mastery,count),
-      mastered:average(season.mastered,count),intermediate:average(100*season.intermediate,count),advanced:average(100*season.advanced,count),expert:average(100*season.expert,count)})),
+      mastered:average(season.mastered,count),intermediate:average(100*season.intermediate,count),advanced:average(100*season.advanced,count),expert:average(100*season.expert,count),
+      affinity:average(season.affinity,count),topAffinity:average(season.topAffinity,count)})),
     eventsPerCareer:Object.fromEntries((['decisions','personal','crew','happenings','chapters','casual'] as const).map(key=>[key,Math.round(totals[key]/count*10)/10])),
     competition:Object.fromEntries([...samples].map(([key,{scores,wins,podiums,parts,meets}])=>{
       scores.sort((a,b)=>a-b);

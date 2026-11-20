@@ -14,7 +14,14 @@
 .weekly-action-grid > button > svg { flex:none; color:#567970; }.weekly-action-grid strong { font-size:.8rem; word-break:keep-all; }
 .weekly-action-grid > button[aria-label="휴식 선택"] { background:#e8efdc; }
 .weekly-action-grid > button[aria-pressed=true],.weekly-action-grid > button:hover:not(:disabled) { border-color:#668d6c; background:#deedc8; }
-.weekly-action-copy { display:grid; justify-items:start; }
+.weekly-action-copy { display:grid; justify-items:start; min-width:0; }
+.weekly-action-title { display:flex; align-items:center; flex-wrap:wrap; gap:2px 4px; }
+.weekly-joint-label { color:#315b57; font-size:.64rem; line-height:1.2; font-weight:700; text-align:left; }
+.weekly-action-grid > .weekly-joint-card { border-color:#87b2a6; }
+.weekly-action-grid > .weekly-focus-card { border-color:#9972a9; background:#f1e7f4; }
+.weekly-action-grid > .weekly-focus-card[aria-pressed=true] { border-color:#815995; background:#e9d8ee; }
+.weekly-focus-card .weekly-joint-label { color:#684478; }
+@media(max-width:480px){ .weekly-action-grid > button:has(.weekly-joint-label) > svg { display:none; } }
 .weekly-meet-choice { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:0 0 8px; }
 .weekly-meet-choice > button { min-height:36px; padding:4px 6px; border:1px solid #c8cbb6; border-radius:6px; background:#f9f5e9; color:#2a4350; font-size:.76rem; font-weight:700; }
 .weekly-meet-choice > button[aria-pressed=true] { background:#e2edcb; border-color:#75925b; }

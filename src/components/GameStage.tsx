@@ -4,7 +4,8 @@ import { ACTION_NAMES, ACTION_STORIES, calendarFor, formatCareerDate, meetById, 
 import { currentMeet, divisionFor, singleEntry } from '../game/career';
 import { eventBody, eventCast, eventChoiceAvailable, eventFor, eventNpc, eventPaused } from '../game/events';
 import { happeningDuration } from '../game/happenings';
-import { RIVAL, lineTerms } from '../game/content';
+import { jointTrainingFor, jointTrainingLabel } from '../game/jointTraining';
+import { RIVAL, affinityTerms, lineTerms } from '../game/content';
 import { equippedLook, gearBonuses, playerPlace } from '../game/economy';
 import { formatRP, meetRP, validRP } from '../game/rp';
 import { repeatFactor } from '../game/runScoring';
@@ -55,6 +56,8 @@ export default function GameStage({r,send,saving,remaining,weekMs,fastForward,sp
   const meet=r.phase==='meet'?currentMeet(r):undefined;
   const retired=r.phase==='retired';
   const overlay=!!event||!!meet||r.phase==='injury';
+  const runningSpecial=r.plan&&specialTraining(r,r.plan);
+  const runningJoint=r.plan&&jointTrainingFor(r,r.plan);
   const viewSpot=meet?.spot??(event?r.spot:spot);
   const technique=overlay||autoChoosing?undefined:trainingTechnique(r,Math.max(0,weekMs-remaining)/1000,weekMs/1000);
   const actionMotion:Partial<Record<NonNullable<Rider['plan']>['action'],Motion>>={speed:'accelerate',carve:'carve',balance:'land',rest:'rest',hospital:'rest'};
@@ -76,7 +79,7 @@ export default function GameStage({r,send,saving,remaining,weekMs,fastForward,sp
         </button>;
       })}</div>}
     </div>:meet?<Entry key={r.year+':'+r.week} r={r} send={send} saving={saving} active={active}/>:r.phase==='injury'?<div className="game-dialogue" role="region" aria-label="부상 확인" ref={dialogue} tabIndex={-1}><div className="game-caption"><HeartPulse size={16}/> 컨디션 알림</div><h2>잠깐, 몸 상태를 확인해요.</h2><p>새 부상으로 자동 육성을 멈췄어요. 다음 훈련에서 휴식이나 치료를 선택할 수 있습니다.</p><div className="game-actions"><button disabled={saving} onClick={()=>void send({type:'resume'})}>확인하고 재개 <ArrowRight size={15}/></button></div></div>:!r.plan&&<div className="spot-title"><span>{formatCareerDate(r)}</span><h2>{LOCATIONS[viewSpot].name}</h2>{!retired&&<p>{LOCATIONS[viewSpot].detail}</p>}{guest&&<span className="spot-visitor"><PixelRider look={guest}/> 함께 연습 중</span>}</div>}
-    {r.plan&&!overlay&&!autoChoosing&&<div className="weekly-running" role="status">{specialTraining(r,r.plan)&&<SpecialTrainingBadge/>}<strong>{ACTION_STORIES[r.plan.action].start}{r.plan.skill?' · '+SKILL[r.plan.skill]?.name:''}</strong><progress max={weekMs} value={Math.max(0,weekMs-remaining)} aria-label="행동 진행"/></div>}
+    {r.plan&&!overlay&&!autoChoosing&&<div className="weekly-running" role="status">{runningSpecial&&<SpecialTrainingBadge/>}{runningJoint&&<span>{jointTrainingLabel({...runningJoint,focus:!runningSpecial&&runningJoint.focus})}</span>}<strong>{ACTION_STORIES[r.plan.action].start}{r.plan.skill?' · '+SKILL[r.plan.skill]?.name:''}</strong><progress max={weekMs} value={Math.max(0,weekMs-remaining)} aria-label="행동 진행"/></div>}
   </section>;
 }
 function Entry({r,send,saving,active}:{r:Rider;send:Submit;saving:boolean;active:boolean}){
@@ -183,10 +186,10 @@ function TrainingOutcome({r,saving,active,onDone}:{r:Rider;saving:boolean;active
   const dialogue=useDialogueFocus(r.id+':training:'+result?.year+':'+result?.week,active);
   useAutoAdvance(r.id+':'+result?.year+':'+result?.week,r.settings.mode==='auto'&&!saving,AUTO_FLOW.resultMs,onDone);
   return <section className="spot-stage game-stage has-dialogue training-outcome-stage">
-    <Scene spot={r.spot} look={equippedLook(r)} motion={result?.grade==='injury'?'fall':result?.grade==='miss'?'lose':result?.grade==='recovery'?'rest':result?.grade==='great'||result?.grade==='learned'?'great':'success'} variant="event"/>
+    <Scene spot={r.spot} look={equippedLook(r)} guest={result?.joint?RIVAL.get(result.joint.npc)?.look:undefined} motion={result?.grade==='injury'?'fall':result?.grade==='miss'?'lose':result?.grade==='recovery'?'rest':result?.grade==='great'||result?.grade==='learned'?'great':'success'} variant="event"/>
     <div className="scene-shade"/>
     <div className={'game-dialogue'+(result?.special?' training-special-result':'')} role="region" aria-labelledby="training-outcome-title" tabIndex={-1} ref={dialogue}>
-      {result&&<div className="game-caption">{formatCareerDate(result)}{result.special&&<SpecialTrainingBadge/>}</div>}
+      {result&&<div className="game-caption">{formatCareerDate(result)}{result.special&&<SpecialTrainingBadge/>}{result.joint&&<span>{jointTrainingLabel(result.joint)}</span>}</div>}
       <h2 id="training-outcome-title">{title}</h2>
       {narration&&<p>{lineTerms(narration)}</p>}
       {!!result?.changes?.length&&<p className="game-reward">{result.changes.join(' · ')}</p>}
@@ -219,5 +222,5 @@ function EventResult({r,result,saving,active,onDone}:EventSceneProps){
   const dialogue=useDialogueFocus(result.key,active);
   useAutoAdvance(result.key,r.settings.mode==='auto'&&!saving,AUTO_FLOW.resultMs,onDone);
   const person=result.npc==='mentor'?r.mentor:result.npc?RIVAL.get(result.npc):undefined;
-  return <section className="spot-stage game-stage has-dialogue" aria-label="인게임 이벤트 결과"><Scene spot={r.spot} look={equippedLook(r)} guest={person?.look} motion="success" variant="event"/><div className="scene-shade"/><div className="game-dialogue" role="region" aria-label="이벤트 결과" ref={dialogue} tabIndex={-1}><div className="game-caption">{formatCareerDate(result)} · {result.kind}{person&&<span className="game-speaker"><PixelRider look={person.look}/>{person.name}</span>}</div><h2>{result.title}</h2><p>{lineTerms(result.choice)}</p>{result.dialogue&&<p>{result.dialogue}</p>}{result.details.length>0&&<p className="game-reward">{result.details.slice(0,3).join(' / ')}</p>}<div className="game-actions"><button disabled={saving} onClick={onDone}>계속 <ArrowRight size={15}/></button></div></div></section>;
+  return <section className="spot-stage game-stage has-dialogue" aria-label="인게임 이벤트 결과"><Scene spot={r.spot} look={equippedLook(r)} guest={person?.look} motion="success" variant="event"/><div className="scene-shade"/><div className="game-dialogue" role="region" aria-label="이벤트 결과" ref={dialogue} tabIndex={-1}><div className="game-caption">{formatCareerDate(result)} · {result.kind}{person&&<span className="game-speaker"><PixelRider look={person.look}/>{person.name}</span>}</div><h2>{result.title}</h2><p>{lineTerms(result.choice)}</p>{result.dialogue&&<p>{result.dialogue}</p>}{result.details.length>0&&<p className="game-reward">{result.details.slice(0,3).map(affinityTerms).join(' / ')}</p>}<div className="game-actions"><button disabled={saving} onClick={onDone}>계속 <ArrowRight size={15}/></button></div></div></section>;
 }

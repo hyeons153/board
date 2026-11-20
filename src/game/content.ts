@@ -4,7 +4,7 @@ import { rooftopUnlocked } from './relationships.js';
 import { seeded } from './random.js';
 
 export type Rival = {
-  id:string; name:string; age:number; style:string; personality:string; line:string; stats:Stats; favorite:Discipline;
+  id:keyof typeof NPC_NAMES; name:string; age:number; style:string; personality:string; line:string; stats:Stats; favorite:Discipline;
   color:string; look:Look; spots:Spot[]; signature:string; tactic:RoutineStyle; growth:Stats; mastery:number;
 };
 export const RIVALS: Rival[] = [
@@ -21,7 +21,7 @@ export const RIVALS: Rival[] = [
   {id:'noa',name:NPC_NAMES.noa,age:22,style:'하이 리스크 트릭',personality:'아무도 성공하지 못한 트릭을 기록하고 싶은 야간 라이더. 가까워질수록 답을 기다리는 일이 어려워진다',line:'“실패 영상도 모으면 도감이 되겠지.”',
     stats:{speed:15,carve:14,link:16,balance:15},favorite:'trick',color:'#7254a7',look:{gender:'female',hair:9,hairColor:0,skin:2,shirt:11,pants:0,shoes:3,board:2,deckDesign:2,outfit:0,bottom:2,footwear:1,eyes:1},spots:['plaza','night','studio'],signature:'treflip',tactic:'score',growth:{speed:7,carve:6,link:8,balance:10},mastery:9.4},
 ];
-export const RIVAL = new Map(RIVALS.map(npc => [npc.id, npc]));
+export const RIVAL = new Map<string,Rival>(RIVALS.map(npc => [npc.id, npc]));
 export function rivalCanJoinEvent(rider:Pick<Rider,'look'>,npc:string){
   const gender=RIVAL.get(npc)?.look.gender;
   return gender===undefined||gender!==(rider.look.gender??'male');
@@ -81,3 +81,4 @@ const descriptions: Record<string,string> = {
 export const skillDescription=(id:string)=>descriptions[id] ?? '';
 // Keep historical journals readable with the current longboard terminology.
 export const lineTerms=(text:string)=>text.replaceAll('루틴','라인');
+export const affinityTerms=(text:string)=>text.replace(/^관계 (?=[+-]\d)/,'친밀도 ');

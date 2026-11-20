@@ -1,6 +1,7 @@
 import { ACTION_NAMES, ACTION_STORIES, calendarFor, DISCIPLINE_NAMES, LOCATIONS, RULES, SKILL, SKILLS, START_SKILLS, STAT_NAMES } from './data.js';
 import { generateRoutine, learned, simulateMeet, validRoutine } from './competition.js';
 import { autoChoice, eventCast, eventChoiceAvailable, eventFor, eventPaused, pickEvent } from './events.js';
+import { jointDiscovery, jointEnergySaving, jointInjuryFactor, jointTrainingFor, jointTrainingLabel, jointTrainingOffer } from './jointTraining.js';
 import { canStudy, nextSkillTraining } from './skillTree.js';
 import { chooseEnding, honors, mentorFrom } from './legacy.js';
 import { RUN_PROOF_VERSION } from './public.js';
@@ -11,7 +12,7 @@ import { clamp, round, seeded } from './random.js';
 import { RELATIONSHIP_NAMES, RELATIONSHIP_TITLES, rooftopUnlocked } from './relationships.js';
 import { applyStoryImpact, name as storyNpcName, storyAffinity } from './storyState.js';
 import type { Happening } from './happenings.js';
-import { greatTraining, meetTrainingAvailable, practiceMasteryRate, practiceStudyRate, randomSpecialTraining, specialTraining, specialTrainingForm, statAfter, trainingCost, trainingFactor, trainingStatGains, trainingSuccess } from './training.js';
+import { greatTraining, isTrainingAction, meetTrainingAvailable, practiceMasteryRate, practiceStudyRate, randomSpecialTraining, specialTraining, specialTrainingForm, statAfter, trainingCost, trainingFactor, trainingStatGains, trainingSuccess } from './training.js';
 import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family, type Settings, type Stat, type Result } from './types.js';
 
 export class GameError extends Error {}
@@ -85,6 +86,8 @@ function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
   const progress=r.extras=upgradeEquipment(r.extras??freshExtras());
   const trainingRider=setup?{...r,routines:setup.routines,extras:{...progress,...setup.gear}}:r;
   const special=specialTraining(trainingRider,p);
+  const joint=jointTrainingFor(trainingRider,p);
+  const coaching=special?undefined:joint;
   const skillBefore=special&&(p.action==='dance'||p.action==='trick')?structuredClone(r.skills):undefined;
   const bonuses=gearBonuses(trainingRider);
   let grade: NonNullable<typeof progress.lastTraining>['grade']='success';
@@ -110,34 +113,34 @@ function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
     const success=trainingSuccess(trainingRider,p,special);
     const missed=form<1-success;
     const great=greatTraining(trainingRider,form);
-    const factor=trainingFactor(trainingRider,p,form,great,special);
-    const gains=trainingStatGains(trainingRider,p,factor);
+    const factor=trainingFactor(trainingRider,p,form,great,special,coaching);
+    const gains=trainingStatGains(trainingRider,p,factor,coaching);
     if(p.lesson){
       r.money-=ECONOMY.lesson;
       names.push(`레슨비 ₩${ECONOMY.lesson.toLocaleString('ko-KR')}.`);
     }
     grade=missed?'miss':great?'great':'success';
-    r.energy=round(clamp(r.energy-trainingCost(trainingRider,p,special)));
+    r.energy=round(clamp(r.energy-trainingCost(trainingRider,p,special,coaching)));
     let difficulty=attempted?.difficulty??1, mastery=attempted?(r.skills[attempted.id]?.mastery??12):60;
     if(missed){
       names.push(`훈련에 실패했다. 훈련 전 체력 ${round(energyBefore)} · 성공률 ${Math.round(success*100)}%. 능력치는 오르지 않았다.`);
     } else if (p.action==='dance'||p.action==='trick') {
       const candidates=SKILLS.filter(s=>s.family===p.action&&canStudy(r,s.id));
       const reachable=candidates.filter(s=>!learned(r.skills,s.id));
-      const target=p.skill?attempted:(rng()<practice.discovery+bonuses.discovery&&reachable.length?reachable[Math.floor(rng()*reachable.length)]:undefined);
+      const target=p.skill?attempted:(rng()<practice.discovery+bonuses.discovery+jointDiscovery(coaching)&&reachable.length?reachable[Math.floor(rng()*reachable.length)]:undefined);
       if(target){
         difficulty=target.difficulty; mastery=r.skills[target.id]?.mastery??12;
         practiced=target.id;
         const learnedBefore=learned(r.skills,target.id);
         const gain=practiceStudyRate(r.year,target,Boolean(p.skill))*factor;
-        if(trainSkill(r,target.id,gain,practiceMasteryRate(r.year,target,RULES.mastery,bonuses)*factor)) grade='learned';
+        if(trainSkill(r,target.id,gain,practiceMasteryRate(r.year,target,RULES.mastery,bonuses,coaching)*factor)) grade='learned';
         else if(learnedBefore&&!great) grade='mastery';
         names.push(`${target.name} · ${learned(r.skills,target.id)?'숙련도 '+r.skills[target.id].mastery+'%':'학습 '+r.skills[target.id].study+'%'}.`);
       }
       const ready=candidates.filter(s=>s.id!==target?.id&&learned(r.skills,s.id));
       if(!p.skill && ready.length) {
         const first=Math.floor(rng()*ready.length);
-        for(const s of [...ready.slice(first),...ready.slice(0,first)].slice(0,2)) trainSkill(r,s.id,0,practiceMasteryRate(r.year,s,RULES.mastery,bonuses)*factor*.66);
+        for(const s of [...ready.slice(first),...ready.slice(0,first)].slice(0,2)) trainSkill(r,s.id,0,practiceMasteryRate(r.year,s,RULES.mastery,bonuses,coaching)*factor*.66);
         names.push('배운 기술의 숙련도가 올랐다.');
         if(grade==='success') grade='mastery';
       }
@@ -159,7 +162,7 @@ function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
     if(!missed)for(const stat of STATS)r.stats[stat]=round(r.stats[stat]+(gains[stat]??0));
     const risk=RULES.injury;
     const pInjury=clamp((risk.base+(100-energyBefore)*risk.energy+(difficulty-1)*risk.difficulty-(effectiveStats(trainingRider).balance+mastery*.34)*risk.stability)*spot.risk+(r.injury?.03:0)-bonuses.injury,.004,.38);
-    if(!special&&rng()<pInjury){
+    if(!special&&rng()<pInjury*jointInjuryFactor(coaching)){
       const major=rng()<clamp(.12+(difficulty-1)*.06+(100-energyBefore)*.002,0,.48) || r.injury?.severity==='major';
       r.injury={severity:major?'major':'minor',weeks:major?risk.majorWeeks:risk.minorWeeks,treated:false};
       names.push(major?'중상을 입었다.':'경상을 입었다.');
@@ -175,9 +178,19 @@ function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
     r.injury.weeks-=bonuses.minorRecovery;r.injury.taped=true;names.push('테이핑 키트로 경상 회복 1주 단축.');if(r.injury.weeks<=0)r.injury=null;
   }
   r.money=Math.max(RULES.safetyFund,r.money+RULES.weeklyAllowance);
-  const text=`${special?'특별훈련 · ':''}${ACTION_NAMES[p.action]} · ${names.join(' ')}`;
+  let affinity=0;
+  if(joint&&grade!=='miss'&&grade!=='injury'){
+    const previous=r.relations[joint.npc]??0;
+    r.relations[joint.npc]=clamp(previous+(previous<60?2:1));
+    affinity=round(r.relations[joint.npc]-previous);
+    const sessions=progress.jointSessions??={};
+    sessions[joint.npc]=(sessions[joint.npc]??0)+1;
+  }
+  const partner=joint&&{npc:joint.npc,focus:!!coaching?.focus,affinity};
+  const text=[special?'특별훈련':undefined,partner?jointTrainingLabel(partner):undefined,ACTION_NAMES[p.action],names.join(' ')].filter(Boolean).join(' · ');
   const changes=STATS.flatMap(stat=>{const gain=round(r.stats[stat]-before.stats[stat]);return gain?[`${STAT_NAMES[stat]} ${gain>0?'+':''}${gain}`]:[];});
   const energy=round(r.energy-before.energy);if(energy)changes.push(`체력 ${energy>0?'+':''}${energy}`);
+  if(partner?.affinity)changes.push(`${storyNpcName(partner.npc)} 친밀도 +${partner.affinity}`);
   changes.push(...names.filter(name=>(skillBefore?/회복|치료비|의료 지원|레슨비|부상|다쳤/:/숙련|학습|회복|치료비|의료 지원|레슨비|부상|다쳤/).test(name)));
   if(skillBefore)for(const [id,skill] of Object.entries(r.skills)){
     const study=round(skill.study-(skillBefore[id]?.study??0));
@@ -185,10 +198,10 @@ function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
     if(study||mastery)changes.push([SKILL[id]?.name,study?`학습 +${study}%`:'',mastery?`숙련 +${mastery}%`:''].filter(Boolean).join(' '));
   }
   const narration=grade==='injury'?'연습 도중 넘어져 보드를 내려놓았다.':grade==='miss'?'몸이 따라주지 않아 이번 연습은 여기까지였다.':ACTION_STORIES[p.action].done;
-  progress.lastTraining={grade,text,narration,changes,skill:practiced,year:r.year,week:r.week,reaction:equipmentReaction(trainingRider,grade),special};
+  progress.lastTraining={grade,text,narration,changes,skill:practiced,year:r.year,week:r.week,reaction:equipmentReaction(trainingRider,grade),special,...(partner?{joint:partner}:{})};
   note(r,'training',text);
 }
-function autoPlan(r:Rider):Plan {
+function standardAutoPlan(r:Rider):Plan {
   const base:Plan={action:'rest',spot:r.spot};
   if(r.injury?.severity==='major'&&!r.injury.treated) return {...base,action:'hospital'};
   if(r.injury?.severity==='major') return base;
@@ -218,6 +231,23 @@ function autoPlan(r:Rider):Plan {
   const order=STATS.map(s=>({s,value:r.stats[s]+rng()*16-prioritiesByStrategy[strategy][s]})).sort((a,b)=>a.value-b.value);
   const s=special??order[0].s;
   return {...base,action:s,spot:s==='speed'?'river':s==='link'?'plaza':'park'};
+}
+function autoPlan(r:Rider):Plan {
+  const base=standardAutoPlan(r);
+  if(!isTrainingAction(base.action)||specialTraining(r,base))return base;
+  const offer=jointTrainingOffer(r,base.spot);
+  if(!offer||offer.action===base.action)return base;
+  const action=offer.action;
+  const family=action==='dance'||action==='trick'?action:undefined;
+  const baseStat=base.action==='dance'||base.action==='trick'?undefined:base.action;
+  const target=family?nextSkillTraining(r,family):undefined;
+  if(family&&!target)return base;
+  const statGap=action!=='dance'&&action!=='trick'&&baseStat?Math.max(0,r.stats[action]-r.stats[baseStat]):0;
+  const strategy=r.settings.strategy;
+  const opposed=family&&(strategy==='dance'||strategy==='trick')&&strategy!==family;
+  const switchingCost=(baseStat&&!family ? .08 : .16)+statGap*.013+(opposed ? .12 : 0);
+  if(offer.growth-1+jointEnergySaving(offer)*.02<=switchingCost)return base;
+  return {action,spot:base.spot,skill:target?.id};
 }
 export function prepareWeek(r:Rider|undefined|null){
   if(r?.phase==='plan'&&r.settings.mode==='auto'&&!r.plan){r.plan=autoPlan(r);r.spot=r.plan.spot;}
@@ -249,7 +279,7 @@ function applyEvent(r:Rider,index:number){
   if(npc&&(e.npc||affinity)){
     const before=r.relations[npc]??0;r.relations[npc]=clamp(before+relation);
     const change=round(r.relations[npc]-before);
-    if(change)details.push(`관계 ${change>0?'+':''}${change}`);
+    if(change)details.push(`친밀도 ${change>0?'+':''}${change}`);
   }
   if(fx.skill&&SKILL[fx.skill]&&(fx.teach?!learned(r.skills,fx.skill):canStudy(r,fx.skill))){
     const before={study:r.skills[fx.skill]?.study??0,mastery:r.skills[fx.skill]?.mastery??0};
@@ -317,7 +347,7 @@ function applyHappening(r:Rider,event:Happening){
     const {npc,points}=event.relation;
     const before=r.relations[npc]??0;
     r.relations[npc]=clamp(before+points);
-    if(r.relations[npc]>before)details.push('관계 +'+(r.relations[npc]-before));
+    if(r.relations[npc]>before)details.push('친밀도 +'+(r.relations[npc]-before));
   }
   if(event.energy){
     const before=r.energy;

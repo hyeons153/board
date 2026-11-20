@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ACTION_NAMES, ACTION_STORIES, DISCIPLINE_NAMES, SKILL, SKILLS, STAT_NAMES, STRATEGY_DETAILS, STRATEGY_NAMES } from '../game/data';
 import { validatePlan } from '../game/career';
 import { skipsEventChoices } from '../game/events';
+import { jointEffectLabel, jointTrainingLabel, jointTrainingOffer, type JointTraining } from '../game/jointTraining';
 import { canStudy } from '../game/skillTree';
 import { isTrainingAction, meetTrainingAvailable, previewTraining, randomSpecialTraining } from '../game/training';
 import { ACTIONS, DISCIPLINES, STRATEGIES, type Plan, type Rider } from '../game/types';
@@ -16,13 +17,14 @@ const range=(min:number,max:number)=>min===max?signed(min):signed(min)+' ~ '+sig
 
 export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true,hidden=false}:{r:Rider;send:Submit;saving:boolean;onPreview?:(plan:Plan|undefined)=>void;pendingChoice?:string;active?:boolean;hidden?:boolean}){
   const [action,setAction]=useState<typeof ACTIONS[number]>();
-  const spot=r.spot;
+  const spot=r.plan?.spot??r.spot;
   const [skill,setSkill]=useState(''),[lesson,setLesson]=useState(false);
   const [skipMeet,setSkipMeet]=useState(false);
   const auto=r.settings.mode==='auto';
   const meetChoice=!auto&&meetTrainingAvailable(r);
   const meetTraining=auto?!!r.plan?.meetTraining:meetChoice&&skipMeet;
   const offer=meetTraining?undefined:randomSpecialTraining(r);
+  const joint=jointTrainingOffer(r,spot);
   useEffect(()=>setLesson(false),[spot]);
   const choose=(next:typeof ACTIONS[number])=>{setAction(current=>current===next?undefined:next);setSkill('');setLesson(false);};
   const plan=useMemo<Plan|undefined>(()=>action?{action,spot,...(skill?{skill}:{}),...(lesson?{lesson:true}:{}),...(meetTraining?{meetTraining:true}:{})}:undefined,[action,spot,skill,lesson,meetTraining]);
@@ -43,12 +45,15 @@ export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true
     </div>}
     <div className="weekly-action-grid">{ACTIONS.map(next=>{
       const Icon=icons[next],special=meetTraining&&isTrainingAction(next)||offer===next;
-      return <button key={next} className={special?'weekly-special-card':undefined} aria-label={ACTION_NAMES[next]+' 선택'} aria-description={special?'특별훈련, 성장량 두 배':undefined} aria-pressed={selected?.action===next} disabled={saving||auto} onClick={()=>choose(next)}>
-        <Icon size={16} aria-hidden="true"/><span className="weekly-action-copy"><strong>{choiceLabels[next]}</strong>{special&&<SpecialTrainingBadge/>}</span>
+      const partner=joint?.action===next?joint:undefined;
+      const label=partner?jointTrainingLabel({...partner,focus:!special&&partner.focus}):undefined;
+      const effect=partner?(special?'친밀도 상승':jointBonus(partner)):undefined;
+      return <button key={next} className={special?'weekly-special-card':partner?.focus?'weekly-focus-card':partner?'weekly-joint-card':undefined} aria-label={ACTION_NAMES[next]+' 선택'} aria-description={[special?'특별훈련, 성장량 두 배':undefined,label,effect].filter(Boolean).join(' · ')||undefined} aria-pressed={selected?.action===next} disabled={saving||auto} onClick={()=>choose(next)}>
+        <Icon size={16} aria-hidden="true"/><span className="weekly-action-copy"><span className="weekly-action-title"><strong>{choiceLabels[next]}</strong>{special&&<SpecialTrainingBadge/>}</span>{partner&&<small className="weekly-joint-label">{label}{!special&&` +${Math.round((partner.growth-1)*100)}%`}</small>}</span>
       </button>;
     })}</div>
     <div className="weekly-selection-slot">
-    {auto?<div className="weekly-auto"><strong>{r.plan?ACTION_STORIES[r.plan.action].start:'이번 주 일정을 고르는 중…'}</strong>{preview?.special&&<SpecialTrainingForecast/>}</div>:<>
+    {auto?<div className="weekly-auto"><strong>{r.plan?ACTION_STORIES[r.plan.action].start:'이번 주 일정을 고르는 중…'}</strong>{preview?.special&&<SpecialTrainingForecast/>}{preview?.joint&&<span className="weekly-joint-label">{preview.special?'함께 훈련하면 친밀도 상승':jointBonus(preview.joint)}</span>}</div>:<>
         {(action==='dance'||action==='trick')&&<div className="weekly-inline-controls" aria-label="행동 설정">
           <label>연마 목표<select aria-label="연마 목표" value={skill} disabled={saving} onChange={e=>{setSkill(e.target.value);setLesson(false);}}><option value="">자유 연마</option>{SKILLS.filter(s=>s.family===action&&canStudy(r,s.id)).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           {!!skill&&['studio','night','arena'].includes(spot)&&<label className="weekly-lesson"><input type="checkbox" checked={lesson} disabled={saving} onChange={e=>setLesson(e.target.checked)}/> 개인 레슨</label>}
@@ -62,8 +67,9 @@ export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true
           </div>
           <button className="weekly-execute" disabled={!plan||saving||!!blocked} onClick={()=>{if(plan)void send({type:'plan',plan});}}>확인 <Check size={16}/></button>
         </footer>
-        {blocked?<p className="weekly-blocked" role="status">{blocked}</p>:(recoveryNote||preview?.skill)&&<p className="weekly-selection-note" role="status">
+        {blocked?<p className="weekly-blocked" role="status">{blocked}</p>:(recoveryNote||preview?.skill||preview?.joint)&&<p className="weekly-selection-note" role="status">
           {preview?.skill&&<span>{SKILL[preview.skill.id]?.name} {preview.skill.label} {range(preview.skill.min,preview.skill.max)}%</span>}
+          {preview?.joint&&<span>{preview.special?'함께 훈련하면 친밀도 상승':jointBonus(preview.joint)}</span>}
           {recoveryNote}
         </p>}
     </>}
@@ -73,6 +79,7 @@ export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true
 
 export function SpecialTrainingBadge(){return <span className="weekly-special-badge">SPECIAL ×2</span>;}
 function SpecialTrainingForecast(){return <span className="weekly-special-forecast">성공률 100% · 체력 소모 0 · 성장 ×2</span>;}
+const jointBonus=(joint:JointTraining)=>`성장 +${Math.round((joint.growth-1)*100)}% · ${jointEffectLabel(joint)}`;
 
 export function AutoSettings({r,send,saving,onApplied}:{r:Rider;send:Submit;saving:boolean;onApplied:()=>void}){
   const [draft,setDraft]=useState(()=>({

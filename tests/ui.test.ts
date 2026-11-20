@@ -77,6 +77,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
   const {simulateMeet}=await import('../src/game/competition');
   const {DEFAULT_LOOK,SKILL}=await import('../src/game/data');
   const {previewTraining}=await import('../src/game/training');
+  const {jointTrainingOffer}=await import('../src/game/jointTraining');
   const root=createRoot(win.document.getElementById('root')!);
   const settle=async(ms=40)=>{await act(async()=>{await new Promise(resolve=>setTimeout(resolve,ms));});};
   const click=async(label:string)=>{
@@ -356,6 +357,17 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.equal(win.document.querySelectorAll('.weekly-special-card').length,6);
     assert.match(win.document.querySelector('.weekly-special-forecast')!.textContent!,/100% · 체력 소모 0 · 성장 ×2/);
     assert.equal(selected?.meetTraining,true);
+    const focused=Array.from({length:80},(_,i)=>{
+      const candidate=newRider('focus-ui-'+i,71,'Focus rider',DEFAULT_LOOK);
+      Object.assign(candidate,{spot:'park',trainingOffer:null,week:2});
+      candidate.relations.sol=35;candidate.extras!.jointSessions={sol:3};
+      return candidate;
+    }).find(candidate=>{const offer=jointTrainingOffer(candidate,'park');return offer?.npc==='sol'&&offer.focus;});
+    assert.ok(focused);
+    await act(async()=>root.render(createElement(WeeklyChoices,{key:focused.id,r:focused,send:async()=>true,saving:false})));
+    assert.match(win.document.querySelector('.weekly-focus-card')!.textContent!,/윤솔 · 집중훈련 \+35%/);
+    await click('연계 훈련 선택');
+    assert.match(win.document.querySelector('.weekly-selection-note')!.textContent!,/성장 \+35% · 연계 · 체력 소모 감소/);
     rider.lastPlan={action:'speed',spot:'river',meetTraining:true};
     rider.extras!.lastTraining={grade:'success',special:'meet',year:1,week:7,text:'',changes:['속도 +4.2']};
     await act(async()=>root.render(createElement(GameStage,{r:{...rider},send:async()=>true,saving:false,remaining:0,weekMs:2000,fastForward:false,spot:'river',motion:'rest',pendingTraining:'special-test',onDone:()=>{}})));

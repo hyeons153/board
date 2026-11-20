@@ -34,9 +34,10 @@ export type CareerExtras = {
   choices: Record<string, { index:number; year:number; week:number; npc?:string }>;
   relationships?:RelationshipHistory;
   storyReadyAt?:Partial<Record<string,number>>;
+  jointSessions?:Partial<Record<import('./jointTraining.js').TrainingNpc,number>>;
   timeline: { year:number; week:number; title:string; text:string }[];
   lastEvent?:import('./types.js').EventOutcome;
-  lastTraining?: { reaction?:string; special?:import('./training.js').SpecialTraining; grade:'success'|'great'|'learned'|'mastery'|'miss'|'injury'|'recovery'; text:string; narration?:string; changes?:string[]; skill?:string; year:number; week:number };
+  lastTraining?: { reaction?:string; special?:import('./training.js').SpecialTraining; joint?:import('./jointTraining.js').JointTrainingResult; grade:'success'|'great'|'learned'|'mastery'|'miss'|'injury'|'recovery'; text:string; narration?:string; changes?:string[]; skill?:string; year:number; week:number };
 };
 export function freshExtras(): CareerExtras {
   return { inventory:[...STARTER_IDS], equipped:{deck:'deck_001',trucks:'truck_001',wheels:'wheel_001'},accessories:[],equipmentVersion:2,contract:null,signedYear:0,achievements:[],choices:{},timeline:[] };

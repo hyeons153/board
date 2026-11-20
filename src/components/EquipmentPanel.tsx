@@ -9,7 +9,7 @@ import { equippedLook } from '../game/economy';
 import { setSoundsEnabled, soundsEnabled } from '../sounds';
 import { money, type Submit } from './Overview';
 
-const effectNames:Record<keyof Effects,[string,string]>={injury:['부상 확률 감소','%p'],cost:['훈련 체력 소모 감소',''],rest:['휴식 체력 회복',''],minorRecovery:['경상 회복 단축 · 부상당 1회','주'],danceMastery:['댄싱 숙련 경험치','%'],trickMastery:['트릭 숙련 경험치','%'],linkGrowth:['연계 훈련 성장','%'],danceLink:['댄싱 연계 성공률','%p'],discovery:['자유 연마 발견 확률','%p'],great:['대성공 확률','%p'],podiumFame:['입상 명성','%'],fame:['대회 명성','%'],prize:['대회 상금','%'],entryEnergy:['대회 시작 체력',''],eventChance:['일반 이벤트 등장','%p'],specialWeight:['특별 스팟 이벤트 가중치','%'],relation:['NPC 관계도 보상',''],trickLand:['트릭 착지 성공률','%p'],practice:['기술 연마','%'],fatigue:['종목 체력 소모 감소',''],carve:['옛 카빙 채점 보정',''],speed:['옛 속도 채점 보정','']};
+const effectNames:Record<keyof Effects,[string,string]>={injury:['부상 확률 감소','%p'],cost:['훈련 체력 소모 감소',''],rest:['휴식 체력 회복',''],minorRecovery:['경상 회복 단축 · 부상당 1회','주'],danceMastery:['댄싱 숙련 경험치','%'],trickMastery:['트릭 숙련 경험치','%'],linkGrowth:['연계 훈련 성장','%'],danceLink:['댄싱 연계 성공률','%p'],discovery:['자유 연마 발견 확률','%p'],great:['대성공 확률','%p'],podiumFame:['입상 명성','%'],fame:['대회 명성','%'],prize:['대회 상금','%'],entryEnergy:['대회 시작 체력',''],eventChance:['일반 이벤트 등장','%p'],specialWeight:['특별 스팟 이벤트 가중치','%'],relation:['NPC 친밀도 보상',''],trickLand:['트릭 착지 성공률','%p'],practice:['기술 연마','%'],fatigue:['종목 체력 소모 감소',''],carve:['옛 카빙 채점 보정',''],speed:['옛 속도 채점 보정','']};
 export function effectsText(item:Gear){
   const lines=STATS.flatMap(stat=>item.stats[stat]?[STAT_NAMES[stat]+' +'+item.stats[stat]]:[]);
   for(const [key,value] of Object.entries(item.effects)){

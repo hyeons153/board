@@ -6,6 +6,7 @@ import { chance, competitionStandings, generateRoutine, learned, routineTime, si
 import { ECONOMY, equippedLook, extras, gearBonuses, playerPlace, SPONSOR } from '../src/game/economy';
 import { previewTraining, randomSpecialTraining, statAfter, trainingFactor, trainingSuccess } from '../src/game/training';
 import { EVENTS, eventBody, eventCast, eventChoiceAvailable, eventFor, pickEvent } from '../src/game/events';
+import { jointDiscovery, jointInjuryFactor, jointMasteryFactor, jointTrainingOffer, type TrainingNpc } from '../src/game/jointTraining';
 import { canStudy, nextSkillTraining } from '../src/game/skillTree';
 import { RIVALS, spotRegulars, spotUnlocked, spotVisitor } from '../src/game/content';
 import { HAPPENINGS, pickHappening } from '../src/game/happenings';
@@ -16,7 +17,7 @@ import { RELATIONSHIP_REWARDS, relationshipEpilogues, relationshipWith, represen
 import { seeded } from '../src/game/random';
 import { meetRP, rankingPoints, seasonPlace } from '../src/game/rp';
 import { advance, blankSave, remaining } from '../server/clock';
-import { DISCIPLINES, SPOTS, STATS, TRAINING_ACTIONS, type Career, type Plan } from '../src/game/types';
+import { DISCIPLINES, SPOTS, STATS, TRAINING_ACTIONS, type Career, type Plan, type Spot } from '../src/game/types';
 
 const identity=()=>({id:'rider-1',seed:5411});
 const career=():Career=>({rider:newRider(identity().id,identity().seed,'리버',{...DEFAULT_LOOK}),hall:[]});
@@ -250,7 +251,8 @@ test('training previews and results use the requested primary, secondary and tec
     for(let seed=1;seed<=5;seed++){
       const c:Career={rider:newRider('training-'+seed,seed,'Training',DEFAULT_LOOK),hall:[]},r=c.rider!;r.week=3;
       const before=structuredClone(r),p:Plan={action,spot:'river',...(['dance','trick'].includes(action)?{skill:action==='dance'?'peter-pan':'pivot'}:{})};
-      const preview=previewTraining(r,p);assert.deepEqual(Object.keys(preview.gains).sort(),[...expected[action]].sort());
+      const preview=previewTraining(r,p);if(preview.joint&&!preview.special)continue;
+      assert.deepEqual(Object.keys(preview.gains).sort(),[...expected[action]].sort());
       command(c,{type:'plan',plan:p},identity);processWeek(c);if(r.extras!.lastTraining!.grade==='miss')continue;succeeded=true;
       for(const stat of STATS){const gain=r.stats[stat]-before.stats[stat],forecast=preview.gains[stat];if(forecast)assert.ok(gain>=forecast.min-.001&&gain<=forecast.max+.001);else assert.equal(gain,0);}
       if(p.skill)assert.ok(r.skills[p.skill].mastery>before.skills[p.skill].mastery);
@@ -260,6 +262,89 @@ test('training previews and results use the requested primary, secondary and tec
     assert.ok(succeeded);
   }
   const c=career();c.rider!.year=4;c.rider!.spot='arena';assert.throws(()=>command(c,{type:'plan',plan:{action:'rehearsal',spot:'arena'}},identity),/종료/);
+});
+
+function jointFixture(npc:TrainingNpc,spot:Spot,focus=false){
+  for(let seed=1;seed<=500;seed++){
+    const r=newRider(`joint-${npc}-${seed}`,seed,'Joint training',DEFAULT_LOOK);
+    Object.assign(r,{spot,week:2,trainingOffer:null});
+    if(focus){r.relations[npc]=35;r.extras!.jointSessions={[npc]:3};}
+    const offer=jointTrainingOffer(r,spot);
+    if(offer?.npc===npc&&offer.focus===focus)return {r,offer};
+  }
+  throw new Error(`Missing joint training fixture for ${npc}`);
+}
+
+test('joint offers follow the weekly visitor, survive reloads and use each NPC specialty',()=>{
+  for(const [npc,spot,actions] of [['yu','river',['dance']],['jun','plaza',['trick']],['sol','park',['link']],['min','park',['balance']],['ha','river',['speed','carve']],['noa','night',['trick']]] as const){
+    const {r,offer}=jointFixture(npc,spot);
+    const p:Plan={action:offer.action,spot};
+    assert.ok(actions.some(action=>action===offer.action));
+    assert.equal(spotVisitor(r,spot).id,npc);
+    assert.deepEqual(jointTrainingOffer({...structuredClone(r),seed:0},spot),offer);
+    assert.deepEqual([0,20,40,60,80,100].map(points=>jointTrainingOffer({...r,relations:{...r.relations,[npc]:points}},spot)?.growth),[1.05,1.10,1.15,1.20,1.25,1.25]);
+    const preview=previewTraining(r,p);
+    if(npc==='yu')assert.ok(preview.gains.link!.min>0);
+    if(npc==='jun')assert.ok(jointDiscovery(offer)>0&&jointMasteryFactor(offer,SKILL.pivot!)>1);
+    if(npc==='sol')assert.equal(preview.energy,-(RULES.energy.link-gearBonuses(r).cost-3));
+    if(npc==='min')assert.ok(jointInjuryFactor(offer)<1);
+    if(npc==='ha')assert.ok(preview.gains.speed!.min>0&&preview.gains.carve!.min>0);
+    if(npc==='noa'){
+      assert.equal(jointMasteryFactor(offer,SKILL.pivot!),1);
+      assert.ok(jointMasteryFactor(offer,SKILL.hardflip!)>1);
+    }
+  }
+});
+
+test('focus requires joint experience, works without romance, and yields to fixed special training bonuses',()=>{
+  const {r,offer}=jointFixture('sol','park',true);
+  const p:Plan={action:offer.action,spot:r.spot};
+  assert.equal(relationshipWith(r,'sol'),undefined);
+  assert.equal(offer.growth,1.35);
+  assert.equal(jointTrainingOffer({...r,extras:{...r.extras!,jointSessions:{sol:2}}},r.spot)?.focus,false);
+  assert.equal(jointTrainingOffer({...r,relations:{...r.relations,sol:34}},r.spot)?.focus,false);
+  assert.equal(previewTraining(r,p).energy,-(RULES.energy.link-gearBonuses(r).cost-5));
+  r.trainingOffer=offer.action;
+  const {joint,...combined}=previewTraining(r,p);
+  const previous={...r,extras:{...r.extras!,lastTraining:{grade:'success' as const,year:1,week:1,text:'',joint:{npc:'sol' as const,focus:false,affinity:2}}}};
+  assert.equal(jointTrainingOffer(previous,r.spot),undefined);
+  const {joint:solo,...special}=previewTraining(previous,p);
+  assert.ok(joint?.focus&&!solo);
+  assert.deepEqual(combined,special);
+  assert.equal(combined.success,1);
+  assert.equal(combined.energy,0);
+});
+
+test('joint affinity is saved once through the weekly timer, and an automatic plan can prefer focus',()=>{
+  const {r,offer}=jointFixture('yu','river');
+  const p:Plan={action:offer.action,spot:r.spot};
+  r.trainingOffer=offer.action;
+  const save=blankSave();save.career.rider=r;
+  const planned=advance(save,{type:'plan',plan:p},'tab',100,2000,identity);
+  const finished=advance(JSON.parse(JSON.stringify(planned)),{type:'pulse'},'tab',2100,2000,identity);
+  const result=finished.career.rider!.extras!;
+  assert.equal(result.lastTraining!.special,'random');
+  assert.deepEqual(result.lastTraining!.joint,{npc:'yu',focus:false,affinity:2});
+  assert.equal(result.jointSessions!.yu,1);
+  assert.ok(result.lastTraining!.changes!.includes('한유리 친밀도 +2'));
+  assert.equal(advance(finished,{type:'pulse'},'tab',2200,2000,identity),finished);
+
+  let chosen=false;
+  for(let seed=1;seed<=150&&!chosen;seed++){
+    const rider=newRider('auto-joint-'+seed,seed,'Automatic training',DEFAULT_LOOK);
+    rider.trainingOffer=null;rider.week=2;
+    rider.settings.mode='auto';
+    const soloRider=structuredClone(rider);prepareWeek(soloRider);
+    for(const npc of RIVALS){rider.relations[npc.id]=80;}
+    rider.extras!.jointSessions={yu:3,jun:3,sol:3,min:3,ha:3,noa:3};
+    prepareWeek(rider);
+    const forecast=previewTraining(rider,rider.plan!);
+    if(rider.plan?.action===soloRider.plan?.action||!forecast.joint?.focus)continue;
+    const c:Career={rider,hall:[]};processWeek(c);
+    assert.equal(rider.extras!.lastTraining!.joint?.focus,true);
+    chosen=true;
+  }
+  assert.ok(chosen);
 });
 
 test('direct training spends energy, pauses for an event and awards progress only once',()=>{

@@ -2,7 +2,7 @@ import { ArrowUpRight, ChevronDown, Flag, Medal, Play, Shield, Star, Trophy, Use
 import { useState } from 'react';
 import { formatCareerDate, formatMonthWeek, meetById, DISCIPLINE_NAMES, DIVISION_NAMES, LOCATIONS, RULES, SKILL, STAT_NAMES, STYLE_NAMES } from '../game/data';
 import { NAMES, competitor, learned } from '../game/competition';
-import { RIVALS, lineTerms, rivalCanJoinEvent } from '../game/content';
+import { RIVALS, affinityTerms, lineTerms, rivalCanJoinEvent } from '../game/content';
 import { equippedLook, extras, ITEM, playerPlace } from '../game/economy';
 import { EVENT, EVENTS } from '../game/events';
 import { HAPPENING } from '../game/happenings';
@@ -94,7 +94,7 @@ export function Rivals({r,send,saving}:{r:Rider;send:Submit;saving:boolean}){
         <p>{n.personality}</p><p>{n.line}</p>
         <p>{n.spots.map(spot=>LOCATIONS[spot].name).join(' · ')}</p>
         <p>주력 기술 {SKILL[n.signature]?.name} · 습득 {Object.keys(progress.skills).length}개</p>
-        <div className="skill-track"><span>{RELATIONSHIP_NAMES[phase]}</span><b>관계도 {relation}</b></div>
+        <div className="skill-track"><span>{RELATIONSHIP_NAMES[phase]}</span><b>친밀도 {relation}</b></div>
         <div className="bar"><span style={{width:relation+'%',background:n.color}}/></div>
         {hint&&<p className="relationship-hint">{hint}</p>}
         {rewards.map(reward=><div className="relationship-reward" key={reward.titleId}>
@@ -120,7 +120,7 @@ function StoryLogItem({entry}:{entry:ReturnType<typeof storyLog>[number]}){
     <b>{formatCareerDate(entry)} · {event?.title??HAPPENING.get(entry.id)?.title}</b>
     {event&&entry.choice!==undefined&&<span>{event.choices[entry.choice]?.label}</span>}
     {entry.dialogue&&<span>{entry.dialogue}</span>}
-    {entry.choice!==undefined&&!!entry.details.length&&<small>{entry.details.join(' · ')}</small>}
+    {entry.choice!==undefined&&!!entry.details.length&&<small>{entry.details.map(affinityTerms).join(' · ')}</small>}
   </li>;
 }
 function RetirementSummary({r}:{r:Rider}){
@@ -131,7 +131,7 @@ function RetirementSummary({r}:{r:Rider}){
     <div className="pill-row">{DISCIPLINES.map(d=><Tag key={d}>{DISCIPLINE_NAMES[d]} 최고 {stats.best[d].toFixed(1)}점</Tag>)}</div>
     <details className="past-meets"><summary>기술 {stats.learned.length}개와 라이벌 관계</summary>
       <div className="pill-row">{stats.learned.map(s=><Tag key={s.id}>{s.name} {r.skills[s.id].mastery}%</Tag>)}</div>
-      <div className="pill-row">{RIVALS.map(n=><Tag key={n.id}>{n.name} 관계 {r.relations[n.id]??0}</Tag>)}</div>
+      <div className="pill-row">{RIVALS.map(n=><Tag key={n.id}>{n.name} 친밀도 {r.relations[n.id]??0}</Tag>)}</div>
     </details>
   </div>;
 }
@@ -213,7 +213,7 @@ function ArchiveCard({archive:a,status,error,actions}:{archive:Archive;status:Re
       {!!earned.length&&<><h4>업적·칭호</h4><div className="pill-row">{earned.map(title=><Tag kind="lilac" key={title}>{title}</Tag>)}</div></>}
       <h4>기술과 숙련도</h4>
       <div className="pill-row">{summary.learned.map(skill=><Tag key={skill.id}>{skill.name} {a.skills[skill.id].mastery}%</Tag>)}</div>
-      {relationships.length>0&&<><h4>라이벌</h4><div className="pill-row">{relationships.map(rival=><Tag key={rival.id}>{rival.name} 관계 {a.relations[rival.id]??0}</Tag>)}</div></>}
+      {relationships.length>0&&<><h4>라이벌</h4><div className="pill-row">{relationships.map(rival=><Tag key={rival.id}>{rival.name} 친밀도 {a.relations[rival.id]??0}</Tag>)}</div></>}
       <RelationshipEpilogues archive={a}/>
       {storyLog(a).length>0&&<details className="past-meets relationship-episodes">
         <summary>커리어 이야기와 해프닝 <ChevronDown size={14}/></summary>
