@@ -52,14 +52,17 @@ export default function GameStage({r,send,saving,remaining,weekMs,fastForward,sp
   if(record) return <Competition key={r.id+':'+record.year+':'+record.id+':'+replaying} record={record} r={r} saving={saving||!active} active={active} playbackRate={playbackRate} onSpeed={()=>setPlaybackRate(rate=>rate===1?2:1)} replaying={replaying} onDone={onDone}/>;
   const person=event?eventNpc(event,r):undefined;
   const meet=r.phase==='meet'?currentMeet(r):undefined;
+  const retired=r.phase==='retired';
   const overlay=!!event||!!meet||r.phase==='injury';
   const viewSpot=meet?.spot??(event?r.spot:spot);
   const technique=overlay||autoChoosing?undefined:trainingTechnique(r,Math.max(0,weekMs-remaining)/1000,weekMs/1000);
   const actionMotion:Partial<Record<NonNullable<Rider['plan']>['action'],Motion>>={speed:'accelerate',carve:'carve',balance:'land',rest:'rest',hospital:'rest'};
-  return <section className={'spot-stage game-stage '+(overlay?'has-dialogue':'')} aria-label="인게임 화면">
-    <Scene spot={viewSpot} look={equippedLook(r)} guest={person?.look??guest} motion={overlay||autoChoosing?'rest':r.plan?actionMotion[r.plan.action]??'ride':motion} technique={technique} variant={meet?'race':event?'event':'dashboard'}/>
+  const stageStatus=retired?'커리어 종료':meet?'출전 준비':event?'스팟 이야기':
+    autoChoosing?'자동 육성 중':r.plan?when(remaining)+' 남음':'훈련 준비';
+  return <section className={'spot-stage game-stage'+(overlay?' has-dialogue':'')+(retired?' is-retired':'')} aria-label="인게임 화면">
+    <Scene key={retired?'retired':'active'} spot={viewSpot} look={equippedLook(r)} guest={person?.look??guest} motion={overlay||autoChoosing?'rest':r.plan?actionMotion[r.plan.action]??'ride':motion} technique={technique} variant={meet?'race':event?'event':'dashboard'}/>
     <div className="scene-shade"/>
-    <div className="game-hud">{!overlay&&onSpotMenu?<button className="spot-map-trigger" aria-label="스팟 지도 열기" disabled={saving||!!r.plan||r.settings.mode==='auto'||r.phase!=='plan'} onClick={onSpotMenu}><MapPin size={13}/>{LOCATIONS[viewSpot].name} · 지도</button>:<span><MapPin size={13}/> {meet?meet.name:LOCATIONS[viewSpot].en}</span>}<div className="scene-counter"><Timer size={14}/><span>{meet?'출전 준비':event?'스팟 이야기':autoChoosing?'자동 육성 중':r.plan?when(remaining)+' 남음':'훈련 준비'}</span>
+    <div className="game-hud">{!retired&&(!overlay&&onSpotMenu?<button className="spot-map-trigger" aria-label="스팟 지도 열기" disabled={saving||!!r.plan||r.settings.mode==='auto'||r.phase!=='plan'} onClick={onSpotMenu}><MapPin size={13}/>{LOCATIONS[viewSpot].name} · 지도</button>:<span><MapPin size={13}/> {meet?meet.name:LOCATIONS[viewSpot].en}</span>)}<div className="scene-counter">{retired?<Flag size={14}/>:<Timer size={14}/>}<span>{stageStatus}</span>
     </div></div>
     {event?<div className="game-dialogue" role="region" aria-label="이벤트 선택" key={r.event} ref={dialogue} tabIndex={-1}>
       <div className="game-caption">{event.kind}{person&&<span className="game-speaker"><PixelRider look={person.look}/>{eventCast(r,event).map(id=>id==='mentor'?person.name:RIVAL.get(id)?.name).filter(Boolean).join(' · ')||person.name}</span>}</div>
@@ -71,7 +74,7 @@ export default function GameStage({r,send,saving,remaining,weekMs,fastForward,sp
           <span>{choice.label}{!available&&<small className="relationship-choice-lock">이 커리어에서 이미 연애 상대를 선택했어요.</small>}</span><ArrowRight size={15}/>
         </button>;
       })}</div>}
-    </div>:meet?<Entry key={r.year+':'+r.week} r={r} send={send} saving={saving} active={active}/>:r.phase==='injury'?<div className="game-dialogue" role="region" aria-label="부상 확인" ref={dialogue} tabIndex={-1}><div className="game-caption"><HeartPulse size={16}/> 컨디션 알림</div><h2>잠깐, 몸 상태를 확인해요.</h2><p>새 부상으로 자동 육성을 멈췄어요. 다음 훈련에서 휴식이나 치료를 선택할 수 있습니다.</p><div className="game-actions"><button disabled={saving} onClick={()=>void send({type:'resume'})}>확인하고 재개 <ArrowRight size={15}/></button></div></div>:!r.plan&&<div className="spot-title"><span>{formatCareerDate(r)}</span><h2>{LOCATIONS[viewSpot].name}</h2><p>{LOCATIONS[viewSpot].detail}</p>{guest&&<span className="spot-visitor"><PixelRider look={guest}/> 함께 연습 중</span>}</div>}
+    </div>:meet?<Entry key={r.year+':'+r.week} r={r} send={send} saving={saving} active={active}/>:r.phase==='injury'?<div className="game-dialogue" role="region" aria-label="부상 확인" ref={dialogue} tabIndex={-1}><div className="game-caption"><HeartPulse size={16}/> 컨디션 알림</div><h2>잠깐, 몸 상태를 확인해요.</h2><p>새 부상으로 자동 육성을 멈췄어요. 다음 훈련에서 휴식이나 치료를 선택할 수 있습니다.</p><div className="game-actions"><button disabled={saving} onClick={()=>void send({type:'resume'})}>확인하고 재개 <ArrowRight size={15}/></button></div></div>:!r.plan&&<div className="spot-title"><span>{formatCareerDate(r)}</span><h2>{LOCATIONS[viewSpot].name}</h2>{!retired&&<p>{LOCATIONS[viewSpot].detail}</p>}{guest&&<span className="spot-visitor"><PixelRider look={guest}/> 함께 연습 중</span>}</div>}
     {r.plan&&!overlay&&!autoChoosing&&<div className="weekly-running" role="status">{specialTraining(r,r.plan)&&<SpecialTrainingBadge/>}<strong>{ACTION_STORIES[r.plan.action].start}{r.plan.skill?' · '+SKILL[r.plan.skill]?.name:''}</strong><progress max={weekMs} value={Math.max(0,weekMs-remaining)} aria-label="행동 진행"/></div>}
   </section>;
 }

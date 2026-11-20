@@ -13,8 +13,11 @@ function mobileActors(parent:HTMLElement,world:HTMLElement,field:HTMLElement){
   const band=field.querySelector('.console-scene-space')?.getBoundingClientRect();
   const hud=field.querySelector('.console-status')?.getBoundingClientRect();
   const running=field.querySelector('.weekly-running')?.getBoundingClientRect();
-  const top=(band?.top??hud?.bottom??view.top)+6;
-  const below=(band?.bottom??running?.top??view.bottom)-8;
+  const retired=parent.closest('.is-retired');
+  const retirementTitle=retired?.querySelector('.spot-title')?.getBoundingClientRect();
+  const retirementActions=retired?world.querySelector('.console-home-actions')?.getBoundingClientRect():undefined;
+  const top=(band?.top??hud?.bottom??retirementTitle?.bottom??view.top)+6;
+  const below=(band?.bottom??running?.top??retirementActions?.top??view.bottom)-8;
 
   // Match the centered cover crop of the canvas, then map the clear part of the screen back to Phaser coordinates.
   const zoom=Math.max(view.width/WIDTH,view.height/HEIGHT);
@@ -65,6 +68,10 @@ export async function createStage(parent:HTMLElement,latest:()=>Stage){
         observer.observe(parent);observer.observe(world);
         const trainingArea=field.querySelector('.console-training-area');
         if(trainingArea)observer.observe(trainingArea);
+        if(parent.closest('.is-retired')){
+          const actions=world.querySelector('.console-home-actions');
+          if(actions)observer.observe(actions);
+        }
         media.addEventListener('change',fit);
         this.events.once('shutdown',()=>{observer.disconnect();media.removeEventListener('change',fit);});
         fit();

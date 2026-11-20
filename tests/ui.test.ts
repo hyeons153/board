@@ -80,7 +80,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
   const root=createRoot(win.document.getElementById('root')!);
   const settle=async(ms=40)=>{await act(async()=>{await new Promise(resolve=>setTimeout(resolve,ms));});};
   const click=async(label:string)=>{
-    const find=()=>[...win.document.querySelectorAll('button')].find(button=>(button.getAttribute('aria-label')??button.textContent?.trim())===label);
+    const find=()=>[...win.document.querySelectorAll('button')].find(button=>!button.closest('[inert]')&&(button.getAttribute('aria-label')??button.textContent?.trim())===label);
     let button=find();
     for(let attempt=0;!button&&attempt<80;attempt++){await settle(25);button=find();}
     assert.ok(button,'Missing button: '+label);
@@ -499,6 +499,9 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.ok(owner);const finalRow=await store.get(owner),finalRider=finalRow.snapshot.career.rider!;
     finalRider.year=8;finalRider.week=52;finalRider.phase='meet';finalRider.plan=null;finalRider.settings.mode='manual';
     finalRider.season={year:8,division:'master',scores:{dance:{},trick:{},freestyle:{}}};
+    finalRider.extras!.relationships={titles:[],npcs:{
+      yu:{state:'ended',flags:[]},jun:{state:'rival',flags:[]},min:{state:'friend',flags:[]},
+    }};
     finalRow.snapshot.clock={credit:0,stamp:0,tabs:{},stateVersion:(finalRow.snapshot.clock.stateVersion??0)+1};
     assert.ok(await store.replace(owner,finalRow.version,finalRow.snapshot));
     const endingRoot=createRoot(win.document.getElementById('root')!);
@@ -511,10 +514,40 @@ test('one game frame previews choices on the existing HUD before confirmation, t
       }
       await click('육성 계속');
       assert.ok(win.document.querySelector('[aria-label="커리어 엔딩"]'),'Final international acknowledgement must open the ending');
-      assert.match(win.document.querySelector('.ceremony-stage')!.textContent!,/국제대회 · 로스앤젤레스/);
-      await click('성적 바로 보기');
       const persisted=await store.get(owner),archive=persisted.snapshot.career.hall[0];
       assert.equal(archive.records.at(-1)!.results.length,3);
+      const endingPanel=()=>win.document.querySelector('.ceremony')!;
+      assert.match(endingPanel().querySelector('.ceremony-stage')!.textContent!,/국제대회 · 로스앤젤레스.*한 번 더 보드에 올랐다/);
+      assert.equal(endingPanel().querySelector('.ceremony-progress')?.textContent,'1 / 4');
+      await click('계속');
+      assert.equal(endingPanel().querySelector('blockquote strong')?.textContent,'이민재');
+      assert.match(endingPanel().querySelector('blockquote p')!.textContent!,/같이 탔던 시간/);
+      await click('계속');
+      const bestScore=Math.max(...archive.records.flatMap(record=>record.results.map(result=>result.run.score)));
+      assert.match(endingPanel().querySelector('.ceremony-highlight')!.textContent!,/개인 최고 기록/);
+      assert.equal(endingPanel().querySelector('.ceremony-highlight strong')?.textContent,bestScore.toFixed(1)+'점');
+      const endingScroll=endingPanel().querySelector<HTMLElement>('.ceremony-scroll')!;
+      endingScroll.scrollTop=140;
+      endingScroll.scrollTo=(x?:number|ScrollToOptions,y?:number)=>{endingScroll.scrollTop=typeof x==='number'?(y??0):(x?.top??0);};
+      await click('이전');assert.equal(endingScroll.scrollTop,0);
+      assert.equal(endingPanel().querySelector('.ceremony-progress')?.textContent,'2 / 4');
+      await click('성적 바로 보기');
+      const epilogue=endingPanel().querySelector<HTMLDetailsElement>('details.relationship-epilogue')!;
+      assert.equal(epilogue.open,false);
+      assert.match(epilogue.querySelector('summary')!.textContent!,/한유리 관계 종료/);
+      await act(async()=>epilogue.querySelector<HTMLElement>('summary')!.click());await settle();
+      assert.equal(epilogue.open,true);
+      assert.match(epilogue.querySelector('.epilogue-stories')!.textContent!,/한유리 · 관계 종료/);
+      assert.ok(endingPanel().querySelector('.ceremony-footer .ceremony-registration .primary'));
+      await click('메뉴 닫기');
+      assert.match(win.document.querySelector('.game-stage .scene-counter')!.textContent!,/커리어 종료/);
+      assert.equal(win.document.querySelector('.console-status'),null);
+      assert.equal(win.document.querySelector('.game-stage .spot-map-trigger'),null);
+      await click('기술');assert.ok(win.document.querySelector('.skill-library'));await click('메뉴 닫기');
+      await click('대회');assert.ok(win.document.querySelector('[aria-label="대회"]'));await click('메뉴 닫기');
+      await click('엔딩 다시 보기');assert.equal(endingPanel().querySelector('.ceremony-progress')?.textContent,'1 / 4');
+      await click('성적 바로 보기');
+      assert.deepEqual((await store.get(owner)).snapshot.career.hall,persisted.snapshot.career.hall);
       hallFlow=true;publicCard={id:randomUUID(),profile:publicationFor(archive).profile};
       const button=(label:string)=>[...win.document.querySelectorAll('button')].find(button=>button.textContent?.trim()===label);
       const guide=()=>win.document.querySelector('[aria-label="명예의 전당 등록"]');

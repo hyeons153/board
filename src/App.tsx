@@ -142,7 +142,7 @@ export default function App(){
   const trainingScene=!!r&&!pending&&!replay&&!replayLoading&&(!!trainingResult||!eventResult&&r.phase==='plan');
   const trainingVisible=screen==='home'&&!spotMap;
   const upcoming=active?nextMeet(r!):undefined;
-  const visitor=r?spotVisitor(r,r.plan?.spot??r.spot):undefined;
+  const visitor=r&&active?spotVisitor(r,r.plan?.spot??r.spot):undefined;
   const dockPage=replay||replayLoading?replayFrom:
     dock.some(([id])=>id===screen)?screen:trail.findLast(route=>dock.some(([id])=>id===route));
   const archive=view.career.hall.find(a=>a.id===endingId);
@@ -188,7 +188,7 @@ export default function App(){
     retry:()=>hallSessionError?void changeSession().catch(()=>{}):void publications.refresh(),
     onRegister:registerRider,onRank:showRanking,onWithdraw:rider=>void publications.change(rider.id,false,view.storage),
   };
-  const status=r&&<RiderHud r={r} preview={preview} recentTraining={!!trainingResult&&!replay} interactive={screen==='home'&&!spotMap&&!replayLoading}/>;
+  const status=r&&(active||busyFlow||stageRecord)&&<RiderHud r={r} preview={preview} recentTraining={!!trainingResult&&!replay} interactive={screen==='home'&&!spotMap&&!replayLoading}/>;
   let content:ReactNode;
   if(screen==='new')content=<NewRider saving={game.saving} onCreate={async(name,look)=>{const ok=await game.send({type:'create',name,look});if(ok)go('home');return ok;}}/>;
   else if(screen==='account')content=<Account key={hallView.scope} view={hallView} send={game.send} onSwitch={playHome}
@@ -262,11 +262,13 @@ export default function App(){
         </>}
       </div>}
       </div>
-      {screen==='home'&&!busyFlow&&!replay&&!replayLoading&&(r?<>
-        {r.phase==='retired'&&<div className="console-home-actions"><button className="console-primary" onClick={()=>{setEndingId(r.id);setEndingStep(0);go('ending');}}>은퇴식 보기 <Trophy size={18}/></button><button onClick={()=>go('new')}>새 선수 육성</button></div>}
-      </>:<div className="console-welcome"><span>{ENGLISH_GAME_NAME}</span><h1>롱보더 <br/><em>키우기</em></h1><p>강변의 첫 푸시부터 마지막 국제대회까지.<br/>나만의 8년 커리어를 시작하세요.</p><button className="console-primary" onClick={()=>go('new')}>나만의 라이더 만들기 <ArrowRight size={20}/></button></div>)}
+      {r?.phase==='retired'&&!busyFlow&&!replay&&!replayLoading&&<div className="console-home-actions" inert={screen!=='home'}>
+        <button className="console-primary" onClick={()=>{setEndingId(r.id);setEndingStep(0);go('ending');}}>엔딩 다시 보기 <Trophy size={18}/></button>
+        <button onClick={()=>go('new')}>새 선수 육성</button>
+      </div>}
+      {screen==='home'&&!r&&<div className="console-welcome"><span>{ENGLISH_GAME_NAME}</span><h1>롱보더 <br/><em>키우기</em></h1><p>강변의 첫 푸시부터 마지막 국제대회까지.<br/>나만의 8년 커리어를 시작하세요.</p><button className="console-primary" onClick={()=>go('new')}>나만의 라이더 만들기 <ArrowRight size={20}/></button></div>}
       {spotMap&&r&&screen==='home'&&!busyFlow&&!r.plan&&<SpotMap r={r} send={game.send} saving={game.saving} onClose={()=>setSpotMap(false)}/>}
-      {content&&screen!=='home'&&<section className={'console-panel console-panel-'+(panelStyle[screen]??'standard')} aria-label={names[screen]}>
+      {content&&screen!=='home'&&<section className={'console-panel console-panel-'+(panelStyle[screen]??'standard')+(screen==='ending'?' console-panel-ending':'')} aria-label={names[screen]}>
         <header><h1>{names[screen]}</h1><button onClick={back} aria-label={trail.length?'뒤로 가기':'메뉴 닫기'} title={trail.length?'뒤로 가기':'닫기'}>{trail.length?<ArrowLeft size={18}/>:<X size={18}/>}</button></header>
         <div className="console-panel-body" ref={panel} tabIndex={-1} key={screen}>{content}</div>
       </section>}

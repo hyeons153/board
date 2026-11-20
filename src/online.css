@@ -26,7 +26,6 @@
 .archive-registration-status:not(:empty) { margin:.6rem 0; }
 .hall-selected-rider { justify-content:space-between; }
 .hall-selected-rider > div { min-width:0; overflow-wrap:anywhere; }
-.ceremony-registration { margin-top:1rem; }
 .archive-cover { display:flex; align-items:center; gap:clamp(10px,3vw,28px); padding:12px; border:1px solid #c9d4bf; border-radius:9px; background:linear-gradient(120deg,#e4edda,#f2ebdb); }
 .archive-cover .pixel-rider { width:clamp(78px,13vw,128px); height:clamp(98px,16vw,148px); flex:none; object-fit:contain; }
 .archive-cover h3 { margin:.35rem 0 0; font-size:clamp(1.28rem,4vw,2.05rem); overflow-wrap:anywhere; }
@@ -92,14 +91,58 @@
 .public-hero .pixel-rider { width: 90px; height: 91px; flex: none; }
 .public-subhead { margin-top: 1rem; font-size: .97rem; }
 .public-routine { padding-left: 1.55rem; margin: .45rem 0; font-size: .86rem; }
-.ceremony { overflow: hidden; margin: 1rem auto; max-width: 1040px; }
-.ceremony-stage { position: relative; min-height: clamp(205px, 38vw, 415px); overflow: hidden; background: #344358; }
-.ceremony-legend .ceremony-stage { box-shadow: inset 0 0 0 3px #e9c565; }
-.ceremony-stage .spot-title p { max-width: 26rem; font-size: .91rem; }
-.ceremony-content { padding: clamp(.85rem, 2vw, 1.45rem); }
+.console-panel.console-panel-ending { bottom:14px; }
+.console-home-actions[inert] { visibility:hidden; }
+.console-panel-ending .console-panel-body { display:flex; overflow:hidden; padding:clamp(7px,1.2vw,14px); }
+.ceremony { display:flex; flex-direction:column; flex:1; min-height:0; max-width:1040px; margin-inline:auto; overflow:hidden; }
+.ceremony-scroll { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-color:#8eaa93 #eee9dc; }
+.ceremony-stage { position:relative; color:#f8f1de; background:#293b50; }
+.ceremony-scene {
+  --ceremony-scene-height:clamp(168px,36dvh,340px);
+  --ceremony-art-width:min(100%,calc(var(--ceremony-scene-height) * 456 / 194));
+  position:relative;
+  height:var(--ceremony-scene-height);
+}
+.ceremony[data-step="4"] .ceremony-scene { --ceremony-scene-height:clamp(144px,30dvh,280px); }
+.ceremony-scene .scene-media { background:#293b50; }
+.ceremony-scene .scene-media canvas { object-fit:contain; object-position:right center; }
+.ceremony-scene .scene-shade { left:auto; width:var(--ceremony-art-width); background:linear-gradient(90deg,#293b50,transparent 42%); }
+.ceremony-legend .ceremony-stage { border-bottom:3px solid #d7b36b; }
+.ceremony-heading { position:absolute; inset:auto auto clamp(10px,3vh,27px) clamp(14px,3vw,30px); width:min(48%,30rem); animation:ceremony-arrival .18s ease-out; }
+@keyframes ceremony-arrival { from { opacity:.25; } to { opacity:1; } }
+@media(prefers-reduced-motion:reduce) { .ceremony-heading { animation:none; } }
+.ceremony-heading > span { color:#e5ddc9; font-size:.78rem; font-weight:750; overflow-wrap:anywhere; }
+.ceremony-heading h2 { margin:.15rem 0 .35rem; color:#fff5df; font-size:clamp(1.35rem,3.1vw,2.5rem); line-height:1.18; word-break:keep-all; overflow-wrap:anywhere; }
+.ceremony-heading h2:focus { outline:none; }
+.ceremony-heading p { color:#f3ead9; font-size:.87rem; line-height:1.5; word-break:keep-all; overflow-wrap:anywhere; }
+.ceremony-highlight { display:grid; gap:4px; }
+.ceremony-highlight strong { font-size:1.13rem; color:#e2f2b1; }
+.ceremony-highlight small { margin-inline-start:7px; color:#e5ddc9; }
+.ceremony-content { padding:clamp(10px,1.8vw,18px); }
 .ceremony-content blockquote { margin: 0; padding: .7rem .9rem; border-left: 4px solid #9f88bd; background: #eee8f8; border-radius: 0 7px 7px 0; }
+.ceremony-totals { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin:0 0 10px; padding:0 0 10px; border-bottom:1px solid var(--game-border); }
+.ceremony-totals dt,.ceremony-best > span:not(.tag) { color:#4e6259; font-size:.77rem; }
+.ceremony-totals dd { color:#213746; font-weight:800; font-size:clamp(.95rem,2vw,1.24rem); }
+.ceremony-totals > div:first-child dd { color:#355d45; }
+.ceremony-best { align-items:center; }
+.ceremony-registration-notice:not(:empty) { margin-top:8px; }
+.ceremony .relationship-epilogue { font-size:.84rem; }
+.ceremony .relationship-epilogue summary { cursor:pointer; padding:4px 2px; }
+.ceremony .relationship-epilogue summary span { display:block; margin:3px 0 0 1rem; color:#514661; overflow-wrap:anywhere; }
+.epilogue-stories { display:grid; gap:8px; margin:7px 0 0 1rem; }
+.ceremony-footer { flex:none; display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px clamp(8px,1.8vw,18px); background:#f7f3e8; border-top:1px solid var(--game-border); }
+.ceremony-progress { flex:none; color:#3f5a4f; font:750 .8rem var(--mono); white-space:nowrap; }
+.ceremony-footer .bottom-actions { gap:6px; margin:0; }
+.ceremony-footer .button { min-height:40px; }
 .epilogue { background: #ede9f7; padding: .65rem; border-radius: 8px; margin-top: .7rem; }
 .top-status .button { max-width: 155px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media(max-width:760px){
+  .console-panel.console-panel-ending { bottom:7px; }
+  .game-console .game-stage.is-retired .spot-title { top:52px; bottom:auto; }
+  .ceremony[data-step] .ceremony-scene { height:auto; aspect-ratio:456 / 194; }
+  .ceremony-heading { position:relative; inset:auto; width:auto; padding:8px 12px 11px; }
+  .ceremony-scene .scene-shade { width:100%; background:linear-gradient(0deg,#293b50b0,transparent 43%); }
+}
 @media(max-width:640px){
   .start-top { flex-wrap: wrap; justify-content: flex-end; gap: .3rem; }
   .public-grid { grid-template-columns: 1fr; }
@@ -119,7 +162,13 @@
   .search-form input { width:100%; }
   .console-panel .hall-registration-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
   .console-panel .hall-registration-actions .button { justify-content:center; min-height:44px; white-space:normal; }
+  .ceremony-footer .ceremony-registration { flex:1; min-width:0; }
+  .console-panel .ceremony-registration .hall-registration-actions { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .console-panel .ceremony-registration .hall-registration-actions .button.primary { grid-column:1/-1; }
+  .ceremony-footer .button { gap:4px; padding:5px 7px; font-size:.78rem; word-break:keep-all; }
+  .ceremony-registration .button.quiet svg { display:none; }
+  .ceremony-totals { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .ceremony-totals > div:first-child { grid-column:1/-1; display:flex; align-items:baseline; gap:9px; }
 }
 @media(max-width:475px){
   .sidebar nav { grid-template-columns: repeat(9,minmax(0,1fr)); }
