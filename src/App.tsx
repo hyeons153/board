@@ -243,7 +243,7 @@ export default function App(){
   }
   return <div className="console-page"><main className="game-console" aria-label="롱보더 키우기">
     <header className="console-top"><button className="console-brand" onClick={playHome} aria-label="게임 홈"><Brand/></button>
-      {r?<div className="console-rider"><span>{r.name}</span><b>{formatCareerDate(r)}</b><small>{DIVISION_NAMES[divisionFor(r.year)]}</small></div>:<span className="console-motto">나만의 롱보드 커리어</span>}
+      {r?<div className="console-rider"><span>{r.name}</span><b>{formatCareerDate(r)}</b><small>{DIVISION_NAMES[divisionFor(r.year)]}</small></div>:<span className="console-motto">대환장 실전 롱보더 육성 게임</span>}
       <div className="console-top-actions">{active&&<button aria-label="자동 육성 설정" title="자동 육성 설정" onClick={()=>go('training')}><Settings size={18}/></button>}{active&&<button className={'console-auto '+(r!.settings.mode==='auto'?'is-on':'')} aria-label="자동 진행" aria-pressed={r!.settings.mode==='auto'} disabled={game.saving} onClick={async()=>{if(await game.send({type:'settings',settings:{...r!.settings,mode:r!.settings.mode==='auto'?'manual':'auto',pauseStory:false,pauseMeet:false,pauseInjury:false}}))playHome();}}>{r!.settings.mode==='auto'?'AUTO ON':'AUTO OFF'}</button>}{(game.saving||view.storage==='neon')&&<span className="console-save" role="status">{game.saving?'저장 중':'저장됨'}</span>}<button aria-label="라이더 일지" onClick={()=>go(r?'journal':'menu')}><NotebookText size={18}/></button><button aria-label="계정" onClick={()=>go('account')}><UserRound size={18}/></button></div>
     </header>
     <div className={'console-world'+(showTraining&&trainingVisible?' has-weekly-choices':'')}>
