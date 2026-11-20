@@ -1,7 +1,8 @@
 import { calendarFor, LOCATIONS, RULES, SKILL } from './data.js';
 import { ECONOMY, gearBonuses } from './economy.js';
 import { clamp, round, seeded } from './random.js';
-import { TRAINING_ACTIONS, type Action, type Plan, type Rider, type Stat } from './types.js';
+import { learned } from './skillTree.js';
+import { TRAINING_ACTIONS, type Action, type Plan, type Rider, type Skill, type Stat } from './types.js';
 
 export const SECONDARY_STAT:Record<Stat,Stat>={speed:'carve',carve:'balance',link:'speed',balance:'carve'};
 
@@ -64,6 +65,16 @@ export function trainingStatGains(r:Rider,p:Plan,factor:number):Partial<Record<S
   }
   return gains;
 }
+export function practiceStudyRate(year:number,skill:Skill,targeted:boolean){
+  const late=RULES.growth[Math.min(7,year-1)],practice=RULES.practice;
+  return RULES.study*late.study*(targeted?practice.targeted:1)/(1+practice.difficultyCost*(skill.difficulty-1));
+}
+export function practiceMasteryRate(year:number,skill:Skill,base:number,bonus:ReturnType<typeof gearBonuses>){
+  const late=RULES.growth[Math.min(7,year-1)];
+  const difficulty=RULES.practice.masteryByDifficulty[skill.difficulty-1]??1;
+  const equipment=skill.family==='dance'?bonus.danceMastery:bonus.trickMastery;
+  return base*late.mastery*difficulty*(1+equipment);
+}
 export function previewTraining(r:Rider,p:Plan){
   const special=specialTraining(r,p);
   const recovery=p.action==='rest'||p.action==='hospital',success=trainingSuccess(r,p,special);
@@ -77,12 +88,11 @@ export function previewTraining(r:Rider,p:Plan){
   const target=SKILL[p.skill??''];
   let skill:undefined|{id:string;label:string;min:number;max:number};
   if(target){
-    const learned=(r.skills[target.id]?.study??0)>=100,late=RULES.growth[Math.min(7,r.year-1)];
-    const bonus=gearBonuses(r);
-    const rate=learned?RULES.mastery*late.mastery*(1+(target.family==='dance'?bonus.danceMastery:bonus.trickMastery)):RULES.study*late.study*RULES.practice.targeted/(1+RULES.practice.difficultyCost*(target.difficulty-1));
-    const current=learned?r.skills[target.id]?.mastery??0:r.skills[target.id]?.study??0;
+    const known=learned(r.skills,target.id);
+    const rate=known?practiceMasteryRate(r.year,target,RULES.mastery,gearBonuses(r)):practiceStudyRate(r.year,target,true);
+    const current=known?r.skills[target.id]?.mastery??0:r.skills[target.id]?.study??0;
     const gain=(factor:number)=>round(round(clamp(current+rate*factor))-current);
-    skill={id:target.id,label:learned?'숙련도':'학습',min:gain(minFactor),max:gain(maxFactor)};
+    skill={id:target.id,label:known?'숙련도':'학습',min:gain(minFactor),max:gain(maxFactor)};
   }
   return {success,energyAfter,energy:round(energyAfter-r.energy),money,gains,skill,recovery,special};
 }

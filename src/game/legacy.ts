@@ -55,8 +55,9 @@ export function honors(record:CareerRecord):string[]{
   const s=summarize(record);
   const achieved=[
     [s.learned.length>6,'첫 기술 습득'],[s.learned.some(x=>x.difficulty>=3),'고급 기술 첫 습득'],[s.learned.length>=10,'기술 10개 습득'],
-    [s.learned.filter(x=>x.family==='dance').length===16,'모든 댄싱 기술'],[s.learned.filter(x=>x.family==='trick').length===13,'모든 트릭 기술'],
-    [s.learned.length===29&&s.learned.every(skill=>record.skills[skill.id].mastery>=90),'전체 기술 마스터'],
+    [SKILLS.filter(x=>x.family==='dance').every(skill=>s.learned.includes(skill)),'모든 댄싱 기술'],
+    [SKILLS.filter(x=>x.family==='trick').every(skill=>s.learned.includes(skill)),'모든 트릭 기술'],
+    [s.learned.length===SKILLS.length&&s.learned.every(skill=>record.skills[skill.id].mastery>=90),'전체 기술 마스터'],
     [s.meets>0,'첫 대회 참가'],[s.podiums>0,'첫 입상'],[s.wins>0,'첫 우승'],
     [s.champions.some(x=>x.division==='rookie'),'뉴비부 챔피언'],[s.champions.some(x=>x.division==='regular'),'일반부 챔피언'],
     [s.champions.some(x=>x.division==='open'),'오픈부 챔피언'],[s.champions.some(x=>x.division==='master'),'마스터부 챔피언'],[s.triple,'한 대회 3종목 우승'],

@@ -393,7 +393,7 @@ test('previous competition proofs replay under their original stamina rules',()=
   command(career,{type:'entry',disciplines:['dance']},()=>({id:randomUUID(),seed:517}),true);
   command(career,{type:'retire'},()=>({id:randomUUID(),seed:517}),true);
   const archive=career.hall[0],meet=archive.records[0],result=meet.results[0],proof=result.proof!;
-  assert.equal(proof.rules,4);assert.ok(verifiedResult(archive,meet,result));
+  assert.equal(proof.rules,5);assert.ok(verifiedResult(archive,meet,result));
   delete proof.rules;
   result.run=simulateRun({stats:proof.stats,energy:proof.energy,injury:proof.injury,skills:proof.skills},'dance',proof.routine,seeded(proof.seed,meet.year,meet.id,'dance','player'),1);
   result.standings.find(row=>row.id==='player')!.score=result.run.score;

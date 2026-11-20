@@ -174,13 +174,15 @@ test('one game frame previews choices on the existing HUD before confirmation, t
         await click('노즈트릭');
         assert.equal(win.document.querySelectorAll('.skill-entry-summary').length,5);
         await click('테일트릭');
-        assert.equal(win.document.querySelectorAll('.skill-entry-summary').length,8);
+        assert.equal(win.document.querySelectorAll('.skill-entry-summary').length,9);
+        await click('알리 상세');
+        assert.match(win.document.querySelector('.skill-detail')!.textContent!,/테일트릭.*초급/);
         await click('트래플립 상세');
         assert.match(win.document.querySelector('.skill-detail')!.textContent!,/킥플립.*남은 숙련도.*빅스핀/);
         assert.equal(win.document.querySelector('[role="region"][aria-label="스킬트리"]'),null);
         await click('스킬트리 보기');
         const tree=win.document.querySelector('[role="region"][aria-label="스킬트리"]')!;
-        assert.equal(tree.querySelectorAll('.skill-tree-card:not([data-prerequisite])').length,8);
+        assert.equal(tree.querySelectorAll('.skill-tree-card:not([data-prerequisite])').length,9);
         assert.equal(tree.querySelectorAll('.skill-tree-card[data-prerequisite]').length,4);
         assert.ok(tree.querySelector('svg g path[marker-end]'));
         assert.equal(tree.querySelector('[aria-label="트래플립 상세"]')?.getAttribute('aria-expanded'),'true');

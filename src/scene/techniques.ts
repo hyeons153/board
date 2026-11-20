@@ -16,10 +16,10 @@ export const TECHNIQUES:Record<string,Profile>={
   'peter-pan':{kind:'step'},'step-180':{kind:'turn',body:.5},'step-360':{kind:'turn',body:1},
   cross:{kind:'cross'},'back-cross':{kind:'cross'},sidewinder:{kind:'carve'},'v-spin':{kind:'turn',body:1},
   ghost:{kind:'ghost'},piglet:{kind:'piglet'},mango:{kind:'mango'},wood:{kind:'wood'},
-  pirouette:{kind:'pirouette',body:1},'mango-pendulum':{kind:'mango'},
+  pirouette:{kind:'pirouette',body:1},p2p:{kind:'pirouette',body:1},'mango-pendulum':{kind:'mango'},
   'pirouette-540':{kind:'pirouette',body:1.5},pendulum:{kind:'carve'},'pirouette-720':{kind:'pirouette',body:2},
   pivot:{kind:'pivot',body:.5,board:.5},shuvit:{kind:'pop',board:.5,air:10},
-  'no-comply':{kind:'no-comply',air:19},kickflip:{kind:'pop',flip:1,air:23},
+  'no-comply':{kind:'no-comply',air:19},ollie:{kind:'pop',air:20},kickflip:{kind:'pop',flip:1,air:23},
   'no-com-big':{kind:'no-comply',body:.5,board:1,air:20},bigspin:{kind:'pop',body:.5,board:1,air:23},
   'front-pop':{kind:'pop',board:-.5,air:21},'pop-shuvit':{kind:'pop',board:.5,air:23},
   heelflip:{kind:'pop',flip:-1,air:23},bigger:{kind:'pop',body:.5,board:1.5,air:25},
@@ -38,7 +38,14 @@ const base=():Pose=>({board:{x:64,y:102,yaw:0,roll:0,pitch:0},hip:{x:64,y:75},bo
 
 /** A single timeline controls foot contacts, body turns and the independent deck. */
 export function techniquePose(id:string,progress:number,outcome:Outcome='clean',bodyHeading=0,boardHeading=0):Pose {
-  const p=clamp(progress),profile=TECHNIQUES[id]??TECHNIQUES['peter-pan'],pose=base();
+  const p=clamp(progress);
+  if(id==='p2p'){
+    const remount=.46;
+    return p<remount
+      ?techniquePose('piglet',p/remount,'clean',bodyHeading,boardHeading)
+      :techniquePose('pirouette',(p-remount)/(1-remount),outcome,bodyHeading,boardHeading);
+  }
+  const profile=TECHNIQUES[id]??TECHNIQUES['peter-pan'],pose=base();
   const q=between(p,.18,.75),wave=Math.sin(Math.PI*q),prepare=Math.sin(Math.PI*clamp(p/.2));
   pose.board.yaw=boardHeading+(profile.board??0)*TAU*q;
   pose.bodyYaw=bodyHeading+(profile.body??0)*TAU*q;

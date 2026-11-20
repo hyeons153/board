@@ -11,12 +11,12 @@ const padding=14;
 // Vertical lanes keep the main chains straight while leaving room for their branches.
 const lanes=[
   ['peter-pan','sidewinder','v-spin','pivot','shuvit','no-com-big','bigspin','bigger'],
-  ['step-180','step-360','pirouette','pirouette-540','pirouette-720','kickflip','varial','treflip'],
-  ['cross','back-cross','pop-shuvit','heelflip','hardflip'],
-  ['mango','mango-pendulum','pendulum','no-comply','front-pop'],
-  ['wood'],
+  ['step-180','step-360','ollie','kickflip','varial','treflip'],
+  ['piglet','pirouette','pirouette-540','pirouette-720','pop-shuvit','heelflip','hardflip'],
+  ['cross','back-cross','p2p','no-comply','front-pop'],
+  ['wood','pendulum','mango-pendulum'],
+  ['mango'],
   ['ghost'],
-  ['piglet'],
 ];
 
 const layers=new Map<string,number>();
@@ -57,12 +57,21 @@ export function SkillTreeView({skills,node}:{
       const top=Math.min(...coordinates.map(point=>point.y));
       const width=Math.max(...coordinates.map(point=>point.x))-left+cardWidth+padding*2;
       const height=Math.max(...coordinates.map(point=>point.y))-top+cardHeight+padding*2;
+      // Give incoming arrows separate vertical lanes so adjacent branches don't merge.
+      const incomingByColumn=new Map<number,number>();
+      const routedByColumn=new Map<number,number>();
+      for(const [index,skill] of group.entries()){
+        const column=coordinates[index].x;
+        incomingByColumn.set(column,(incomingByColumn.get(column)??0)+skill.requires.length);
+      }
       const edges=group.flatMap(skill=>skill.requires.map((id,index)=>{
         const from=positions.get(id)!, to=positions.get(skill.id)!;
         const startX=from.x+cardWidth, endX=to.x-3;
         const startY=from.y+cardHeight/2;
         const endY=to.y+cardHeight/2+(index-(skill.requires.length-1)/2)*12;
-        const approach=endX-15+(index-(skill.requires.length-1)/2)*10;
+        const lane=(routedByColumn.get(to.x)??0)+1;
+        routedByColumn.set(to.x,lane);
+        const approach=endX-8-(columnGap-24)*lane/((incomingByColumn.get(to.x)??1)+1);
         const detourY=from.y+cardHeight+rowGap/2;
         const path=to.x-from.x>cardWidth+columnGap
           ?`M${startX} ${startY} H${startX+10} V${detourY} H${approach} V${endY} H${endX}`

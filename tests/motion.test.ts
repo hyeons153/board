@@ -226,9 +226,9 @@ test('all streetwear combinations and NPCs have distinct front/profile/rear view
 });
 test('step turns, shuvits, flips and compound spins keep their prescribed independent rotations',()=>{
   const rotations:Record<string,[number,number,number]>={
-    'step-180':[180,0,0],'step-360':[360,0,0],pirouette:[360,0,0],'pirouette-540':[540,0,0],'pirouette-720':[720,0,0],
+    'step-180':[180,0,0],'step-360':[360,0,0],pirouette:[360,0,0],p2p:[360,0,0],'pirouette-540':[540,0,0],'pirouette-720':[720,0,0],
     pivot:[180,180,0],shuvit:[0,180,0],'pop-shuvit':[0,180,0],'front-pop':[0,-180,0],
-    kickflip:[0,0,360],heelflip:[0,0,-360],bigspin:[180,360,0],bigger:[180,540,0],
+    ollie:[0,0,0],kickflip:[0,0,360],heelflip:[0,0,-360],bigspin:[180,360,0],bigger:[180,540,0],
     'no-com-big':[180,360,0],hardflip:[0,-180,-360],treflip:[0,360,360],varial:[0,180,360],
   };
   for(const [id,[body,board,flip]] of Object.entries(rotations)){
@@ -236,6 +236,11 @@ test('step turns, shuvits, flips and compound spins keep their prescribed indepe
   }
   const kick=techniquePose('kickflip',.4),heel=techniquePose('heelflip',.4);
   assert.ok(kick.board.roll>0&&heel.board.roll<0);assert.ok(kick.hip.y<kick.board.y-25);
+  const ollie=techniquePose('ollie',.45);
+  assert.ok(ollie.board.y<90);near(ollie.board.roll,0);
+  const pigletPhase=techniquePose('p2p',.23),pirouettePhase=techniquePose('p2p',.73);
+  assert.ok(pigletPhase.board.pitch<0);
+  assert.ok(pirouettePhase.bodyYaw>Math.PI);near(pirouettePhase.board.yaw,0);
 });
 test('support feet and deck contacts distinguish pivots, pirouettes, ghost, wood and no-comply',()=>{
   for(const p of [.2,.35,.5,.65,.8,1]){

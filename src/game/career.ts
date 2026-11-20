@@ -11,7 +11,7 @@ import { clamp, round, seeded } from './random.js';
 import { RELATIONSHIP_NAMES, RELATIONSHIP_TITLES, rooftopUnlocked } from './relationships.js';
 import { applyStoryImpact, name as storyNpcName, storyAffinity } from './storyState.js';
 import type { Happening } from './happenings.js';
-import { greatTraining, meetTrainingAvailable, randomSpecialTraining, specialTraining, specialTrainingForm, statAfter, trainingCost, trainingFactor, trainingStatGains, trainingSuccess } from './training.js';
+import { greatTraining, meetTrainingAvailable, practiceMasteryRate, practiceStudyRate, randomSpecialTraining, specialTraining, specialTrainingForm, statAfter, trainingCost, trainingFactor, trainingStatGains, trainingSuccess } from './training.js';
 import { DISCIPLINES, STATS, type Rider, type Career, type GameAction, type Look, type Division, type Season, type Plan, type Discipline, type News, type Family, type Settings, type Stat, type Result } from './types.js';
 
 export class GameError extends Error {}
@@ -87,7 +87,6 @@ function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
   const special=specialTraining(trainingRider,p);
   const skillBefore=special&&(p.action==='dance'||p.action==='trick')?structuredClone(r.skills):undefined;
   const bonuses=gearBonuses(trainingRider);
-  const masteryGain=(id:string,amount:number)=>amount*(1+(SKILL[id]?.family==='dance'?bonuses.danceMastery:bonuses.trickMastery));
   let grade: NonNullable<typeof progress.lastTraining>['grade']='success';
   let practiced:string|undefined;
   if(p.action==='rest') {
@@ -112,7 +111,6 @@ function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
     const missed=form<1-success;
     const great=greatTraining(trainingRider,form);
     const factor=trainingFactor(trainingRider,p,form,great,special);
-    const late=RULES.growth[Math.min(7,r.year-1)];
     const gains=trainingStatGains(trainingRider,p,factor);
     if(p.lesson){
       r.money-=ECONOMY.lesson;
@@ -131,15 +129,15 @@ function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
         difficulty=target.difficulty; mastery=r.skills[target.id]?.mastery??12;
         practiced=target.id;
         const learnedBefore=learned(r.skills,target.id);
-        const gain=RULES.study*factor*late.study*(p.skill?practice.targeted:1)/(1+practice.difficultyCost*(difficulty-1));
-        if(trainSkill(r,target.id,gain,masteryGain(target.id,RULES.mastery*factor*late.mastery))) grade='learned';
+        const gain=practiceStudyRate(r.year,target,Boolean(p.skill))*factor;
+        if(trainSkill(r,target.id,gain,practiceMasteryRate(r.year,target,RULES.mastery,bonuses)*factor)) grade='learned';
         else if(learnedBefore&&!great) grade='mastery';
         names.push(`${target.name} · ${learned(r.skills,target.id)?'숙련도 '+r.skills[target.id].mastery+'%':'학습 '+r.skills[target.id].study+'%'}.`);
       }
       const ready=candidates.filter(s=>s.id!==target?.id&&learned(r.skills,s.id));
       if(!p.skill && ready.length) {
         const first=Math.floor(rng()*ready.length);
-        for(const s of [...ready.slice(first),...ready.slice(0,first)].slice(0,2)) trainSkill(r,s.id,0,masteryGain(s.id,RULES.mastery*factor*late.mastery*.66));
+        for(const s of [...ready.slice(first),...ready.slice(0,first)].slice(0,2)) trainSkill(r,s.id,0,practiceMasteryRate(r.year,s,RULES.mastery,bonuses)*factor*.66);
         names.push('배운 기술의 숙련도가 올랐다.');
         if(grade==='success') grade='mastery';
       }
@@ -147,7 +145,10 @@ function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
     } else if(p.action==='rehearsal'){
       const discipline=p.discipline??'freestyle';
       const ids=trainingRider.routines[discipline].length?trainingRider.routines[discipline]:generateRoutine(trainingRider,discipline,'flow');
-      for(const id of [...new Set(ids)].slice(0,4)) trainSkill(r,id,0,masteryGain(id,practice.rehearsalMastery*factor*late.mastery));
+      for(const id of [...new Set(ids)].slice(0,4)){
+        const skill=SKILL[id];
+        if(skill)trainSkill(r,id,0,practiceMasteryRate(r.year,skill,practice.rehearsalMastery,bonuses)*factor);
+      }
 
       if(!great) grade='mastery';
       practiced=ids[0];

@@ -299,8 +299,8 @@ test('severe injury restricts training and remains treatable even with no money'
 
 test('three disciplines have reproducible bounded runs, and repeats, failed landings matter without stamina penalties',()=>{
   const r=career().rider!;
-  assert.equal(SKILLS.filter(s=>s.family==='dance').length,16);
-  assert.equal(SKILLS.filter(s=>s.family==='trick').length,13);
+  assert.equal(SKILLS.filter(s=>s.family==='dance').length,17);
+  assert.equal(SKILLS.filter(s=>s.family==='trick').length,14);
   for(const d of DISCIPLINES){
     const ids=generateRoutine(r,d,'flow');
     assert.ok(validRoutine(r,d,ids));
@@ -322,20 +322,33 @@ test('three disciplines have reproducible bounded runs, and repeats, failed land
 test('the documented tech tree is reachable and requires every prerequisite to be mastered',()=>{
   const r=career().rider!;
   assert.deepEqual(Object.keys(START_SKILLS),['peter-pan','cross','step-180','pivot','no-comply']);
-  assert.equal(SKILL.pirouette?.name,'피루엣 360');
+  assert.equal(SKILL.pirouette?.name,'피루엣');
+  assert.equal(SKILL.sidewinder?.difficulty,1);
+  for(const [id,requires] of Object.entries({
+    pendulum:['wood'],'mango-pendulum':['pendulum','mango'],
+    'v-spin':['peter-pan','sidewinder','step-360'],
+    pirouette:['piglet'],'pirouette-540':['pirouette'],'pirouette-720':['pirouette-540'],p2p:['pirouette'],
+    kickflip:['ollie'],ollie:[],'pop-shuvit':[],
+  }))assert.deepEqual(SKILL[id]?.requires,requires,id);
   assert.deepEqual(SKILLS.filter(s=>s.trickSide==='nose').map(s=>s.id),['pivot','shuvit','no-com-big','bigspin','bigger']);
-  assert.equal(SKILLS.filter(s=>s.trickSide==='tail').length,8);
+  assert.equal(SKILLS.filter(s=>s.trickSide==='tail').length,9);
   const reached=new Set<string>();
   for(const skill of SKILLS){
     assert.equal(new Set(skill.requires).size,skill.requires.length,skill.id);
     assert.ok(skill.requires.every(id=>reached.has(id)),`Invalid, cyclic, or out-of-order prerequisite for ${skill.id}`);
     reached.add(skill.id);
   }
-  assert.equal(reached.size,29);
-  assert.equal(nextSkillTraining(r,'trick')?.id,'pivot');
+  assert.equal(reached.size,31);
+  assert.equal(nextSkillTraining(r,'trick')?.id,'ollie');
+  assert.ok(canStudy(r,'pop-shuvit'));
+  assert.equal(canStudy(r,'kickflip'),false);
+  r.skills.ollie={study:100,mastery:99.9};
+  assert.equal(canStudy(r,'kickflip'),false);
+  r.skills.ollie.mastery=100;
+  assert.ok(canStudy(r,'kickflip'));
   assert.equal(canStudy(r,'shuvit'),false);
   r.skills.pivot.mastery=100;
-  assert.equal(nextSkillTraining(r,'trick')?.id,'shuvit');
+  assert.ok(canStudy(r,'shuvit'));
   r.skills.kickflip={study:100,mastery:100};
   r.skills['pop-shuvit']={study:100,mastery:99.9};
   assert.equal(canStudy(r,'varial'),false);
@@ -343,6 +356,41 @@ test('the documented tech tree is reachable and requires every prerequisite to b
   assert.equal(canStudy(r,'varial'),true);
   r.skills.kickflip.mastery=99.9;
   assert.equal(canStudy(r,'varial'),false);
+});
+
+test('technique practice previews match actual gains and harder moves build mastery more slowly',()=>{
+  let previousStudy=Infinity,previousMastery=Infinity;
+  for(const id of ['sidewinder','pirouette','p2p','pirouette-720']){
+    const c=career(),r=c.rider!;
+    const p={action:'dance',skill:id,spot:'river'} as const;
+    r.energy=100;
+    r.trainingOffer=null;
+    const study=previewTraining(r,p).skill!;
+    assert.ok(study.max<previousStudy,id);
+    previousStudy=study.max;
+    r.skills[id]={study:100,mastery:30};
+    r.trainingOffer='dance';
+    const mastery=previewTraining(r,p).skill!;
+    assert.ok(mastery.max<previousMastery,id);
+    assert.equal(mastery.min,mastery.max);
+    previousMastery=mastery.max;
+    command(c,{type:'plan',plan:p},identity);
+    assert.ok(processWeek(c));
+    assert.equal(Number((r.skills[id].mastery-30).toFixed(1)),mastery.max,id);
+  }
+});
+
+test('version 4 run replays retain the old Sidewinder difficulty and only current rules admit the new moves',()=>{
+  const r=career().rider!;
+  r.skills.sidewinder={study:100,mastery:35};
+  const landing=chance(r,SKILL.sidewinder!)-.03;
+  assert.equal(simulateRun(r,'dance',['sidewinder'],()=>landing,4).log[0].outcome,'miss');
+  assert.equal(simulateRun(r,'dance',['sidewinder'],()=>landing).log[0].outcome,'rough');
+  for(const id of ['p2p','ollie']){
+    r.skills[id]={study:100,mastery:35};
+    assert.throws(()=>simulateRun(r,'freestyle',[id],()=>0,4));
+    assert.equal(simulateRun(r,'freestyle',[id],()=>0).log[0].outcome,'great');
+  }
 });
 
 test('NPC instruction grants a skill once, and it stays available in lessons, auto training and lines',()=>{

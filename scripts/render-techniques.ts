@@ -10,7 +10,7 @@ await prepareCharacterReview();
 
 const folder=resolve('.longboard/animation-review');await mkdir(folder,{recursive:true});
 const frames=[.07,.26,.4,.53,.67,.86,1],scale=1.3,cellWidth=ACTOR_WIDTH*scale,cellHeight=ACTOR_HEIGHT*scale+28;
-for(let page=0;page<3;page++){
+for(let page=0;page<Math.ceil(SKILLS.length/10);page++){
   const skills=SKILLS.slice(page*10,page*10+10);
   const sheet=createCanvas(Math.ceil(cellWidth*frames.length),Math.ceil(cellHeight*skills.length)),c=sheet.getContext('2d');
   c.imageSmoothingEnabled=false;c.fillStyle='#253e52';c.fillRect(0,0,sheet.width,sheet.height);
