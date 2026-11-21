@@ -123,20 +123,7 @@ function sourceFrame(model:number,direction:number):SourceFrame{
   if(frames.size>16)frames.delete(frames.keys().next().value!);
   return frame;
 }
-function paintPart(cell:Canvas,frame:SourceFrame,part:Part,slot:number,look:Look){
-  const c=cell.getContext('2d')!,buffer=c.createImageData(SIZE,ATLAS_HEIGHT);
-  const base=originals[frame.model];
-  const shades={...base,skin:1,eyes:0};
-  const picks={...look,hair:look.hairColor??(look.hair<4?look.hair:base.hair)};
-  for(let position=0;position<frame.slots.length;position++){
-    const offset=position*4;
-    if(!frame.pixels[offset+3]||frame.slots[position]!==slot)continue;
-    buffer.data.set(frame.pixels.subarray(offset,offset+4),offset);
-    const material=frame.materials[position] as Material,role=swatches[material];
-    if(role==='fixed')continue;
-    const picked=picks[role];
-    if(picked!==undefined&&picked!==shades[role])recolor(buffer.data,offset,rgbPalettes[role][picked],rgbPalettes[role][shades[role]],material);
-  }
+function paintPart(frame:SourceFrame,part:Part,slot:number,look:Look){
   const {neck,hip,knee,ankle,center,faceScale}=frame;
   const upper={from:neck,to:NECK,scale:(HIP-NECK)/(hip-neck)};
   const thigh={from:hip,to:HIP,scale:(KNEE-HIP)/(knee-hip)};
@@ -145,10 +132,35 @@ function paintPart(cell:Canvas,frame:SourceFrame,part:Part,slot:number,look:Look
   const head={from:neck,to:NECK,scale:faceScale};
   const placement=part==='head'?head:part.startsWith('thigh')?thigh:part.startsWith('shin')?shin:part.startsWith('shoe')?shoe:upper;
   const widthScale=part==='head'?faceScale:1;
+  const left=CENTER-center*widthScale,top=placement.to-placement.from*placement.scale;
   const out=factory!(SIZE,HEIGHT),context=out.getContext('2d')!;
-  context.imageSmoothingEnabled=false;
-  c.putImageData(buffer,0,0);
-  context.drawImage(cell,CENTER-center*widthScale,placement.to-placement.from*placement.scale,SIZE*widthScale,ATLAS_HEIGHT*placement.scale);
+  const buffer=context.createImageData(SIZE,HEIGHT),data=buffer.data;
+  const base=originals[frame.model],shades={...base,skin:1,eyes:0};
+  const picks={...look,hair:look.hairColor??(look.hair<4?look.hair:base.hair)};
+
+  // Sample the atlas on the destination pixel grid and upload each part once.
+  // No draw depends on a scratch canvas that is overwritten for the next part.
+  const columns=Array.from({length:SIZE},(_,x)=>Math.floor((x+.5-left)/widthScale));
+  for(let y=0;y<HEIGHT;y++){
+    const sourceY=Math.floor((y+.5-top)/placement.scale);
+    if(sourceY<0||sourceY>=ATLAS_HEIGHT)continue;
+    for(let x=0;x<SIZE;x++){
+      const sourceX=columns[x];
+      if(sourceX<0||sourceX>=SIZE)continue;
+      const index=sourceY*SIZE+sourceX,source=index*4;
+      if(frame.slots[index]!==slot||!frame.pixels[source+3])continue;
+      const target=(y*SIZE+x)*4;
+      data[target]=frame.pixels[source];
+      data[target+1]=frame.pixels[source+1];
+      data[target+2]=frame.pixels[source+2];
+      data[target+3]=frame.pixels[source+3];
+      const material=frame.materials[index] as Material,role=swatches[material];
+      if(role==='fixed')continue;
+      const picked=picks[role];
+      if(picked!==undefined&&picked!==shades[role])recolor(data,target,rgbPalettes[role][picked],rgbPalettes[role][shades[role]],material);
+    }
+  }
+  context.putImageData(buffer,0,0);
   return out;
 }
 export function loadCharacterSprites(){
@@ -175,11 +187,10 @@ function styledFrame(look:Look,direction:number):Frame{
   const existing=cache.get(key);if(existing)return existing;
   const models=sourceModels(look),body=sourceFrame(models.body,direction);
   const sources={head:sourceFrame(models.head,direction),body,bottom:sourceFrame(models.bottom,direction),shoe:sourceFrame(models.shoe,direction)};
-  const cell=factory!(SIZE,ATLAS_HEIGHT);
   const images={} as Record<Part,Canvas>;
   for(const [slot,part] of parts.entries()){
     const frame=slot===0?sources.head:slot<4?sources.body:slot<8?sources.bottom:sources.shoe;
-    images[part]=paintPart(cell,frame,part,slot,look);
+    images[part]=paintPart(frame,part,slot,look);
   }
   const front=direction!==0?styledFrame(look,0):undefined;
   const result={neck:NECK,hip:HIP,knee:KNEE,ankle:ANKLE,side:body.side,parts:images,handEnds:front?.handEnds??body.handEnds,armArt:front?.parts??images,torsoUnderlay:body.side?front!.parts.torso:undefined};

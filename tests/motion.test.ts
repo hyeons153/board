@@ -13,7 +13,7 @@ import { createCanvas,loadImage } from '@napi-rs/canvas';
 import { BOARDS, BOTTOMS, DEFAULT_LOOK, FOOTWEAR, HAIR_COLORS, HAIR_STYLES, LOOK_PRESETS, OUTFITS, PANTS, SHIRTS, SHOES, SKILLS, SKINS } from '../src/game/data';
 import { lineTerms, RIVALS } from '../src/game/content';
 import { paintRider } from '../src/scene/rider';
-import { paintSpriteCharacter } from '../src/scene/spriteCharacter';
+import { installCharacterSprites, paintSpriteCharacter } from '../src/scene/spriteCharacter';
 import { NEW_GEAR } from '../src/game/equipmentCatalog';
 import { equippedLook, freshExtras } from '../src/game/economy';
 import { ACTOR_HEIGHT, ACTOR_OFFSET, ACTOR_WIDTH, TECHNIQUES, basicPose, boardPoint, headingsBefore, techniquePose, trainingTechnique } from '../src/scene/techniques';
@@ -34,6 +34,36 @@ test('idle artwork retains the supplied sprite body proportions and every opaque
   for(let i=0;i<b.length;i+=4)if(b[i+3]===255){total++;if(a[i]===b[i]&&a[i+1]===b[i+1]&&a[i+2]===b[i+2])same++;}
   assert.ok(total>10000,'The detailed original body must be present');
   assert.ok(same/total>.995,`Original artwork must survive the idle pose: ${same}/${total}`);
+});
+
+test('registration and makeover sprites retain each head and both shoes across costume changes',async()=>{
+  const atlas=await loadImage('public/art/characters/riders-v2.png');
+  installCharacterSprites(atlas as unknown as CanvasImageSource,(width,height)=>{
+    const canvas=createCanvas(width,height);
+    const c=canvas.getContext('2d'),write=c.putImageData.bind(c);
+    let written=false;
+    c.putImageData=(pixels,x,y)=>{
+      assert.equal(written,false,'A part surface must stay unchanged after its first upload');
+      written=true;
+      write(pixels,x,y);
+    };
+    return canvas as unknown as HTMLCanvasElement;
+  });
+  try{
+    const preview=createCanvas(256,ACTOR_HEIGHT*2),context=preview.getContext('2d');
+    const looks=[...LOOK_PRESETS.male,...LOOK_PRESETS.female,...RIVALS.map(npc=>npc.look)];
+    for(const look of [...looks,...looks.slice().reverse()]){
+      paintRider(context as unknown as CanvasRenderingContext2D,look,'rest',0);
+      const head=context.getImageData(64,104,128,72).data;
+      const leftShoe=context.getImageData(74,299,54,11).data;
+      const rightShoe=context.getImageData(128,299,54,11).data;
+      const opaque=(pixels:Uint8ClampedArray)=>pixels.reduce((count,value,i)=>count+Number(i%4===3&&value>200),0);
+      assert.ok(opaque(head)>1000,'Missing head in '+JSON.stringify(look));
+      assert.ok(opaque(leftShoe)>40&&opaque(rightShoe)>40,'Missing shoe in '+JSON.stringify(look));
+    }
+  }finally{
+    await prepareCharacterReview();
+  }
 });
 
 test('raised hoodie sleeves connect both hands to the body instead of leaving floating hands',()=>{

@@ -19,20 +19,23 @@ function mobileActors(parent:HTMLElement,world:HTMLElement,field:HTMLElement){
   const top=(band?.top??hud?.bottom??retirementTitle?.bottom??view.top)+6;
   const below=(band?.bottom??running?.top??retirementActions?.top??view.bottom)-8;
 
-  // Match the centered cover crop of the canvas, then map the clear part of the screen back to Phaser coordinates.
+  // Keep the actor textures in screen coordinates. Only the background uses the cover crop.
   const zoom=Math.max(view.width/WIDTH,view.height/HEIGHT);
-  const offsetX=(view.width-WIDTH*zoom)/2,offsetY=(view.height-HEIGHT*zoom)/2;
+  const offsetY=(view.height-HEIGHT*zoom)/2;
   const referenceHeight=Math.min(world.clientHeight,Math.max(window.innerHeight*.52,world.clientHeight-245));
   const size=Math.min(referenceHeight/HEIGHT*.9,Math.max(0,below-top)/126);
   if(!size)return;
   const guestSize=size*.62;
   const guestX=Math.min(view.width*.76,view.width-12-guestSize*40);
-  const x=(center:number,scale:number)=>(center-offsetX)/zoom-ACTOR_WIDTH/2*scale;
-  const floor=(below-view.top-offsetY)/zoom;
-  const y=(scale:number)=>floor-170*scale;
-  const riderScale=size/zoom,guestScale=guestSize/zoom;
-  return {rider:{x:x(view.width*.39,riderScale),y:y(riderScale),scale:riderScale/2},
-    guest:{x:x(guestX,guestScale),y:y(guestScale),scale:guestScale/2},landscapeY:Math.min(0,Math.round(floor-167))};
+  const floor=below-view.top;
+  const fit=(center:number,scale:number)=>({
+    x:center-ACTOR_WIDTH/2*scale,
+    y:floor-170*scale,
+    width:ACTOR_WIDTH*scale,
+    height:ACTOR_HEIGHT*scale,
+  });
+  return {rider:fit(view.width*.39,size),guest:fit(guestX,guestSize),zoom,
+    landscapeY:Math.min(0,Math.round((floor-offsetY)/zoom-167))};
 }
 
 export async function createStage(parent:HTMLElement,latest:()=>Stage){
@@ -53,17 +56,40 @@ export async function createStage(parent:HTMLElement,latest:()=>Stage){
     private progressAt=0;
     private animationClock:AnimationClock={elapsed:0};
     private mobile?:ReturnType<typeof mobileActors>;
+    private actorLayer?:HTMLDivElement;
     create(){
       this.art=this.textures.createCanvas('pixel-landscape',WIDTH,HEIGHT)!;
-      this.rider=this.textures.createCanvas('pixel-rider',ACTOR_WIDTH*2,ACTOR_HEIGHT*2)!;
-      this.guestArt=this.textures.createCanvas('pixel-guest',ACTOR_WIDTH*2,ACTOR_HEIGHT*2)!;
+      const makeActor=(key:string)=>{
+        const canvas=document.createElement('canvas');
+        canvas.width=ACTOR_WIDTH*2;canvas.height=ACTOR_HEIGHT*2;
+        return this.textures.addCanvas(key,canvas)!;
+      };
+      this.rider=makeActor('pixel-rider');
+      this.guestArt=makeActor('pixel-guest');
       this.landscape=this.add.image(0,0,'pixel-landscape').setOrigin(0,0);
       this.guestSprite=this.add.image(370,84,'pixel-guest').setOrigin(0,0).setScale(.28);
       this.sprite=this.add.image(0,0,'pixel-rider').setOrigin(0,0).setScale(.45);
       const world=parent.closest<HTMLElement>('.console-world'),field=parent.closest<HTMLElement>('.console-field');
       if(world&&field&&latest().variant==='dashboard'){
         const media=matchMedia('(max-width:760px)');
-        const fit=()=>{this.mobile=media.matches?mobileActors(parent,world,field):undefined;};
+        const layer=document.createElement('div'),rider=this.rider.getCanvas(),guest=this.guestArt.getCanvas();
+        layer.className='scene-actors';
+        layer.hidden=true;
+        layer.append(guest,rider);
+        parent.append(layer);
+        this.actorLayer=layer;
+        const fit=()=>{
+          this.mobile=media.matches?mobileActors(parent,world,field):undefined;
+          if(!this.mobile)return;
+          const place=(canvas:HTMLCanvasElement,box:NonNullable<typeof this.mobile>['rider'])=>{
+            canvas.style.width=box.width+'px';
+            canvas.style.height=box.height+'px';
+            canvas.style.left=box.x+'px';
+            canvas.style.top=box.y+'px';
+          };
+          place(rider,this.mobile.rider);
+          place(guest,this.mobile.guest);
+        };
         const observer=new ResizeObserver(fit);
         observer.observe(parent);observer.observe(world);
         const trainingArea=field.querySelector('.console-training-area');
@@ -73,7 +99,7 @@ export async function createStage(parent:HTMLElement,latest:()=>Stage){
           if(actions)observer.observe(actions);
         }
         media.addEventListener('change',fit);
-        this.events.once('shutdown',()=>{observer.disconnect();media.removeEventListener('change',fit);});
+        this.events.once('shutdown',()=>{observer.disconnect();media.removeEventListener('change',fit);layer.remove();});
         fit();
       }
       this.render(performance.now());
@@ -106,16 +132,18 @@ export async function createStage(parent:HTMLElement,latest:()=>Stage){
       const drift=moving?Math.sin(now/1350)*(competition?38:15):0;
       const frame=s.variant==='dashboard'?this.mobile:undefined;
       this.landscape.setY(frame?.landscapeY??0);
-      this.sprite.setScale(frame?.rider.scale??.45);
-      if(frame)this.sprite.setPosition(Math.round(frame.rider.x+drift*.32+lurch*.18),Math.round(frame.rider.y));
-      else this.sprite.setPosition(Math.round(anchor+drift+lurch),16);
-      this.guestSprite.setVisible(!!s.guest);
+      if(this.actorLayer)this.actorLayer.hidden=!frame;
+      this.sprite.setVisible(!frame);
+      if(frame){
+        const shift=Math.round((drift*.32+lurch*.18)*frame.zoom);
+        this.rider.getCanvas().style.transform=`translateX(${shift}px)`;
+        this.guestArt.getCanvas().hidden=!s.guest;
+      }else this.sprite.setPosition(Math.round(anchor+drift+lurch),16);
+      this.guestSprite.setVisible(!!s.guest&&!frame);
       if(s.guest){
         paintRider(this.guestArt.getContext(),s.guest,s.variant==='event'?'rest':'ride',now);
         this.guestArt.refresh();
-        this.guestSprite.setScale(frame?.guest.scale??.28);
-        if(frame)this.guestSprite.setPosition(Math.round(frame.guest.x),Math.round(frame.guest.y));
-        else this.guestSprite.setPosition(s.variant==='event'?298:348,s.variant==='event'?73:79);
+        if(!frame)this.guestSprite.setPosition(s.variant==='event'?298:348,s.variant==='event'?73:79);
       }
     }
   }
