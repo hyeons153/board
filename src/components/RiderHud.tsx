@@ -140,7 +140,7 @@ export function RiderHud({r,preview,interactive,recentTraining}:{r:Rider;preview
       :<dl><div><dt>최대 체력</dt><dd>100</dd></div></dl>;
   } else if(active==='money') {
     detail=preview?.money?<dl><div><dt>예상 비용</dt><dd className="hud-estimate">₩{(-preview.money).toLocaleString('ko-KR')}</dd></div></dl>
-      :<p>장비 구매와 개인 레슨에 사용해요.</p>;
+      :<p>장비 구매와 외형 변경에 사용해요.</p>;
   } else if(active==='fame') {
     detail=<p>대회와 이야기에서 쌓는 인지도예요. 스폰서 계약과 야간 광장 해금에 쓰여요.</p>;
   } else if(active) {

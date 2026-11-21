@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Package, Volume2, VolumeX } from 'lucide-react';
 import { STAT_NAMES } from '../game/data';
 import { BASIC_SLOTS, RARITIES, RARITY_NAMES, type Effects, type Gear, type GearSlot } from '../game/equipmentCatalog';
-import { ECONOMY, effectiveStats, equipmentStats, equipmentUnlocked, extras, GEAR, GEAR_NAMES, GEAR_SLOTS, ITEM, resaleValue, STARTER_IDS, unlockText } from '../game/economy';
+import { effectiveStats, equipmentStats, equipmentUnlocked, extras, GEAR, GEAR_NAMES, GEAR_SLOTS, ITEM, resaleValue, STARTER_IDS, unlockText } from '../game/economy';
 import { STATS, type GameAction, type Rider } from '../game/types';
 import { PixelRider } from './Appearance';
 import { equippedLook } from '../game/economy';
@@ -32,7 +32,7 @@ export default function EquipmentPanel({r,send,saving}:{r:Rider;send:Submit;savi
   const [ownership,setOwnership]=useState<'all'|'owned'|'equipped'>('all'),[selected,setSelected]=useState<string>();
   const [sound,setSound]=useState(soundsEnabled);
   const [feedback,setFeedback]=useState('');
-  const disabled=saving||r.phase==='retired',available=r.money-(r.plan?.lesson?ECONOMY.lesson:0);
+  const disabled=saving||r.phase==='retired',available=r.money;
   const isEquipped=(id:string)=>Object.values(progress.equipped).includes(id)||(progress.accessories??[]).includes(id);
   const chosenButton=useRef<HTMLButtonElement|null>(null);
   const detail=useRef<HTMLElement|null>(null);

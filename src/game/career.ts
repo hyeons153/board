@@ -2,7 +2,6 @@ import { ACTION_NAMES, ACTION_STORIES, calendarFor, DISCIPLINE_NAMES, LOCATIONS,
 import { generateRoutine, learned, simulateMeet, validRoutine } from './competition.js';
 import { autoChoice, eventCast, eventChoiceAvailable, eventFor, eventPaused, pickEvent } from './events.js';
 import { jointDiscovery, jointEnergySaving, jointInjuryFactor, jointTrainingFor, jointTrainingLabel, jointTrainingOffer } from './jointTraining.js';
-import { ensureObjectives, objectiveTrainingPlan, settleObjectives } from './objectives.js';
 import { canStudy, nextSkillTraining } from './skillTree.js';
 import { chooseEnding, honors, mentorFrom } from './legacy.js';
 import { RUN_PROOF_VERSION } from './public.js';
@@ -74,15 +73,14 @@ export function validatePlan(r:Rider,p:Plan) {
   if(p.action==='rehearsal'&&p.spot!=='arena') throw new GameError('대회 연습장에서만 라인 리허설을 할 수 있어요.');
   if(p.discipline&&p.action!=='rehearsal') throw new GameError('종목 선택은 라인 리허설에만 사용해요.');
   if (p.skill && (SKILL[p.skill]?.family!==p.action||!canStudy(r,p.skill))) throw new GameError('아직 연마할 수 없는 기술이에요.');
-  if(p.lesson&&(!p.skill||!['studio','night','arena'].includes(p.spot)||r.money<ECONOMY.lesson))
-    throw new GameError('레슨은 실내·야간·대회 연습장에서 기술을 지정하고 레슨비를 확보해야 해요.');
 }
 function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
   const before={energy:r.energy,stats:{...r.stats}};
   const rng=seeded(r.seed,r.year,r.week,'training');
   const injuryBefore=r.injury;
   r.spot=p.spot;
-  r.lastPlan=p;
+  r.lastPlan={...p};
+  Reflect.deleteProperty(r.lastPlan,'lesson');
   const names:string[]=[];
   const progress=r.extras=upgradeEquipment(r.extras??freshExtras());
   const trainingRider=setup?{...r,routines:setup.routines,extras:{...progress,...setup.gear}}:r;
@@ -116,10 +114,6 @@ function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
     const great=greatTraining(trainingRider,form);
     const factor=trainingFactor(trainingRider,p,form,great,special,coaching);
     const gains=trainingStatGains(trainingRider,p,factor,coaching);
-    if(p.lesson){
-      r.money-=ECONOMY.lesson;
-      names.push(`레슨비 ₩${ECONOMY.lesson.toLocaleString('ko-KR')}.`);
-    }
     grade=missed?'miss':great?'great':'success';
     r.energy=round(clamp(r.energy-trainingCost(trainingRider,p,special,coaching)));
     let difficulty=attempted?.difficulty??1, mastery=attempted?(r.skills[attempted.id]?.mastery??12):60;
@@ -192,7 +186,7 @@ function train(r:Rider,p:Plan,setup?:import('./types.js').TrainingSetup) {
   const changes=STATS.flatMap(stat=>{const gain=round(r.stats[stat]-before.stats[stat]);return gain?[`${STAT_NAMES[stat]} ${gain>0?'+':''}${gain}`]:[];});
   const energy=round(r.energy-before.energy);if(energy)changes.push(`체력 ${energy>0?'+':''}${energy}`);
   if(partner?.affinity)changes.push(`${storyNpcName(partner.npc)} 친밀도 +${partner.affinity}`);
-  changes.push(...names.filter(name=>(skillBefore?/회복|치료비|의료 지원|레슨비|부상|다쳤/:/숙련|학습|회복|치료비|의료 지원|레슨비|부상|다쳤/).test(name)));
+  changes.push(...names.filter(name=>(skillBefore?/회복|치료비|의료 지원|부상|다쳤/:/숙련|학습|회복|치료비|의료 지원|부상|다쳤/).test(name)));
   if(skillBefore)for(const [id,skill] of Object.entries(r.skills)){
     const study=round(skill.study-(skillBefore[id]?.study??0));
     const mastery=round(skill.mastery-(skillBefore[id]?.mastery??0));
@@ -240,7 +234,7 @@ function standardAutoPlan(r:Rider):Plan {
   const s=special??order[0].s;
   return {...base,action:s,spot:s==='speed'?'river':s==='link'?'plaza':'park'};
 }
-function jointAutoPlan(r:Rider):Plan {
+function autoPlan(r:Rider):Plan {
   const base=standardAutoPlan(r);
   if(!isTrainingAction(base.action)||specialTraining(r,base))return base;
   const offer=jointTrainingOffer(r,base.spot);
@@ -258,12 +252,8 @@ function jointAutoPlan(r:Rider):Plan {
   if(benefit<=switchingCost)return base;
   return {action,spot:base.spot,skill:target?.id};
 }
-function autoPlan(r:Rider):Plan {
-  const base=jointAutoPlan(r);
-  return isTrainingAction(base.action)&&!specialTraining(r,base)?objectiveTrainingPlan(r,base):base;
-}
 export function prepareWeek(r:Rider|undefined|null){
-  if(r?.phase==='plan'&&r.settings.mode==='auto'&&!r.plan){ensureObjectives(r);r.plan=autoPlan(r);r.spot=r.plan.spot;}
+  if(r?.phase==='plan'&&r.settings.mode==='auto'&&!r.plan){r.plan=autoPlan(r);r.spot=r.plan.spot;}
 }
 function applyEvent(r:Rider,index:number){
   const e=eventFor(r,r.event??'');
@@ -373,7 +363,6 @@ function applyHappening(r:Rider,event:Happening){
   note(r,'event',event.title+' · '+dialogue.split(/(?<=[.?!])\s/u)[0]);
 }
 function finishWeek(c:Career,r:Rider) {
-  settleObjectives(r);
   if(r.week===RULES.weeks){
     for(const d of DISCIPLINES){
       const place=seasonPlace(r.season.scores[d],'player');
@@ -396,7 +385,6 @@ function finishWeek(c:Career,r:Rider) {
     note(r,'system',`${r.year}년차가 시작됐다. 새 시즌 RP를 쌓아 보자!`);
   } else r.week++;
   r.phase='plan'; r.plan=null; r.entries=null;
-  ensureObjectives(r);
 }
 const podiumStats:Record<Discipline,[Stat,Stat]>={dance:['carve','speed'],trick:['balance','link'],freestyle:['link','carve']};
 
@@ -474,10 +462,9 @@ export function processWeek(c:Career,official=false,setup?:import('./types.js').
   const r=c.rider;
   if(!r||r.phase!=='plan'||(!r.plan&&r.settings.mode==='manual')) return false;
   r.extras=upgradeEquipment(r.extras??freshExtras());
-  ensureObjectives(r);
   let plan=r.plan??autoPlan(r);
   // An unfinished plan saved before the mastery rules can finish as free practice.
-  if(plan.skill&&SKILL[plan.skill]&&!canStudy(r,plan.skill))plan={...plan,skill:undefined,lesson:undefined};
+  if(plan.skill&&SKILL[plan.skill]&&!canStudy(r,plan.skill))plan={...plan,skill:undefined};
   validatePlan(r,plan);
   train(r,plan,setup);
   r.plan=null;
@@ -586,14 +573,13 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
   }
   if(a.type==='trade'||a.type==='unequip'||a.type==='sponsor'||a.type==='makeover'){
     const progress=r.extras ??= freshExtras();
-    const reserve=r.plan?.lesson?ECONOMY.lesson:0;
     if(a.type==='trade'){
       const item=ITEM.get(a.item);
       if(!item) throw new GameError('없는 장비입니다.');
       const owned=progress.inventory.includes(item.id);
       if(a.operation==='buy'){
         if(item.unlock||STARTER_IDS.includes(item.id))throw new GameError('이 아이템은 해금 또는 기본 지급으로 획득합니다.');
-        if(owned||r.money-reserve<item.price) throw new GameError('이미 가진 장비이거나 구매 가능 금액이 부족해요.');
+        if(owned||r.money<item.price) throw new GameError('이미 가진 장비이거나 구매 가능 금액이 부족해요.');
         r.money-=item.price;
         progress.inventory.push(item.id);
         (progress.purchasePrices??={})[item.id]=item.price;
@@ -636,7 +622,7 @@ export function command(c:Career,a:GameAction,identity:()=>{id:string;seed:numbe
     if(a.type==='makeover'){
       const gender=r.look.gender??'male';
       if(a.look.gender!==undefined&&a.look.gender!==gender)throw new GameError('등록한 성별은 바꿀 수 없어요.');
-      if(r.money-reserve<ECONOMY.makeover) throw new GameError('외형 변경 비용이 부족해요.');
+      if(r.money<ECONOMY.makeover) throw new GameError('외형 변경 비용이 부족해요.');
       r.money-=ECONOMY.makeover;
       r.look={...a.look,gender};
     }

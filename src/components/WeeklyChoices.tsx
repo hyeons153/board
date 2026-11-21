@@ -4,7 +4,6 @@ import { ACTION_NAMES, ACTION_STORIES, DISCIPLINE_NAMES, SKILL, SKILLS, STAT_NAM
 import { validatePlan } from '../game/career';
 import { skipsEventChoices } from '../game/events';
 import { jointEffectLabel, jointTrainingLabel, jointTrainingOffer, type JointTraining } from '../game/jointTraining';
-import { currentObjectives, objectiveAwardDialogue, objectiveAwardText, objectiveText, recentObjectiveAwards } from '../game/objectives';
 import { canStudy } from '../game/skillTree';
 import { isTrainingAction, meetTrainingAvailable, previewTraining, randomSpecialTraining } from '../game/training';
 import { ACTIONS, DISCIPLINES, STRATEGIES, type Plan, type Rider } from '../game/types';
@@ -19,16 +18,15 @@ const range=(min:number,max:number)=>min===max?signed(min):signed(min)+' ~ '+sig
 export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true,hidden=false}:{r:Rider;send:Submit;saving:boolean;onPreview?:(plan:Plan|undefined)=>void;pendingChoice?:string;active?:boolean;hidden?:boolean}){
   const [action,setAction]=useState<typeof ACTIONS[number]>();
   const spot=r.plan?.spot??r.spot;
-  const [skill,setSkill]=useState(''),[lesson,setLesson]=useState(false);
+  const [skill,setSkill]=useState('');
   const [skipMeet,setSkipMeet]=useState(false);
   const auto=r.settings.mode==='auto';
   const meetChoice=!auto&&meetTrainingAvailable(r);
   const meetTraining=auto?!!r.plan?.meetTraining:meetChoice&&skipMeet;
   const offer=meetTraining?undefined:randomSpecialTraining(r);
   const joint=jointTrainingOffer(r,spot);
-  useEffect(()=>setLesson(false),[spot]);
-  const choose=(next:typeof ACTIONS[number])=>{setAction(current=>current===next?undefined:next);setSkill('');setLesson(false);};
-  const plan=useMemo<Plan|undefined>(()=>action?{action,spot,...(skill?{skill}:{}),...(lesson?{lesson:true}:{}),...(meetTraining?{meetTraining:true}:{})}:undefined,[action,spot,skill,lesson,meetTraining]);
+  const choose=(next:typeof ACTIONS[number])=>{setAction(current=>current===next?undefined:next);setSkill('');};
+  const plan=useMemo<Plan|undefined>(()=>action?{action,spot,...(skill?{skill}:{}),...(meetTraining?{meetTraining:true}:{})}:undefined,[action,spot,skill,meetTraining]);
   const selected=auto?r.plan:plan;
   const preview=selected?previewTraining(r,selected):undefined;
   const recoveryNote=preview?.recovery
@@ -40,7 +38,6 @@ export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true
   useEffect(()=>()=>onPreview?.(undefined),[onPreview]);
   return <section className={'weekly-choices '+(auto?'is-auto ':'')+(action||pendingChoice?'has-preview':'')} aria-label={auto?'자동 행동 선택':'이번 주 행동 선택'} hidden={hidden}>
     <h2>이번 주엔 무엇을 할까?</h2>
-    <WeeklyObjectives r={r}/>
     {meetChoice&&<div className="weekly-meet-choice" role="group" aria-label="대회 주간 행동">
       <button type="button" disabled={saving} aria-pressed={!skipMeet} onClick={()=>setSkipMeet(false)}>대회 준비</button>
       <button type="button" disabled={saving} aria-pressed={skipMeet} onClick={()=>setSkipMeet(true)}>불참하고 특별훈련</button>
@@ -57,8 +54,7 @@ export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true
     <div className="weekly-selection-slot">
     {auto?<div className="weekly-auto"><strong>{r.plan?ACTION_STORIES[r.plan.action].start:'이번 주 일정을 고르는 중…'}</strong>{preview?.special&&<SpecialTrainingForecast/>}{preview?.joint&&<span className="weekly-joint-label">{preview.special?'함께 훈련하면 친밀도 상승':jointBonus(preview.joint)}</span>}</div>:<>
         {(action==='dance'||action==='trick')&&<div className="weekly-inline-controls" aria-label="행동 설정">
-          <label>연마 목표<select aria-label="연마 목표" value={skill} disabled={saving} onChange={e=>{setSkill(e.target.value);setLesson(false);}}><option value="">자유 연마</option>{SKILLS.filter(s=>s.family===action&&canStudy(r,s.id)).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-          {!!skill&&['studio','night','arena'].includes(spot)&&<label className="weekly-lesson"><input type="checkbox" checked={lesson} disabled={saving} onChange={e=>setLesson(e.target.checked)}/> 개인 레슨</label>}
+          <label>연마 목표<select aria-label="연마 목표" value={skill} disabled={saving} onChange={e=>setSkill(e.target.value)}><option value="">자유 연마</option>{SKILLS.filter(s=>s.family===action&&canStudy(r,s.id)).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
         </div>}
         <footer className="weekly-confirm" aria-label="선택한 행동 확인">
           {plan&&<button className="weekly-cancel" aria-label="선택 취소" disabled={saving} onClick={()=>setAction(undefined)}><X size={15}/></button>}
@@ -77,21 +73,6 @@ export function WeeklyChoices({r,send,saving,onPreview,pendingChoice,active=true
     </>}
     </div>
   </section>;
-}
-
-function WeeklyObjectives({r}:{r:Rider}){
-  const {short,season}=currentObjectives(r);
-  const awards=recentObjectiveAwards(r);
-  return <div className="weekly-objectives" aria-label="육성 목표">
-    {([{label:'단기',goal:short},{label:'시즌',goal:season}]).map(({label,goal})=>goal&&<div className="weekly-objective" key={label}>
-      <b>{label}</b>
-      <span>{goal.steps.map(({target,value},i)=><span key={i}>{objectiveText(target)} <small>{Math.min(value,target.target)}/{target.target}</small></span>)}</span>
-      <strong>{goal.status==='complete'?'달성':goal.status==='expired'?'종료':label==='단기'?`${goal.end-r.week+1}주 남음`:`${goal.steps.filter(step=>step.value>=step.target.target).length}/${goal.steps.length} 달성`}</strong>
-    </div>)}
-    {!!awards.length&&<div className="weekly-objective-awards" role="status">{awards.map(award=><div key={award.scope}>
-      <b>{objectiveAwardText(award)}</b>{objectiveAwardDialogue(r,award)&&<small>{objectiveAwardDialogue(r,award)}</small>}
-    </div>)}</div>}
-  </div>;
 }
 
 export function SpecialTrainingBadge(){return <span className="weekly-special-badge">SPECIAL ×2</span>;}

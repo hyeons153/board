@@ -19,19 +19,19 @@ const nonRomance:Record<string,number>={
 
 const average=(sum:number,samples:number)=>Math.round(sum/Math.max(1,samples)*10)/10;
 const spotTrials=1200;
-for(const [spot,lesson,special] of [['studio',false,false],['night',false,false],['night',true,false],['night',true,true]] as const){
+for(const [spot,special] of [['studio',false],['night',false],['night',true]] as const){
   let mastery=0,injuries=0;
   for(let seed=1;seed<=spotTrials;seed++){
     const rider=newRider('spot-'+seed,seed,'Spot trial',DEFAULT_LOOK);
     Object.assign(rider,{year:4,week:CALENDAR[0].week,energy:80,fame:12,stats:{...rider.stats,balance:45}});
     rider.skills.hardflip={study:100,mastery:40};
     const career:Career={rider,hall:[]};
-    command(career,{type:'plan',plan:{action:'trick',skill:'hardflip',spot,lesson,meetTraining:special?true:undefined}},()=>({id:rider.id,seed}));
+    command(career,{type:'plan',plan:{action:'trick',skill:'hardflip',spot,meetTraining:special?true:undefined}},()=>({id:rider.id,seed}));
     processWeek(career);
     mastery+=rider.skills.hardflip.mastery-40;
     injuries+=Number(!!rider.injury);
   }
-  console.log('spot-trial',JSON.stringify({spot,lesson,special,samples:spotTrials,mastery:average(mastery,spotTrials),injuryPercent:average(100*injuries,spotTrials)}));
+  console.log('spot-trial',JSON.stringify({spot,special,samples:spotTrials,mastery:average(mastery,spotTrials),injuryPercent:average(100*injuries,spotTrials)}));
 }
 
 const energyRanges=[[0,19],[20,39],[40,69],[70,79],[80,100]] as const;
@@ -82,7 +82,6 @@ for(const discipline of DISCIPLINES){
 
 for(const enterOrdinary of [true,false])for(const strategy of STRATEGIES){
   const endings:Record<string,number>={};
-  const objectives={short:{offered:0,completed:0,money:0,affinity:0},season:{offered:0,completed:0,money:0,affinity:0}};
   const totals={rankedMeets:0,wins:0,maxed:0,statTotal:0,scoreSum:0,runs:0,rp:0,money:0,decisions:0,personal:0,crew:0,happenings:0,chapters:0,casual:0};
   const training={weeks:0,regularWeeks:0,rest:0,hospital:0,attempts:0,injuries:0,recovered:0,recoveryWeeks:0,opportunities:0,randomUsed:0,meetUsed:0};
   const years=Array.from({length:RULES.years},()=>({stats:0,learned:0,mastery:0,mastered:0,intermediate:0,advanced:0,expert:0,affinity:0,topAffinity:0}));
@@ -161,13 +160,6 @@ for(const enterOrdinary of [true,false])for(const strategy of STRATEGIES){
     }
     const [archive]=career.hall;
     if(!archive||archive.records.length!==48||!archive.records.every(meet=>meet.id.startsWith('international-')?meet.results.length===3:meet.results.length<=1)) throw new Error('Incomplete retirement ledger');
-    const goals=archive.extras?.objectives;
-    if(!goals||goals.seasonTotals.offered!==RULES.years||goals.shortTotals.completed>goals.shortTotals.offered||goals.seasonTotals.completed>goals.seasonTotals.offered)
-      throw new Error('Invalid objective ledger');
-    for(const [scope,row] of [['short',goals.shortTotals],['season',goals.seasonTotals]] as const){
-      objectives[scope].offered+=row.offered;objectives[scope].completed+=row.completed;
-      objectives[scope].money+=row.money;objectives[scope].affinity+=row.affinity;
-    }
     const outcome=chooseEnding(archive).kind;
     endings[outcome]=(endings[outcome]??0)+1;
     const summary=summarize(archive);
@@ -201,8 +193,6 @@ for(const enterOrdinary of [true,false])for(const strategy of STRATEGIES){
     }
   }
   console.log(enterOrdinary?'enter':'skip',strategy,JSON.stringify({
-    objectives:Object.fromEntries(Object.entries(objectives).map(([scope,row])=>[scope,{...row,
-      completionPercent:average(100*row.completed,row.offered),moneyPerCareer:average(row.money,count),affinityPerCareer:average(row.affinity,count)}])),
     complete:count,endings,averageMeets:Math.round(totals.rankedMeets/count*10)/10,
     averageWins:Math.round(totals.wins/count*10)/10,averageStat:Math.round(totals.statTotal/count/4*10)/10,
     cappedStats:totals.maxed,averageScore:Math.round(totals.scoreSum/totals.runs*10)/10,

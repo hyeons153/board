@@ -13,7 +13,6 @@ import { HAPPENINGS, pickHappening } from '../src/game/happenings';
 import { NPC_WORKSHOPS, trainingPromiseActive, workshopId, workshopTitle } from '../src/game/npcWorkshops';
 import { ceremonyDuration, eventResultDuration, trainingResultDuration } from '../src/game/autoFlow';
 import { closingSkill, featureMatch, matchPresentation } from '../src/game/matchPresentation';
-import { currentObjectives, ensureObjectives, objectiveTrainingPlan, settleObjectives } from '../src/game/objectives';
 import { CREW_STORIES } from '../src/game/crewStories';
 import { STORY_ARCS } from '../src/game/storyArcs';
 import { activePartners, formerPartners, hasRomanticInterest, storyLog, STORY_NPCS } from '../src/game/storyState';
@@ -28,75 +27,33 @@ const career=():Career=>({rider:newRider(identity().id,identity().seed,'리버',
 const plan=(p:Plan['action']):Plan=>({action:p,spot:'river'});
 const enterAuto=(c:Career)=>command(c,{type:'settings',settings:{mode:'auto',strategy:'freestyle',entries:['freestyle']}},identity);
 
-test('objectives are deterministic for legacy saves and season targets adapt to strategy and past scores',()=>{
-  const r=career().rider!;
-  r.year=4;r.week=6;r.settings={mode:'auto',strategy:'trick',entries:['trick']};
-  const meet=CALENDAR[0];
-  const {results}=simulateMeet(r,meet,['trick']);
-  results[0].run.score=86;
-  r.records.push({id:meet.id,year:3,division:'regular',results});
-  const derived=currentObjectives(r);
-  assert.equal(r.extras!.objectives,undefined,'A read does not migrate the save or hand out rewards');
-  assert.deepEqual(currentObjectives({...r,seed:0}),derived);
-  assert.ok(derived.short&&derived.short.end-r.week>=1&&derived.short.end-r.week<=3);
-  const meetTarget=derived.season!.steps.find(({target})=>target.kind==='meet')!.target;
-  assert.deepEqual(meetTarget,{kind:'meet',discipline:'trick',meet:'international-4',score:86,target:1});
-  const state=ensureObjectives(r);
-  r.settings.strategy='dance';
-  assert.deepEqual(currentObjectives(JSON.parse(JSON.stringify(r))),{short:state.short,season:state.season});
-  assert.equal(state.shortTotals.offered,1);assert.equal(state.seasonTotals.offered,1);
-  state.short!.steps=[{target:{kind:'mastery',skill:'pivot',target:55},value:20}];
-  const base:Plan={action:'trick',spot:'plaza',skill:'shuvit'};
-  assert.equal(objectiveTrainingPlan(r,base).skill,'pivot');
-  r.energy=60;
-  assert.equal(objectiveTrainingPlan(r,base),base);
-});
-
-test('joint and competition objectives are paid once and count actual successes without awarding RP',()=>{
-  const r=career().rider!;
-  r.week=5;r.relations.yu=99.5;
-  const state=ensureObjectives(r);
-  state.short={year:1,end:8,status:'active',npc:'yu',steps:[{target:{kind:'joint',npc:'yu',target:2},value:0}]};
-  state.season={year:1,end:52,status:'active',steps:[{target:{kind:'meet',discipline:'dance',meet:'regular-1',skill:'peter-pan',target:1},value:0}]};
-  const initial=r.money;
-  r.extras!.lastTraining={year:1,week:5,grade:'miss',text:'',joint:{npc:'yu',focus:false,affinity:0}};
-  settleObjectives(r);
-  assert.equal(state.short.steps[0].value,0);
-  for(const week of [6,7]){
-    r.week=week;
-    r.extras!.lastTraining={year:1,week,grade:'success',text:'',joint:{npc:'yu',focus:true,affinity:0}};
-    if(week===7){
-      const {results}=simulateMeet(r,CALENDAR[0],['dance']);
-      results[0].run.log=[{id:'peter-pan',at:0,end:5,outcome:'clean',linked:false,combo:1,points:10}];
-      r.records.push({year:1,id:'regular-1',division:'rookie',results});
-    }
-    const rp=rankingPoints(r);
-    settleObjectives(r);settleObjectives(r);
-    assert.deepEqual(rankingPoints(r),rp);
-  }
-  assert.equal(state.short.status,'complete');assert.equal(state.season.status,'complete');
-  assert.equal(r.money-initial,10200);assert.equal(r.relations.yu,100);
-  assert.equal(state.awards.length,2);assert.equal(state.shortTotals.affinity,.5);
-});
-
-test('expired objectives let the final season retire on time and preserve the archive',()=>{
-  const c=career(),r=c.rider!;
-  r.year=8;r.week=51;r.season.year=8;r.season.division='master';
-  r.settings={mode:'auto',strategy:'freestyle',entries:[]};
-  r.events=Object.fromEntries([...EVENTS,...HAPPENINGS].map(event=>[event.id,1]));
-  const state=ensureObjectives(r);
-  const unreachable={target:{kind:'stat' as const,stat:'speed' as const,target:RULES.statCap},value:r.stats.speed};
-  state.short!.steps=[structuredClone(unreachable)];state.season!.steps=[structuredClone(unreachable)];
-  for(const week of [51,52]){
-    assert.equal(r.week,week);
-    r.plan=plan('rest');
-    assert.ok(processWeek(c));
-  }
-  assert.equal(r.phase,'retired');assert.equal(c.hall[0].reason,'complete');
-  const saved=JSON.parse(JSON.stringify(c.hall[0])) as typeof c.hall[number];
-  assert.equal(saved.extras!.objectives!.short!.status,'expired');
-  assert.equal(saved.extras!.objectives!.season!.status,'expired');
-  assert.equal(saved.extras!.objectives!.awards.length,0);
+test('old saves continue targeted practice for free and keep previously earned rewards',()=>{
+  const normal=career(),r=normal.rider!;
+  r.week=5;
+  r.settings.mode='auto';
+  r.money+=1200;
+  r.relations.yu=12;
+  r.plan={action:'dance',spot:'studio',skill:'mango'};
+  const legacy=structuredClone(normal),saved=legacy.rider!;
+  Object.assign(saved.plan!,{lesson:true});
+  const goal={year:1,end:8,status:'active',npc:'yu',steps:[{target:{kind:'stat',stat:'speed',target:1},value:0}]};
+  const goals={
+    short:structuredClone(goal),season:structuredClone(goal),lastSettled:4,
+    awards:[{year:1,week:4,scope:'short',money:1200,affinity:1,npc:'yu'}],
+    shortTotals:{offered:2,completed:1,money:1200,affinity:1},
+    seasonTotals:{offered:1,completed:0,money:0,affinity:0},
+  };
+  Object.assign(saved.extras!,{objectives:structuredClone(goals)});
+  assert.deepEqual(previewTraining(saved,saved.plan!),previewTraining(r,r.plan));
+  assert.equal(previewTraining(saved,saved.plan!).money,0);
+  assert.ok(processWeek(normal));
+  assert.ok(processWeek(legacy));
+  assert.equal(saved.week,6);
+  assert.equal(saved.money,r.money);
+  assert.deepEqual(saved.relations,r.relations);
+  assert.deepEqual(saved.skills,r.skills);
+  assert.deepEqual(saved.lastPlan,r.lastPlan);
+  assert.deepEqual(Reflect.get(saved.extras!,'objectives'),goals);
 });
 
 test('every season week has a distinct calendar date and existing meets remain in their listed months',()=>{
@@ -195,7 +152,7 @@ test('manual event preference pauses a regular auto choice and skip shortens onl
 
 test('relationship turning points and advanced workshops wait for the player despite event skip',()=>{
   for(const action of [{type:'pulse'},{type:'pulse',background:'hidden'}] as const){
-    for(const eventId of ['relationship-yu-fork','relationship-yu-confession','relationship-yu-partner','career-first-season',workshopId('ha')]){
+    for(const eventId of ['relationship-yu-fork','relationship-yu-confession','relationship-yu-partner',workshopId('ha')]){
       const save=blankSave(),r=career().rider!;
       Object.assign(r,{year:6,week:11,phase:'event',event:eventId,energy:20});
       r.settings={mode:'auto',strategy:'dance',entries:['dance'],skipEvents:true};
@@ -661,7 +618,7 @@ test('run replays retain recorded skill difficulty and only admit skills availab
   assert.equal(simulateRun(r,'dance',['ghostride-kickflip'],()=>0).log[0].end,6);
 });
 
-test('NPC instruction grants a skill once, and it stays available in lessons, auto training and lines',()=>{
+test('NPC instruction grants a skill once, and it stays available in targeted practice, auto training and lines',()=>{
   const c=career(),r=c.rider!;
   r.week=3;r.phase='event';r.event='juns-clip';r.spot='plaza';
   assert.equal(canStudy(r,'front-pop'),false);
@@ -677,7 +634,7 @@ test('NPC instruction grants a skill once, and it stays available in lessons, au
   command(c,{type:'event',index:0},identity);
   assert.deepEqual(r.skills['front-pop'],before);
   r.energy=100;
-  command(c,{type:'plan',plan:{action:'trick',spot:'studio',skill:'front-pop',lesson:true}},identity);
+  command(c,{type:'plan',plan:{action:'trick',spot:'studio',skill:'front-pop'}},identity);
   assert.ok(processWeek(c));
   assert.ok(progress.mastery>before.mastery);
   const focus=career().rider!;
@@ -824,7 +781,7 @@ test('eight consecutive seasons yield 48 distinct meets, promotion, resets, and 
   assert.equal(c.hall[1].reason,'early');
 });
 
-test('equipment, lesson fees, and locked spots are enforced by the career command',()=>{
+test('equipment, free targeted practice, and locked spots are enforced by the career command',()=>{
   const c=career(),r=c.rider!;r.money=1_000_000;
   assert.throws(()=>command(c,{type:'plan',plan:{...plan('trick'),spot:'night'}},identity),GameError);
   assert.throws(()=>command(c,{type:'plan',plan:{...plan('rehearsal'),spot:'arena'}},identity),GameError);
@@ -841,10 +798,10 @@ test('equipment, lesson fees, and locked spots are enforced by the career comman
   assert.equal(equippedLook(r).shoes,3);
   assert.equal(equippedLook(r).deckDesign,1);
   const before=r.money;
-  command(c,{type:'plan',plan:{action:'dance',spot:'studio',skill:'mango',lesson:true}},identity);
+  command(c,{type:'plan',plan:{action:'dance',spot:'studio',skill:'mango'}},identity);
   assert.equal(r.money,before);
   processWeek(c);
-  assert.equal(r.money,before-ECONOMY.lesson+RULES.weeklyAllowance);
+  assert.equal(r.money,before+RULES.weeklyAllowance);
   assert.ok(r.skills.mango.study>0);
 });
 

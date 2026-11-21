@@ -16,7 +16,7 @@ const paired=(r:Rider)=>r.extras?.relationships?.couples?.find(pair=>pair.some(n
 const peers:Record<StoryNpc,StoryNpc>={yu:'ha',ha:'yu',jun:'noa',noa:'jun',sol:'min',min:'sol'};
 const newPair=(r:Rider)=>formerPartners(r).map(npc=>[npc,peers[npc]] as [StoryNpc,StoryNpc])
   .find(pair=>!pair.some(npc=>activePartners(r).includes(npc)||r.extras?.relationships?.couples?.some(couple=>couple.includes(npc))));
-const linkedTeacher=(r:Rider)=>paired(r)?.find(npc=>!formerPartners(r).some(ex=>ex===npc));
+const linkedPartner=(r:Rider)=>paired(r)?.find(npc=>!formerPartners(r).some(ex=>ex===npc));
 const reviewLead=(r:Rider)=>activePartners(r)[0]??rivalry(r);
 const finalCast=(r:Rider)=>[...new Set([...activePartners(r),...formerPartners(r),...known(r)])].slice(0,6);
 
@@ -87,11 +87,14 @@ export const CREW_STORIES:EventDef[]=[
     option('지금은 머리를 식히고 나중에 설명을 듣기로 한다.','크루는 사진을 더 공유하지 않고 네가 준비될 때까지 기다렸다.',r=>record(lead(r),'rumor-distance')),
     option('화이트보드에 사진별 날짜와 인원을 적는다.','민재가 화살표 세 개를 지우자 전혀 다른 두 일정이 나왔다.',r=>record(lead(r),'timeline-board')),
   ]),
-  cross(7,'전 연인의 현 애인이 내 트릭 선생님',r=>name(linkedTeacher(r)??'jun')+'가 시범 도중 “이거 그 사람이 잘했는데”라고 했다. 어느 사람인지는 굳이 확인할 필요도 없었다.',
-  r=>!!linkedTeacher(r)&&!!r.lastPlan?.lesson&&!!r.lastPlan.skill,r=>paired(r)??[],[
+  cross(7,'전 연인의 새 애인과 합동훈련',r=>name(linkedPartner(r)??'jun')+'가 시범 도중 “이거 그 사람이 잘했는데”라고 했다. 어느 사람인지는 굳이 확인할 필요도 없었다.',
+  r=>{
+    const npc=linkedPartner(r),training=r.extras?.lastTraining;
+    return !!npc&&training?.year===r.year&&training.week===r.week&&training.joint?.npc===npc;
+  },r=>paired(r)??[],[
     option('기술에 집중하고 동작을 다시 보여 달라고 한다.','발을 옮길 타이밍부터 다시 짚었다. 이번에는 제대로 보였다.'),
-    option('레슨 중에는 사적인 이야기를 하지 말아 달라고 한다.','레슨은 착지 각도 이야기로 돌아갔고 예전 관계는 더 나오지 않았다.'),
-    option('수업이 끝나면 같은 동작으로 연습전을 하자고 한다.','선생님도 한 번씩 시도해 보자고 했다. 점수표 대신 영상을 남겼다.'),
+    option('연습 중에는 사적인 이야기를 하지 말아 달라고 한다.','두 사람은 다시 착지 각도에 집중했다. 예전 관계는 더 나오지 않았다.'),
+    option('같은 동작을 번갈아 연습해 보자고 한다.','두 사람은 한 번씩 시도하고 서로의 영상을 남겼다.'),
   ],false),
   cross(8,'크루 단톡방 잘못 보냄',r=>activePartners(r).length?
     '한 사람에게 보내려던 메시지가 크루 전체에 올라갔다. 민재가 제일 먼저 “수신인 확인 부탁드립니다”라고 답했다.':

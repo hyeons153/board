@@ -9,13 +9,6 @@
 .status-gauge meter::-moz-meter-bar { background:#a5d5b0; }
 .weekly-choices { position:absolute; z-index:4; bottom:20px; left:clamp(16px,4vw,72px); width:min(520px,calc(100% - 156px)); max-height:calc(100% - 160px); overflow:auto; padding:12px; border:1px solid #d0ddc6; border-radius:10px; color:#25384b; background:#fffcefef; box-shadow:0 8px 35px #0a18296b; backdrop-filter:blur(8px); scrollbar-color:#7d9a83 #eee9dc; }
 .weekly-choices h2 { margin:0 0 9px; font-size:1.05rem; }
-.weekly-objectives { display:grid; gap:3px; margin:0 0 8px; font-size:.68rem; line-height:1.35; }
-.weekly-objective { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:start; gap:6px; padding:4px 6px; background:#edf1e3; border-radius:4px; }
-.weekly-objective > b,.weekly-objective > strong { color:#345b50; white-space:nowrap; }
-.weekly-objective > span { display:flex; flex-wrap:wrap; gap:1px 9px; }
-.weekly-objective small { color:#53665b; white-space:nowrap; }
-.weekly-objective-awards { color:#284d40; background:#e1ebcb; border-radius:4px; padding:4px 6px; }
-.weekly-objective-awards small { display:block; }
 .weekly-action-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
 .weekly-action-grid > button { display:flex; align-items:center; justify-content:center; gap:6px; min-width:0; min-height:42px; padding:6px; color:#2a4350; background:#f9f5e9; border:1px solid #c8cbb6; border-radius:6px; text-align:center; }
 .weekly-action-grid > button > svg { flex:none; color:#567970; }.weekly-action-grid strong { font-size:.8rem; word-break:keep-all; }
@@ -54,7 +47,6 @@
 .weekly-inline-controls { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-top:8px; }
 .weekly-inline-controls > label { display:flex; align-items:center; gap:6px; font-size:.68rem; color:#526c5c; }
 .weekly-inline-controls select { min-height:30px; padding:4px 7px; font-size:.73rem; width:auto; max-width:185px; }
-.weekly-inline-controls .weekly-lesson { gap:5px; }.weekly-lesson input { width:15px; height:15px; }
 .weekly-selection-note,.weekly-blocked { margin:8px 0 0; font-size:.66rem; line-height:1.5; color:#6c735d; }.weekly-blocked { color:#a34231; font-weight:700; }
 .weekly-confirm { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin-top:7px; padding-top:7px; border-top:1px solid #d0d6be; }
 .weekly-confirm > strong { font-size:.8rem; }.weekly-confirm button { display:flex; align-items:center; justify-content:center; gap:5px; min-height:35px; padding:7px 10px; border:1px solid #bbc8a5; border-radius:6px; font-size:.77rem; font-weight:700; }

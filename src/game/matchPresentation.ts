@@ -57,18 +57,14 @@ export function matchPresentation(rider: Rider, record: MeetRecord, result: Resu
     const prevNpc = previous?.run.standings.find(opponent => opponent.id === row.id);
     return !!prevPlayer && !!prevNpc && prevNpc.place < prevPlayer.place;
   }).sort((a, b) => Number(b.id === rival?.id) - Number(a.id === rival?.id) || scoreGap(a) - scoreGap(b))[0];
-  const completedWith = live ? rider.extras?.objectives?.awards?.find(award =>
-    award.year === record.year && award.week === week && award.npc && known.some(row => row.id === award.npc))?.npc : undefined;
-  const supporter = live ? known.filter(row => row.id === completedWith || (rider.relations[row.id] ?? 0) >= 50)
-    .sort((a, b) => Number(b.id === completedWith) - Number(a.id === completedWith) || (rider.relations[b.id] ?? 0) - (rider.relations[a.id] ?? 0))[0] : undefined;
+  const supporter = live ? known.filter(row => (rider.relations[row.id] ?? 0) >= 50)
+    .sort((a, b) => (rider.relations[b.id] ?? 0) - (rider.relations[a.id] ?? 0))[0] : undefined;
   const candidate = supporter ?? (live ? rematch : undefined);
-  const speaker = candidate && (candidate.id === completedWith || close || rematch || featureMatch(record)) &&
+  const speaker = candidate && (close || rematch || featureMatch(record)) &&
     rider.extras?.relationships?.npcs[candidate.id]?.state !== 'ended' ? candidate : undefined;
   const reaction = speaker && isNpc(speaker.id) ? {
     name: speaker.name,
-    line: speaker.id === completedWith
-      ? '함께 준비한 목표를 무대에서 해냈네. 축하해!'
-      : crowdLines[speaker.id][player.place < speaker.place ? 0 : player.place > speaker.place ? 1 : 2],
+    line: crowdLines[speaker.id][player.place < speaker.place ? 0 : player.place > speaker.place ? 1 : 2],
   } : undefined;
   return { player, leader, rival, gap, title, close, tied: !!tied, personalBest, rematch, reaction };
 }

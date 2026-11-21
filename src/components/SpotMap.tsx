@@ -17,7 +17,6 @@ export function SpotMap({r,send,saving,onClose}:{r:Rider;send:Submit;saving:bool
         <span className="spot-map-visitor">자주 오는 라이더 · {regulars.map(npc=>npc.name).join(' · ')}</span>
         {!locked&&<span className="spot-map-extra">이번 주 방문 · {spotVisitor(r,id).name}</span>}
         {id==='night'&&<span className="spot-map-extra">고급 지정 기술 연마 추가 +9%</span>}
-        {['studio','night','arena'].includes(id)&&<span className="spot-map-extra">지정 기술 개인 레슨 가능</span>}
         {locked&&<span className="spot-map-lock">{SPOT_GATE[id]?.hint}</span>}
       </button>;
     })}</div>

@@ -27,7 +27,7 @@ export const actionSchema=z.discriminatedUnion('type',[
   z.strictObject({type:z.literal('continue-meet'),record:z.string().max(140)}),
   z.strictObject({type:z.literal('fast-forward'),enabled:z.boolean()}),
   z.strictObject({type:z.literal('create'),name:z.string().trim().min(1).max(16).regex(/^[\p{L}\p{N} _.-]+$/u),look}),
-  z.strictObject({type:z.literal('plan'),plan:z.strictObject({action:z.enum(ACTIONS),spot:z.enum(SPOTS),intensity:legacyIntensity,skill:skill.optional(),lesson:z.boolean().optional(),discipline:z.enum(DISCIPLINES).optional(),meetTraining:z.literal(true).optional()}).transform(({intensity,...plan})=>plan)}),
+  z.strictObject({type:z.literal('plan'),plan:z.strictObject({action:z.enum(ACTIONS),spot:z.enum(SPOTS),intensity:legacyIntensity,skill:skill.optional(),lesson:z.boolean().optional(),discipline:z.enum(DISCIPLINES).optional(),meetTraining:z.literal(true).optional()}).transform(({intensity,lesson,...plan})=>plan)}),
   z.strictObject({type:z.literal('settings'),settings:z.strictObject({mode:z.enum(['manual','auto']),strategy:z.enum(STRATEGIES),intensity:legacyIntensity,entries:disciplines,pauseStory:z.boolean().optional(),pauseMeet:z.boolean().optional(),pauseInjury:z.boolean().optional(),manualEvents:z.boolean().optional(),skipEvents:z.boolean().optional(),skipMeets:z.boolean().optional(),watchMajor:z.boolean().optional()}).transform(({intensity,...settings})=>settings)}),
   z.strictObject({type:z.literal('entry'),disciplines}),
   z.strictObject({type:z.literal('event'),index:z.number().int().min(0).max(5),eventId:z.string().max(100).optional()}),

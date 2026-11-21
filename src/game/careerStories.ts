@@ -5,7 +5,7 @@ import { meetById } from './data.js';
 
 const chapter=(id:string,year:number,week:number,title:string,body:EventDef['body'],actions:[string,string,string],afters:[string,string,string],when?:(r:Rider)=>boolean)=>
   scene('career-'+id,title,body,r=>(r.year>year||r.year===year&&r.week>=week)&&(!when||when(r)),actions.map((label,i)=>
-    option(label,afters[i],{}, {},i===0?['balanced']:i===1?['dance','freestyle']:['trick'])),{afterMeet:id==='first-score',...(id==='first-season'?{requiresChoice:true}:{})});
+    option(label,afters[i],{}, {},i===0?['balanced']:i===1?['dance','freestyle']:['trick'])),{afterMeet:id==='first-score'});
 
 export const CAREER_STORIES:EventDef[]=[
   chapter('first-score',1,7,'첫 결과표에 남은 것',r=>r.records.some(meet=>meet.results.length)?

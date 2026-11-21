@@ -117,9 +117,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     const created=await handler(new Request('http://127.0.0.1/api/game',{headers:{cookie}}));
     const createdView=await created.json();assert.equal(createdView.career.rider.look.hair,10);assert.equal(createdView.career.rider.look.outfit,1);assert.equal(createdView.career.rider.look.bottom,3);
     const options=win.document.querySelector('[aria-label="이번 주 행동 선택"]')!;
-    const objectives=options.querySelector('[aria-label="육성 목표"]')!;
-    assert.equal(objectives.querySelectorAll('.weekly-objective').length,2);
-    assert.match(objectives.textContent!,/단기.*주 남음.*시즌/);
+    assert.equal(options.querySelector('[aria-label="육성 목표"]'),null);
     assert.equal(options.querySelector('h2')?.textContent,'이번 주엔 무엇을 할까?');
     assert.deepEqual([...options.querySelectorAll('.weekly-action-grid strong')].map(label=>label.textContent),
       ['속도','카빙','연계','밸런스','댄싱','트릭','휴식','병원 치료']);
@@ -294,7 +292,7 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.equal(win.document.querySelectorAll('.weekly-action-grid > button').length,8);
     assert.equal(win.document.querySelector('.weekly-preview'),null,'Do not open a second detail panel');
     await openHud('energy');
-    assert.match(win.document.querySelector('.hud-popover [aria-label="예상 체력 변화"]')!.textContent!,/100 → 83/);
+    assert.ok(win.document.querySelector('.hud-popover [aria-label="예상 체력 변화"]')!.textContent!.startsWith(createdView.career.rider.trainingOffer==='speed'?'100 → 100':'100 → 83'));
     await closeHud();
     assert.equal(win.document.querySelector('.hud-popover'),null);
     assert.equal(win.document.querySelector('select[aria-label="훈련 강도"]'),null);
@@ -363,6 +361,13 @@ test('one game frame previews choices on the existing HUD before confirmation, t
     assert.equal(win.document.querySelectorAll('.weekly-special-card').length,6);
     assert.match(win.document.querySelector('.weekly-special-forecast')!.textContent!,/100% · 체력 소모 0 · 성장 ×2/);
     assert.equal(selected?.meetTraining,true);
+    const practice={...rider,week:2,spot:'studio' as const};
+    await act(async()=>root.render(createElement(WeeklyChoices,{key:'studio-ui',r:practice,send:async()=>true,saving:false,onPreview:plan=>{selected=plan;}})));
+    await click('트릭 연마 선택');
+    const target=win.document.querySelector<HTMLSelectElement>('select[aria-label="연마 목표"]')!;
+    await act(async()=>{target.value='ollie';target.dispatchEvent(new win.Event('change',{bubbles:true}));});
+    assert.equal(selected?.skill,'ollie');
+    assert.equal(win.document.querySelector('.weekly-inline-controls input[type="checkbox"]'),null);
     const focused=Array.from({length:80},(_,i)=>{
       const candidate=newRider('focus-ui-'+i,71,'Focus rider',DEFAULT_LOOK);
       Object.assign(candidate,{spot:'park',trainingOffer:null,week:2});

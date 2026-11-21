@@ -1,5 +1,5 @@
 import { calendarFor, LOCATIONS, RULES, SKILL } from './data.js';
-import { ECONOMY, gearBonuses } from './economy.js';
+import { gearBonuses } from './economy.js';
 import { jointEnergySaving, jointMasteryFactor, jointStatFactor, jointStats, jointTrainingFor, type JointTraining } from './jointTraining.js';
 import { clamp, round, seeded } from './random.js';
 import { learned } from './skillTree.js';
@@ -51,7 +51,7 @@ export function trainingFactor(r:Rider,p:Plan,form:number,great=false,special?:S
   const technique=['dance','trick','rehearsal'].includes(p.action);
   const growthBonus=special?2:(1+.30*clamp((40-r.energy)/40,0,1))*(joint?.growth??1);
   return spotBoost*advanced*(.72+.0028*r.energy)*health*(technique?1+gearBonuses(r).practice:1)
-    *(p.lesson?RULES.practice.lesson:1)*(great?1.22:.91+form*.19)*growthBonus;
+    *(great?1.22:.91+form*.19)*growthBonus;
 }
 export function trainingStatGains(r:Rider,p:Plan,factor:number,joint?:JointTraining):Partial<Record<Stat,number>>{
   const late=RULES.growth[Math.min(7,r.year-1)],gains:Partial<Record<Stat,number>>={};
@@ -83,7 +83,7 @@ export function previewTraining(r:Rider,p:Plan){
   const coaching=special?undefined:joint;
   const recovery=p.action==='rest'||p.action==='hospital',success=trainingSuccess(r,p,special);
   const energyAfter=round(clamp(r.energy+(p.action==='rest'?RULES.restEnergy+gearBonuses(r).rest:p.action==='hospital'?24:-trainingCost(r,p,special,coaching))));
-  const money=(p.action==='hospital'?-Math.min(r.money,RULES.hospitalFee):p.lesson?-ECONOMY.lesson:0)||0;
+  const money=p.action==='hospital'&&r.money>0?-Math.min(r.money,RULES.hospitalFee):0;
   const form=special?specialTrainingForm(r):undefined;
   const minFactor=form===undefined?trainingFactor(r,p,1-success,false,undefined,coaching):trainingFactor(r,p,form,greatTraining(r,form),special);
   const maxFactor=special?minFactor:trainingFactor(r,p,1,greatTraining(r,1),undefined,coaching);

@@ -8,7 +8,7 @@ export type { GearSlot, Gear, Effects } from './equipmentCatalog.js';
 export type Bonus = { danceLink?: number; trickLand?: number; carve?: number; speed?: number; practice?: number; fatigue?: number };
 export const GEAR_NAMES: Record<GearSlot,string> = { deck:'데크', trucks:'트럭', wheels:'휠', accessory:'액세서리' };
 export const ECONOMY = {
-  lesson:18_000, makeover:12_000, sellRate:.55, participation:4_000, podiumSeason:[60_000,40_000,25_000],
+  makeover:12_000, sellRate:.55, participation:4_000, podiumSeason:[60_000,40_000,25_000],
   achievements:{ learn:35_000, meet:25_000, win:80_000, variety:65_000 },
 } as const;
 
@@ -35,7 +35,6 @@ export type CareerExtras = {
   relationships?:RelationshipHistory;
   storyReadyAt?:Partial<Record<string,number>>;
   jointSessions?:Partial<Record<import('./jointTraining.js').TrainingNpc,number>>;
-  objectives?:import('./objectives.js').ObjectiveState;
   timeline: { year:number; week:number; title:string; text:string }[];
   lastEvent?:import('./types.js').EventOutcome;
   lastTraining?: { reaction?:string; special?:import('./training.js').SpecialTraining; joint?:import('./jointTraining.js').JointTrainingResult; grade:'success'|'great'|'learned'|'mastery'|'miss'|'injury'|'recovery'; text:string; narration?:string; changes?:string[]; skill?:string; year:number; week:number };

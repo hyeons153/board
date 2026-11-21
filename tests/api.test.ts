@@ -3,13 +3,19 @@ import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';
 import { mkdtemp, readdir, rmdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createHandler } from '../server/http';
+import { actionSchema, createHandler } from '../server/http';
 import { advance, blankSave } from '../server/clock';
 import { localStore } from '../server/store';
 import { AUTO_FLOW, BOARDS, BOTTOMS, DEFAULT_LOOK, EYE_COLORS, FOOTWEAR, HAIR_COLORS, HAIR_STYLES, OUTFITS, PANTS, SHIRTS, SHOES, SKINS } from '../src/game/data';
 import { ECONOMY, playerPlace } from '../src/game/economy';
 import { randomSpecialTraining } from '../src/game/training';
 import type { View } from '../src/game/types';
+
+test('a cached client submitting the removed lesson flag still starts ordinary practice',()=>{
+  assert.deepEqual(actionSchema.parse({
+    type:'plan',plan:{action:'dance',spot:'studio',skill:'mango',lesson:true},
+  }),{type:'plan',plan:{action:'dance',spot:'studio',skill:'mango'}});
+});
 
 test('hidden auto mode follows server deadlines, keeps full competition records and resumes the visible flow',()=>{
   const identity=()=>({id:'background-rider',seed:73}),tab=randomUUID();

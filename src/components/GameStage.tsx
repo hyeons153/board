@@ -6,7 +6,6 @@ import { ceremonyDuration, eventResultDuration, trainingResultDuration } from '.
 import { closingSkill, featureMatch, matchPresentation, skipsMatch } from '../game/matchPresentation';
 import { eventBody, eventCast, eventChoiceAvailable, eventFor, eventNpc, eventPaused } from '../game/events';
 import { jointTrainingFor, jointTrainingLabel } from '../game/jointTraining';
-import { currentObjectives, objectiveText } from '../game/objectives';
 import { RIVAL, affinityTerms, lineTerms } from '../game/content';
 import { equippedLook, gearBonuses } from '../game/economy';
 import { formatRP, meetRP, validRP } from '../game/rp';
@@ -91,13 +90,10 @@ function Entry({r,send,saving,active}:{r:Rider;send:Submit;saving:boolean;active
   const locked=!meet.international&&r.injury?.severity==='major'&&!r.injury.treated;
   const fatigue=gearBonuses(r).fatigue;
   const cost=entries.reduce((sum,d)=>sum+RULES.entryCost[d]-fatigue,0);
-  const {short}=currentObjectives(r);
-  const objective=short?.status==='active'?short.steps.find(({target})=>target.kind==='meet'&&target.meet===meet.id):undefined;
   return <div className="game-dialogue" role="region" aria-label="대회 출전 선택" ref={dialogue} tabIndex={-1}>
     <div className="game-caption"><Flag size={16}/> {r.year}년차 · {DIVISION_NAMES[divisionFor(r.year)]} · {meet.international?'국제대회':meet.major?'메이저 대회':'정규 대회'}</div><h2>{meet.name}</h2>
     <p>{meet.international?`${meet.host} · 부문 졸업 무대입니다. 댄싱·트릭·프리스타일 모두 출전합니다.`:'댄싱·트릭·프리스타일 중 1종목만 골라 출전하세요.'}</p>
     <p>{locked?'출전하려면 먼저 중상을 치료해야 해요.':'체력 0에서도 출전할 수 있어요. 기술 성공률과 점수는 체력과 관계없어요.'}</p>
-    {objective&&<p className="game-reward">단기 목표 · {objectiveText(objective.target)}</p>}
     <div className={'game-disciplines'+(meet.international?' is-required':'')}>{DISCIPLINES.map(d=><button key={d} disabled={saving||locked||meet.international} aria-pressed={entries.includes(d)} onClick={()=>setEntries([d])}><span>{DISCIPLINE_NAMES[d]}</span><small>체력 −{RULES.entryCost[d]-fatigue}</small>{entries.includes(d)&&<b>{meet.international?entries.indexOf(d)+1:'선택'}</b>}</button>)}</div>
     <p className="game-hint">{entries.map(d=>DISCIPLINE_NAMES[d]).join(' → ')||'종목을 선택해 주세요'} · 체력 {Math.round(r.energy)} / 소모 {cost} · 종목별 1위 {formatRP(meetRP(1,meet.major))}</p>
     <div className="game-actions">{!meet.international&&<button className="game-quiet" disabled={saving} onClick={()=>void send({type:'entry',disciplines:[]})}>출전 취소</button>}<button disabled={saving||locked||!entries.length} onClick={()=>void send({type:'entry',disciplines:entries})}>경기장 입장 <ArrowRight size={15}/></button></div>

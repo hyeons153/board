@@ -16,7 +16,6 @@ export default function Workshop({r,send,saving,lookDraft,onLookDraft}:{r:Rider;
   const look=lookDraft??r.look;
   const active=SPONSOR.get(progress.contract?.id??'');
   const disabled=saving||r.phase==='retired';
-  const available=r.money-(r.plan?.lesson?ECONOMY.lesson:0);
   const changed=JSON.stringify(look)!==JSON.stringify(r.look);
   return <div className="stack workshop">
     <div className="game-toolbar" role="group" aria-label="상점 메뉴">
@@ -48,7 +47,7 @@ export default function Workshop({r,send,saving,lookDraft,onLookDraft}:{r:Rider;
           {progress.equipped.deck&&<p className="subtle"><Settings2 size={14}/> 장착한 데크의 디자인이 기본 데크 디자인보다 먼저 표시됩니다.</p>}
         </div>
       </div>
-      <div className="bottom-actions"><button className="button primary" disabled={disabled||!changed||available<ECONOMY.makeover}
+      <div className="bottom-actions"><button className="button primary" disabled={disabled||!changed||r.money<ECONOMY.makeover}
         onClick={async()=>{if(await send({type:'makeover',look}))onLookDraft(undefined);}}><Sparkles size={15}/> 적용 {money(ECONOMY.makeover)}</button></div>
     </section>}
   </div>;
